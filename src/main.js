@@ -9,10 +9,13 @@ import { bandPowersFromMagnitudes } from './calibration/bands.js';
 import { createAccumulator, accumulate, fingerprint, coverage } from './calibration/analyzer.js';
 import * as profiles from './calibration/profiles.js';
 import { renderCalibrationControls } from './calibration/ui.js';
+import { autoCorrelate } from './pitch/detector.js';
+import { freqToNote, noteLabel } from './pitch/note.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, analyser, rafId;
 let calibrationEq, calibRAF, calibState, calibCountdown;
+let pitchBuf, pitchMiss = 0;
 
 const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
 const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
@@ -49,16 +52,30 @@ function showStats() {
 }
 
 function startMeter() {
-  const buf = new Uint8Array(analyser.fftSize);
+  const timeBuf = new Uint8Array(analyser.fftSize);
+  pitchBuf = new Float32Array(analyser.fftSize);
   function loop() {
     rafId = requestAnimationFrame(loop);
-    analyser.getByteTimeDomainData(buf);
+    // input meter (time-domain bytes)
+    analyser.getByteTimeDomainData(timeBuf);
     let peak = 0;
-    for (let i = 0; i < buf.length; i++) {
-      const v = Math.abs(buf[i] - 128);
+    for (let i = 0; i < timeBuf.length; i++) {
+      const v = Math.abs(timeBuf[i] - 128);
       if (v > peak) peak = v;
     }
     $('meter').style.width = Math.min(100, peak / 128 * 100 * 1.5) + '%';
+    // note detection (float time-domain)
+    analyser.getFloatTimeDomainData(pitchBuf);
+    const f = autoCorrelate(pitchBuf, ctx.sampleRate);
+    const circle = $('note-circle');
+    if (f > 0) {
+      pitchMiss = 0;
+      circle.textContent = noteLabel(freqToNote(f));
+      circle.classList.add('active');
+    } else if (++pitchMiss > 10) {
+      circle.textContent = '—';
+      circle.classList.remove('active');
+    }
   }
   loop();
 }
@@ -163,7 +180,7 @@ async function start() {
     // Analyser tap off source (read-only; not in the effects path). Used by both the
     // input meter (time-domain) and calibration capture (frequency-domain).
     analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
+    analyser.fftSize = 2048;
     source.connect(analyser);
 
     gainOut = ctx.createGain();
@@ -199,6 +216,7 @@ function stop() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   stopCalibration();
   $('meter').style.width = '0%';
+  { const c = $('note-circle'); if (c) { c.textContent = '—'; c.classList.remove('active'); } }
   if (stream) stream.getTracks().forEach(t => t.stop());
   if (ctx) ctx.close();
   ctx = stream = source = engine = gainOut = analyser = calibrationEq = null;

@@ -61,6 +61,12 @@
   #calibration label { margin-top: 8px; }
   #calibration input[type=range] { width: 100%; accent-color: var(--accent); margin-bottom: 12px; }
   #calibration button { width: 100%; cursor: pointer; }
+  /* Note indicator */
+  .note-circle { width: 92px; height: 92px; border-radius: 50%; border: 2px solid var(--line);
+    background: #11141a; display: flex; align-items: center; justify-content: center;
+    font-size: 30px; font-weight: 700; color: var(--muted); margin: 0 auto 20px;
+    transition: color .1s, border-color .1s; }
+  .note-circle.active { color: var(--accent); border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -68,6 +74,7 @@
   <h1>🎸 Guitar Effects Engine</h1>
   <p class="sub"><span id="status-dot" class="dot"></span><span id="status">Idle — pick devices and press Start</span></p>
   <p class="sub" id="diag" style="font-size:12px;margin-top:-16px"></p>
+  <div id="note-circle" class="note-circle">—</div>
 
   <div class="panel">
     <label for="input">Input (your guitar interface)</label>
