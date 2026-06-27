@@ -3,31 +3,38 @@ import { registry } from './effects/index.js';
 import { buildChain } from './engine.js';
 import { PRESETS, validatePreset } from './presets.js';
 import { renderChain, renderPresetPicker } from './ui.js';
+import { createCalibrationEq } from './calibration/calibration-eq.js';
+import { computeCorrection } from './calibration/correction.js';
+import { bandPowersFromMagnitudes } from './calibration/bands.js';
+import { createAccumulator, accumulate, fingerprint, coverage } from './calibration/analyzer.js';
+import * as profiles from './calibration/profiles.js';
+import { renderCalibrationControls } from './calibration/ui.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, analyser, rafId;
+let calibrationEq, calibRAF, calibState;
 
 const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
 const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
 
-// FIX 4: Show/hide safari-warn on load based on setSinkId support
 $('safari-warn').style.display = hasSetSinkId ? 'none' : 'block';
 
+// The artist chain is fed by the calibration EQ (source -> calibrationEq -> engine).
+// We never disconnect `source` here, so the analyser tap and calibration EQ stay live
+// across preset switches.
 function loadPreset(preset) {
   const errors = validatePreset(preset, registry);
   if (errors.length) { $('error').textContent = errors.join('; '); return; }
-  // FIX 4: Also disconnect engine.output before rebuilding to avoid stale node connections
   if (engine) {
-    try { source.disconnect(); } catch {}
+    try { calibrationEq.output.disconnect(); } catch {}
     try { engine.output.disconnect(); } catch {}
   }
   engine = buildChain(ctx, preset.chain, registry);
-  source.connect(engine.input);
+  calibrationEq.output.connect(engine.input);
   engine.output.connect(gainOut);
   renderChain($('chain'), engine.modules, (i, k, v) => engine.setParam(i, k, v));
 }
 
-// FIX 2: Populate latency stat boxes
 function showStats() {
   const fmt = v => (v && v > 0) ? (v * 1000).toFixed(1) + ' ms' : 'not reported';
   $('base').textContent = fmt(ctx.baseLatency);
@@ -41,7 +48,6 @@ function showStats() {
   $('verdict').textContent = 'Playing — judge the tone by ear';
 }
 
-// FIX 1: rAF loop that reads analyser and drives the meter
 function startMeter() {
   const buf = new Uint8Array(analyser.fftSize);
   function loop() {
@@ -57,6 +63,62 @@ function startMeter() {
   loop();
 }
 
+// ---- Calibration ----
+
+function applyActiveCalibration() {
+  const p = profiles.getActive();
+  calibrationEq.apply(p ? computeCorrection(p.fingerprint, p.strength) : []);
+}
+
+function renderCalibControls() {
+  const active = profiles.getActive();
+  renderCalibrationControls($('calibration'), {
+    profiles: profiles.listProfiles(),
+    activeName: active ? active.name : null,
+    strength: active ? active.strength : 0.65,
+  }, {
+    onSelect: (name) => { profiles.setActive(name); applyActiveCalibration(); renderCalibControls(); },
+    onStrength: (s) => { const a = profiles.getActive(); if (a) profiles.setStrength(a.name, s); applyActiveCalibration(); },
+    onCalibrate: startCalibration,
+  });
+}
+
+function startCalibration() {
+  calibState = createAccumulator();
+  $('calib-wizard').style.display = 'block';
+  $('calib-save').disabled = true;
+  const mags = new Uint8Array(analyser.frequencyBinCount);
+  const minFrames = 720; // ~12s @ ~60fps
+  const loop = () => {
+    analyser.getByteFrequencyData(mags);
+    const lin = Float32Array.from(mags, (v) => v / 255);
+    let peak = 0; for (let i = 0; i < lin.length; i++) if (lin[i] > peak) peak = lin[i];
+    const powers = bandPowersFromMagnitudes(lin, ctx.sampleRate);
+    accumulate(calibState, powers, peak);
+    const c = coverage(calibState, minFrames);
+    $('calib-coverage').style.width = (c.coverage * 100) + '%';
+    $('calib-save').disabled = c.coverage < 0.9;
+    calibRAF = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+function stopCalibration() {
+  if (calibRAF) { cancelAnimationFrame(calibRAF); calibRAF = null; }
+  $('calib-wizard').style.display = 'none';
+}
+
+function saveCalibration() {
+  const name = prompt('Name this guitar (e.g. Strat):');
+  if (!name) return;
+  const a = profiles.getActive();
+  const strength = a ? a.strength : 0.65;
+  profiles.saveProfile(name, fingerprint(calibState), strength);
+  stopCalibration();
+  applyActiveCalibration();
+  renderCalibControls();
+}
+
 async function start() {
   $('error').textContent = '';
   try {
@@ -68,14 +130,14 @@ async function start() {
     ctx = new AudioContext({ latencyHint: 'interactive' });
     await ctx.resume();
 
-    // FIX 2: Set sample rate immediately; outputLatency may not have settled yet
     $('sr').textContent = ctx.sampleRate + ' Hz';
 
     const outId = $('output').value;
     if (outId && outId !== 'default' && hasSetSinkId) { try { await ctx.setSinkId(outId); } catch {} }
     source = ctx.createMediaStreamSource(stream);
 
-    // FIX 1: Create analyser as a tap off source (NOT in the effects path)
+    // Analyser tap off source (read-only; not in the effects path). Used by both the
+    // input meter (time-domain) and calibration capture (frequency-domain).
     analyser = ctx.createAnalyser();
     analyser.fftSize = 1024;
     source.connect(analyser);
@@ -84,17 +146,19 @@ async function start() {
     gainOut.gain.value = parseFloat($('gain').value);
     gainOut.connect(ctx.destination);
 
-    // FIX 3: Find default preset, render picker, load preset, then sync dropdown selection
+    // Calibration EQ sits between source and the artist chain.
+    calibrationEq = createCalibrationEq(ctx);
+    source.connect(calibrationEq.input);
+    applyActiveCalibration();
+
     const defaultPreset = PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0];
     renderPresetPicker($('presets'), PRESETS, loadPreset);
     loadPreset(defaultPreset);
     const sel = $('presets').querySelector('select');
     if (sel) sel.selectedIndex = PRESETS.indexOf(defaultPreset);
 
-    // FIX 1: Start meter loop
+    renderCalibControls();
     startMeter();
-
-    // FIX 2: Show stats now, and again after ~600ms so outputLatency can settle
     showStats();
     setTimeout(showStats, 600);
 
@@ -108,12 +172,12 @@ async function start() {
 }
 
 function stop() {
-  // FIX 1: Cancel the rAF meter loop
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  stopCalibration();
   $('meter').style.width = '0%';
   if (stream) stream.getTracks().forEach(t => t.stop());
   if (ctx) ctx.close();
-  ctx = stream = source = engine = gainOut = analyser = null;
+  ctx = stream = source = engine = gainOut = analyser = calibrationEq = null;
   $('start').disabled = false; $('stop').disabled = true;
   $('status').textContent = 'Stopped'; $('status-dot').classList.remove('live');
 }
@@ -134,5 +198,7 @@ async function listDevices() {
 $('gain').addEventListener('input', e => { if (gainOut) gainOut.gain.value = parseFloat(e.target.value); });
 $('start').addEventListener('click', start);
 $('stop').addEventListener('click', stop);
+$('calib-save').addEventListener('click', saveCalibration);
+$('calib-cancel').addEventListener('click', stopCalibration);
 $('diag').textContent = `${isSafari ? 'Safari' : 'Chrome'} · setSinkId: ${hasSetSinkId ? 'yes' : 'no'}`;
 navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});

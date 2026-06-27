@@ -57,6 +57,10 @@
   #chain label.knob { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
   #chain label.knob input[type=range] { flex: 1; accent-color: var(--accent); }
   #chain label.knob .val { min-width: 56px; text-align: right; color: var(--text); font-size: 12px; }
+  /* Calibration controls */
+  #calibration label { margin-top: 8px; }
+  #calibration input[type=range] { width: 100%; accent-color: var(--accent); margin-bottom: 12px; }
+  #calibration button { width: 100%; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -85,6 +89,19 @@
       Otherwise audio goes to your Mac speakers with extra delay.
     </div>
     <div id="error" class="err"></div>
+  </div>
+
+  <div class="panel">
+    <label>Guitar calibration</label>
+    <div id="calibration"></div>
+    <div id="calib-wizard" style="display:none;margin-top:12px">
+      <p class="sub" id="calib-instr">Play across the whole neck — low to high — for ~12s.</p>
+      <div class="meter-wrap"><div class="meter"><div id="calib-coverage" class="meter-fill"></div></div></div>
+      <div class="row" style="margin-top:10px">
+        <button id="calib-save" class="primary" disabled>Save guitar…</button>
+        <button id="calib-cancel" class="ghost">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <div class="panel">
