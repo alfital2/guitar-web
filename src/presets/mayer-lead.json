@@ -1,0 +1,8 @@
+{ "name": "Mayer — Lead Boost", "artist": "John Mayer", "chain": [
+  { "type": "compressor", "params": { "threshold": -20, "ratio": 3, "attack": 0.005, "release": 0.25, "makeup": 4 } },
+  { "type": "drive",      "params": { "amount": 4.5, "tone": 5, "level": 6, "blend": 0.8, "midBump": 5 } },
+  { "type": "eq",         "params": { "bass": 5, "mid": 8, "midFreq": 800, "treble": 4 } },
+  { "type": "cabinet",    "params": { "brightness": 4, "body": 6, "mix": 1 } },
+  { "type": "delay",      "params": { "time": 400, "feedback": 0.28, "tone": 4, "mix": 0.2 } },
+  { "type": "reverb",     "params": { "size": 0.6, "mix": 0.15 } }
+] }

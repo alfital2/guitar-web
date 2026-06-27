@@ -1,0 +1,8 @@
+{ "name": "Mayer — Edge of Breakup", "artist": "John Mayer", "song": "Slow Dancing in a Burning Room", "chain": [
+  { "type": "compressor", "params": { "threshold": -18, "ratio": 2.5, "attack": 0.005, "release": 0.25, "makeup": 3 } },
+  { "type": "drive",      "params": { "amount": 2.5, "tone": 5, "level": 5, "blend": 0.65, "midBump": 0 } },
+  { "type": "eq",         "params": { "bass": 6, "mid": 7, "midFreq": 750, "treble": 5 } },
+  { "type": "cabinet",    "params": { "brightness": 4, "body": 6, "mix": 1 } },
+  { "type": "delay",      "params": { "time": 320, "feedback": 0.2, "tone": 4, "mix": 0.15 } },
+  { "type": "reverb",     "params": { "size": 0.5, "mix": 0.12 } }
+] }
