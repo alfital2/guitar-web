@@ -11,6 +11,8 @@ import * as profiles from './calibration/profiles.js';
 import { renderCalibrationControls } from './calibration/ui.js';
 import { autoCorrelate } from './pitch/detector.js';
 import { freqToNote, noteLabel } from './pitch/note.js';
+import { fingerprintToStats, archetype } from './profile-card/attributes.js';
+import { renderProfileCard } from './profile-card/ui.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, analyser, rafId;
@@ -98,6 +100,18 @@ function renderCalibControls() {
     onStrength: (s) => { const a = profiles.getActive(); if (a) profiles.setStrength(a.name, s); applyActiveCalibration(); },
     onCalibrate: startCalibration,
   });
+  renderToneCard();
+}
+
+function renderToneCard() {
+  const el = $('tone-card');
+  const p = profiles.getActive();
+  if (!p || !p.fingerprint) {
+    el.innerHTML = '<p class="sub">Calibrate a guitar to see its tone card.</p>';
+    return;
+  }
+  const stats = fingerprintToStats(p.fingerprint);
+  renderProfileCard(el, { name: p.name, stats, archetype: archetype(stats) });
 }
 
 const CALIB_TARGET_MS = 12000; // ~12s of actual playing, measured in wall-clock time

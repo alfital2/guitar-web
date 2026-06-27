@@ -67,6 +67,15 @@
     font-size: 30px; font-weight: 700; color: var(--muted); margin: 0 auto 20px;
     transition: color .1s, border-color .1s; }
   .note-circle.active { color: var(--accent); border-color: var(--accent); }
+  /* Tone card */
+  .tone-card { background: #11141a; border: 1px solid var(--line); border-radius: 10px; padding: 16px; text-align: center; }
+  .tc-name { font-weight: 700; font-size: 16px; }
+  .tc-archetype { color: var(--accent); font-size: 13px; margin-bottom: 8px; }
+  .tc-grid { fill: #1a1d24; stroke: var(--line); }
+  .tc-poly { fill: rgba(255,122,69,0.35); stroke: var(--accent); stroke-width: 2; }
+  .tc-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .tc-stat { display: flex; justify-content: space-between; }
+  .tc-stat b { color: var(--text); }
 </style>
 </head>
 <body>
@@ -109,6 +118,11 @@
         <button id="calib-cancel" class="ghost">Cancel</button>
       </div>
     </div>
+  </div>
+
+  <div class="panel">
+    <label>Tone card</label>
+    <div id="tone-card"><p class="sub">Calibrate a guitar to see its tone card.</p></div>
   </div>
 
   <div class="panel">
