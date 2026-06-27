@@ -1,8 +1,11 @@
 import clean from './presets/clean.json' with { type: 'json' };
 import mayerEdge from './presets/mayer-edge.json' with { type: 'json' };
 import mayerLead from './presets/mayer-lead.json' with { type: 'json' };
+import knopflerSultans from './presets/knopfler-sultans.json' with { type: 'json' };
+import asatoClean from './presets/asato-clean.json' with { type: 'json' };
+import hensonClean from './presets/henson-clean.json' with { type: 'json' };
 
-export const PRESETS = [clean, mayerEdge, mayerLead];
+export const PRESETS = [clean, mayerEdge, mayerLead, knopflerSultans, asatoClean, hensonClean];
 
 export function validatePreset(preset, registry) {
   const errors = [];
