@@ -1,16 +1,18 @@
 // src/profile-card/attributes.js
 export const STAT_ORDER = ['body', 'warmth', 'mids', 'presence', 'brightness', 'air'];
 
+// Band index 9 (~8 kHz) is intentionally unused: electric guitars have essentially no
+// energy that high, so it's just noise floor and would pin any stat using it at 0.
+// "Air" is therefore measured at ~4.8 kHz (band 8), the genuine top of a guitar's range.
 const GROUPS = {
-  body: [0, 1], warmth: [2, 3], mids: [4, 5], presence: [6], brightness: [7, 8], air: [9],
+  body: [0, 1], warmth: [2, 3], mids: [4, 5], presence: [6], brightness: [7], air: [8],
 };
 
 // Expected normalized-dB shape of a TYPICAL electric guitar (bass/mid heavy, rolls
 // off the highs). Stats are scored relative to this, not to a flat spectrum — so a
 // normal guitar reads ~50 across the board and the radar shows how it differs from
-// typical. Without this, every guitar's top end (Air especially) pins at 0, because
-// guitars naturally have almost no 8 kHz energy.
-const REFERENCE = { body: 4, warmth: 4, mids: 2, presence: -2, brightness: -6, air: -10 };
+// typical.
+const REFERENCE = { body: 4, warmth: 4, mids: 2, presence: -2, brightness: -6, air: -12 };
 
 function groupAvg(fp, idxs) {
   let s = 0;
