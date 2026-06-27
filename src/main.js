@@ -13,6 +13,8 @@ import { autoCorrelate } from './pitch/detector.js';
 import { freqToNote, noteLabel } from './pitch/note.js';
 import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
+import { resolveTheme } from './theme.js';
+import { spectrumBars } from './spectrum.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, analyser, rafId;
@@ -53,8 +55,28 @@ function showStats() {
   $('verdict').textContent = 'Playing — judge the tone by ear';
 }
 
+function drawSpectrum(freqBytes) {
+  const canvas = $('spectrum');
+  if (!canvas) return;
+  const ctx2d = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx2d.clearRect(0, 0, W, H);
+  const N = 48;
+  const bars = spectrumBars(freqBytes, N);
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#ff7a45';
+  ctx2d.fillStyle = accent;
+  const bw = W / N;
+  for (let i = 0; i < N; i++) {
+    const h = Math.max(2, bars[i] * H);
+    ctx2d.globalAlpha = 0.35 + 0.65 * bars[i];
+    ctx2d.fillRect(i * bw + 1, H - h, bw - 2, h);
+  }
+  ctx2d.globalAlpha = 1;
+}
+
 function startMeter() {
   const timeBuf = new Uint8Array(analyser.fftSize);
+  const freqBuf = new Uint8Array(analyser.frequencyBinCount);
   pitchBuf = new Float32Array(analyser.fftSize);
   function loop() {
     rafId = requestAnimationFrame(loop);
@@ -78,6 +100,9 @@ function startMeter() {
       // Keep the last note name visible; just dim it once the note has stopped ringing.
       circle.classList.remove('active');
     }
+    // live spectrum (frequency-domain)
+    analyser.getByteFrequencyData(freqBuf);
+    drawSpectrum(freqBuf);
   }
   loop();
 }
@@ -257,4 +282,21 @@ $('stop').addEventListener('click', stop);
 $('calib-save').addEventListener('click', saveCalibration);
 $('calib-cancel').addEventListener('click', stopCalibration);
 $('diag').textContent = `${isSafari ? 'Safari' : 'Chrome'} · setSinkId: ${hasSetSinkId ? 'yes' : 'no'}`;
+
+// Appearance: follow system, with a persisted manual override.
+const prefersDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
+function applyTheme() {
+  const override = localStorage.getItem('ui-theme'); // 'light' | 'dark' | null
+  document.documentElement.setAttribute('data-theme', resolveTheme(prefersDark(), override));
+}
+applyTheme();
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if (!localStorage.getItem('ui-theme')) applyTheme();
+});
+$('theme-toggle').addEventListener('click', () => {
+  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('ui-theme', next);
+  applyTheme();
+});
+
 navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
