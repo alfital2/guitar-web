@@ -2,7 +2,8 @@
 import { registry } from './effects/index.js';
 import { buildChain } from './engine.js';
 import { PRESETS, validatePreset } from './presets.js';
-import { renderChain, renderPresetPicker } from './ui.js';
+import { renderPresetPicker } from './ui.js';
+import { renderPedalboard } from './chain-ui/pedalboard.js';
 import { createCalibrationEq } from './calibration/calibration-eq.js';
 import { computeCorrection } from './calibration/correction.js';
 import { bandPowersFromMagnitudes } from './calibration/bands.js';
@@ -39,7 +40,7 @@ function loadPreset(preset) {
   engine = buildChain(ctx, preset.chain, registry);
   calibrationEq.output.connect(engine.input);
   engine.output.connect(gainOut);
-  renderChain($('chain'), engine.modules, (i, k, v) => engine.setParam(i, k, v));
+  renderPedalboard($('chain'), engine.modules, (i, k, v) => engine.setParam(i, k, v));
 }
 
 function showStats() {

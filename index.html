@@ -146,12 +146,32 @@
   #calibration select, #calibration input[type=range], #calibration button { width: 100%; }
   #calibration input[type=range] { margin-bottom: 10px; }
 
-  /* Signal chain (rendered by JS into #chain) */
-  #chain fieldset { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; padding: 12px 14px; }
-  #chain legend { font-size: 11px; color: var(--accent); padding: 0 6px; text-transform: uppercase; letter-spacing: .04em; }
-  #chain label.knob { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 12px; color: var(--muted); }
-  #chain label.knob input[type=range] { flex: 1; accent-color: var(--accent); }
-  #chain label.knob .val { min-width: 60px; text-align: right; color: var(--text); font-size: 12px; }
+  /* Pedalboard strip */
+  .pedalboard-strip { padding: 0 20px 22px; }
+  .strip-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+  .strip-head h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0; font-weight: 600; }
+  .strip-head #presets { margin-left: auto; min-width: 220px; }
+  #chain .pedalboard { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; }
+  .connector { display: flex; align-items: center; color: var(--muted); font-size: 18px; }
+  .pedal {
+    position: relative; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 14px; padding: 14px 16px 18px; min-width: 150px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    border-top: 3px solid hsl(var(--pedal-hue, 30) 70% 55%);
+  }
+  .pedal::before, .pedal::after { content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--line); bottom: 7px; }
+  .pedal::before { left: 9px; } .pedal::after { right: 9px; }
+  .pedal-name { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text); text-align: center; margin-bottom: 12px; }
+  .knobs { display: flex; flex-wrap: wrap; gap: 12px 14px; justify-content: center; }
+  .knob { display: flex; flex-direction: column; align-items: center; width: 60px; cursor: ns-resize; outline: none; user-select: none; touch-action: none; }
+  .knob .knob-dial { width: 48px; height: 48px; border-radius: 50%; }
+  .knob:focus-visible .knob-dial { box-shadow: 0 0 0 3px rgba(255,122,69,0.45); }
+  .knob-track { fill: none; stroke: var(--line); stroke-width: 5; stroke-linecap: round; }
+  .knob-arc { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; }
+  .knob-pointer { stroke: var(--text); stroke-width: 2.5; stroke-linecap: round; }
+  .knob .val { font-size: 11px; font-weight: 600; color: var(--text); margin-top: 4px; }
+  .knob .label { font-size: 10px; color: var(--muted); margin-top: 1px; text-align: center; }
+  .knob.dragging .val { color: var(--accent); }
 
   /* Tone card */
   .tone-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 16px; text-align: center; }
@@ -239,13 +259,15 @@
       <div id="tone-card"><p class="caption">Calibrate a guitar to see its tone card.</p></div>
     </section>
 
-    <section class="card">
-      <h2>Signal Chain</h2>
-      <label for="presets">Preset</label>
-      <div id="presets"></div>
-      <div id="chain"></div>
-    </section>
   </div>
+
+  <section class="pedalboard-strip">
+    <div class="strip-head">
+      <h2>Pedalboard</h2>
+      <div id="presets"></div>
+    </div>
+    <div id="chain"></div>
+  </section>
 </div>
 <script type="module" src="src/main.js"></script>
 </body>
