@@ -129,7 +129,7 @@ function startCalibration() {
       $('calib-instr').textContent = `Get ready… ${n}`;
       calibCountdown = setTimeout(tick, 1000);
     } else {
-      $('calib-instr').textContent = 'Play across the whole neck — low to high!';
+      $('calib-instr').textContent = 'Play across the whole neck — low to high! (analyzing your dry guitar; the preset is ignored)';
       beginCapture();
     }
   };
