@@ -1,14 +1,13 @@
-let _id = 0;
 function param(value) { return { value, setValueAtTime(v){ this.value = v; }, linearRampToValueAtTime(v){ this.value = v; } }; }
 
 export class FakeNode {
-  constructor(kind, ctx) { this.kind = kind; this.id = _id++; this.ctx = ctx; }
+  constructor(kind, ctx) { this.kind = kind; this.id = ctx._nextId++; this.ctx = ctx; }
   connect(node) { this.ctx.connections.push({ from: this.id, to: node.id, fromKind: this.kind, toKind: node.kind }); return node; }
   disconnect() { this.ctx.connections = this.ctx.connections.filter(c => c.from !== this.id); }
 }
 
 export class FakeAudioContext {
-  constructor(sampleRate = 48000) { this.sampleRate = sampleRate; this.connections = []; this.destination = new FakeNode('destination', this); }
+  constructor(sampleRate = 48000) { this.sampleRate = sampleRate; this._nextId = 0; this.connections = []; this.destination = new FakeNode('destination', this); }
   _mk(kind, extra = {}) { return Object.assign(new FakeNode(kind, this), extra); }
   createGain() { return this._mk('gain', { gain: param(1) }); }
   createWaveShaper() { return this._mk('waveshaper', { curve: null, oversample: 'none' }); }
