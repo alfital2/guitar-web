@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Guitar Latency Test</title>
+<title>Guitar Effects Engine</title>
 <style>
   :root {
     --bg: #0f1115; --panel: #1a1d24; --line: #2a2f3a;
@@ -51,11 +51,17 @@
   .err { color: var(--bad); margin-top: 12px; font-size: 14px; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: middle; }
   .dot.live { background: var(--good); box-shadow: 0 0 8px var(--good); }
+  /* Chain UI */
+  #chain fieldset { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; padding: 12px 14px; }
+  #chain legend { font-size: 13px; color: var(--accent); padding: 0 6px; }
+  #chain label.knob { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
+  #chain label.knob input[type=range] { flex: 1; accent-color: var(--accent); }
+  #chain label.knob .val { min-width: 56px; text-align: right; color: var(--text); font-size: 12px; }
 </style>
 </head>
 <body>
 <div class="app">
-  <h1>🎸 Guitar Latency Test</h1>
+  <h1>🎸 Guitar Effects Engine</h1>
   <p class="sub"><span id="status-dot" class="dot"></span><span id="status">Idle — pick devices and press Start</span></p>
   <p class="sub" id="diag" style="font-size:12px;margin-top:-16px"></p>
 
@@ -82,6 +88,16 @@
   </div>
 
   <div class="panel">
+    <label for="presets">Preset</label>
+    <div id="presets"></div>
+  </div>
+
+  <div class="panel">
+    <label>Signal chain (tweak any block)</label>
+    <div id="chain"></div>
+  </div>
+
+  <div class="panel">
     <label>Input level (play a note to confirm signal)</label>
     <div class="meter-wrap"><div class="meter"><div id="meter" class="meter-fill"></div></div></div>
 
@@ -104,148 +120,6 @@
   </div>
 </div>
 
-<script>
-const $ = id => document.getElementById(id);
-let ctx, stream, source, gainNode, analyser, raf;
-
-async function listDevices() {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const ins = $('input'), outs = $('output');
-  ins.innerHTML = ''; outs.innerHTML = '';
-  for (const d of devices) {
-    if (d.kind === 'audioinput') {
-      const o = new Option(d.label || `Input ${ins.length + 1}`, d.deviceId);
-      if (/focusrite|scarlett|usb/i.test(d.label)) o.selected = true;
-      ins.add(o);
-    } else if (d.kind === 'audiooutput') {
-      const o = new Option(d.label || `Output ${outs.length + 1}`, d.deviceId);
-      if (/focusrite|scarlett|usb/i.test(d.label)) o.selected = true;
-      outs.add(o);
-    }
-  }
-  if (!outs.options.length) outs.add(new Option('System default', 'default'));
-}
-
-function ms(s) { return (s * 1000).toFixed(1) + ' ms'; }
-
-const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
-const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
-
-function showDiag() {
-  const browser = isSafari ? 'Safari' : (/edg/i.test(navigator.userAgent) ? 'Edge' : (/firefox/i.test(navigator.userAgent) ? 'Firefox' : 'Chrome'));
-  $('diag').textContent = `${browser} · output-device selection (setSinkId): ${hasSetSinkId ? 'supported ✓' : 'NOT supported ✗'}`;
-  $('safari-warn').style.display = hasSetSinkId ? 'none' : 'block';
-}
-
-function showStats() {
-  $('sr').textContent = ctx.sampleRate + ' Hz';
-  const base = ctx.baseLatency || 0;
-  const hasOut = typeof ctx.outputLatency === 'number' && ctx.outputLatency > 0.001;
-  const out = hasOut ? ctx.outputLatency : 0;
-  $('base').textContent = ms(base);
-  $('out').textContent = hasOut ? ms(out) : 'not reported';
-  const total = base * 2 + out;
-  const t = total * 1000;
-  const v = $('verdict');
-  if (!hasOut) {
-    // Safari/WebKit doesn't report outputLatency — the biggest chunk — so any
-    // round-trip estimate here is fiction. Don't pretend.
-    $('total').textContent = 'unreliable';
-    v.textContent = '⚠️ This browser hides its real output latency — trust your ears, not this number';
-    v.style.color = 'var(--ok)';
-    return;
-  }
-  $('total').textContent = ms(total);
-  if (t < 10)      { v.textContent = `~${t.toFixed(0)} ms — invisible 🟢`; v.style.color = 'var(--good)'; }
-  else if (t < 20) { v.textContent = `~${t.toFixed(0)} ms — good, very playable 🟢`; v.style.color = 'var(--good)'; }
-  else if (t < 30) { v.textContent = `~${t.toFixed(0)} ms — acceptable 🟡`; v.style.color = 'var(--ok)'; }
-  else             { v.textContent = `~${t.toFixed(0)} ms — laggy, hard to play to 🔴`; v.style.color = 'var(--bad)'; }
-}
-
-function meterLoop() {
-  const buf = new Uint8Array(analyser.fftSize);
-  const tick = () => {
-    analyser.getByteTimeDomainData(buf);
-    let peak = 0;
-    for (let i = 0; i < buf.length; i++) peak = Math.max(peak, Math.abs(buf[i] - 128));
-    $('meter').style.width = Math.min(100, (peak / 128) * 100 * 1.5) + '%';
-    raf = requestAnimationFrame(tick);
-  };
-  tick();
-}
-
-async function start() {
-  $('error').textContent = '';
-  try {
-    const inputId = $('input').value;
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        deviceId: inputId ? { exact: inputId } : undefined,
-        echoCancellation: false,   // the three latency/tone killers — OFF
-        noiseSuppression: false,
-        autoGainControl: false,
-        latency: 0,                // request minimum input latency (Chrome/FF honor; Safari may)
-      },
-      video: false,
-    });
-
-    ctx = new AudioContext({ latencyHint: 'interactive' });
-    await ctx.resume();
-
-    // Route output to chosen device (Chrome/Edge support setSinkId on AudioContext).
-    const outId = $('output').value;
-    if (outId && outId !== 'default' && hasSetSinkId) {
-      try { await ctx.setSinkId(outId); } catch (e) { console.warn('setSinkId failed', e); }
-    }
-
-    source = ctx.createMediaStreamSource(stream);
-    gainNode = ctx.createGain();
-    gainNode.gain.value = parseFloat($('gain').value);
-    analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
-
-    source.connect(analyser);
-    source.connect(gainNode);
-    gainNode.connect(ctx.destination);
-
-    meterLoop();
-    showStats();
-    // outputLatency settles after a moment; refresh once.
-    setTimeout(showStats, 600);
-
-    $('start').disabled = true;
-    $('stop').disabled = false;
-    $('status').textContent = 'Live — play your guitar';
-    $('status-dot').classList.add('live');
-
-    // re-list devices now that we have permission (gets real labels)
-    listDevices();
-  } catch (e) {
-    $('error').textContent = 'Could not start: ' + e.message;
-    console.error(e);
-  }
-}
-
-function stop() {
-  if (raf) cancelAnimationFrame(raf);
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  if (ctx) ctx.close();
-  ctx = stream = source = gainNode = analyser = null;
-  $('meter').style.width = '0%';
-  $('start').disabled = false;
-  $('stop').disabled = true;
-  $('status').textContent = 'Stopped';
-  $('status-dot').classList.remove('live');
-}
-
-$('gain').addEventListener('input', e => { if (gainNode) gainNode.gain.value = parseFloat(e.target.value); });
-$('start').addEventListener('click', start);
-$('stop').addEventListener('click', stop);
-
-// Initial device list (labels appear after first permission grant).
-showDiag();
-navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
-navigator.mediaDevices.addEventListener?.('devicechange', listDevices);
-</script>
+<script type="module" src="src/main.js"></script>
 </body>
 </html>
