@@ -15,7 +15,7 @@ import { freqToNote, noteLabel } from './pitch/note.js';
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, analyser, rafId;
 let calibrationEq, calibRAF, calibState, calibCountdown;
-let pitchBuf, pitchMiss = 0;
+let pitchBuf, lastNoteMs = 0;
 
 const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
 const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
@@ -69,11 +69,11 @@ function startMeter() {
     const f = autoCorrelate(pitchBuf, ctx.sampleRate);
     const circle = $('note-circle');
     if (f > 0) {
-      pitchMiss = 0;
+      lastNoteMs = performance.now();
       circle.textContent = noteLabel(freqToNote(f));
       circle.classList.add('active');
-    } else if (++pitchMiss > 10) {
-      circle.textContent = '—';
+    } else if (performance.now() - lastNoteMs > 1200) {
+      // Keep the last note name visible; just dim it once the note has stopped ringing.
       circle.classList.remove('active');
     }
   }

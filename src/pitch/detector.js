@@ -7,7 +7,7 @@ export function autoCorrelate(buf, sampleRate) {
   let rms = 0;
   for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
   rms = Math.sqrt(rms / SIZE);
-  if (rms < 0.01) return -1; // too quiet
+  if (rms < 0.005) return -1; // too quiet (low gate: the dry DI the detector taps is quieter than the amp you hear)
 
   // Trim near-silent ends to stabilize the correlation.
   let r1 = 0, r2 = SIZE - 1;
@@ -42,5 +42,9 @@ export function autoCorrelate(buf, sampleRate) {
     const bb = (x3 - x1) / 2;
     if (a) T0 = T0 - bb / (2 * a);
   }
-  return sampleRate / T0;
+  const freq = sampleRate / T0;
+  // Bound to the guitar range so the low RMS gate can't surface mains hum (~50/60 Hz)
+  // as a phantom note, and stray high-frequency noise is ignored.
+  if (freq < 70 || freq > 1300) return -1;
+  return freq;
 }
