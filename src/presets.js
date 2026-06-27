@@ -4,8 +4,10 @@ import mayerLead from './presets/mayer-lead.json' with { type: 'json' };
 import knopflerSultans from './presets/knopfler-sultans.json' with { type: 'json' };
 import asatoClean from './presets/asato-clean.json' with { type: 'json' };
 import hensonClean from './presets/henson-clean.json' with { type: 'json' };
+import hetfieldRhythm from './presets/hetfield-rhythm.json' with { type: 'json' };
+import hammettLead from './presets/hammett-lead.json' with { type: 'json' };
 
-export const PRESETS = [clean, mayerEdge, mayerLead, knopflerSultans, asatoClean, hensonClean];
+export const PRESETS = [clean, mayerEdge, mayerLead, knopflerSultans, asatoClean, hensonClean, hetfieldRhythm, hammettLead];
 
 export function validatePreset(preset, registry) {
   const errors = [];

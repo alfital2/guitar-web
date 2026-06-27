@@ -1,0 +1,6 @@
+{ "name": "Hetfield — Puppets Rhythm", "artist": "James Hetfield (Metallica)", "song": "Master of Puppets", "chain": [
+  { "type": "compressor", "params": { "threshold": -20, "ratio": 3, "attack": 0.01, "release": 0.15, "makeup": 2 } },
+  { "type": "drive",      "params": { "amount": 8, "tone": 6, "level": 6, "blend": 0.9, "midBump": 2 } },
+  { "type": "eq",         "params": { "bass": 4.5, "mid": 2.5, "midFreq": 750, "treble": 7 } },
+  { "type": "cabinet",    "params": { "brightness": 6, "body": 5, "mix": 1 } }
+] }
