@@ -12,7 +12,7 @@ import { renderCalibrationControls } from './calibration/ui.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, analyser, rafId;
-let calibrationEq, calibRAF, calibState;
+let calibrationEq, calibRAF, calibState, calibCountdown;
 
 const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
 const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
@@ -83,27 +83,51 @@ function renderCalibControls() {
   });
 }
 
+const CALIB_TARGET_MS = 12000; // ~12s of actual playing, measured in wall-clock time
+
 function startCalibration() {
-  calibState = createAccumulator();
   $('calib-wizard').style.display = 'block';
   $('calib-save').disabled = true;
+  $('calib-coverage').style.width = '0%';
+  // Countdown so the player has time to grab the guitar before capture begins.
+  let n = 3;
+  $('calib-instr').textContent = `Get ready… ${n}`;
+  const tick = () => {
+    n--;
+    if (n > 0) {
+      $('calib-instr').textContent = `Get ready… ${n}`;
+      calibCountdown = setTimeout(tick, 1000);
+    } else {
+      $('calib-instr').textContent = 'Play across the whole neck — low to high!';
+      beginCapture();
+    }
+  };
+  calibCountdown = setTimeout(tick, 1000);
+}
+
+function beginCapture() {
+  calibState = createAccumulator();
   const mags = new Uint8Array(analyser.frequencyBinCount);
-  const minFrames = 720; // ~12s @ ~60fps
+  const startMs = performance.now();
   const loop = () => {
     analyser.getByteFrequencyData(mags);
     const lin = Float32Array.from(mags, (v) => v / 255);
     let peak = 0; for (let i = 0; i < lin.length; i++) if (lin[i] > peak) peak = lin[i];
-    const powers = bandPowersFromMagnitudes(lin, ctx.sampleRate);
-    accumulate(calibState, powers, peak);
-    const c = coverage(calibState, minFrames);
-    $('calib-coverage').style.width = (c.coverage * 100) + '%';
-    $('calib-save').disabled = c.coverage < 0.9;
+    accumulate(calibState, bandPowersFromMagnitudes(lin, ctx.sampleRate), peak);
+    // Duration is measured in real time (not animation frames), so it behaves the
+    // same on 60 Hz and 120 Hz (ProMotion) displays.
+    const c = coverage(calibState, 1); // use bandFraction + leveled; override duration below
+    const durationFraction = Math.min(1, (performance.now() - startMs) / CALIB_TARGET_MS);
+    const cov = c.leveled ? Math.min(c.bandFraction, durationFraction) : 0;
+    $('calib-coverage').style.width = (cov * 100) + '%';
+    $('calib-save').disabled = cov < 0.9;
     calibRAF = requestAnimationFrame(loop);
   };
   loop();
 }
 
 function stopCalibration() {
+  if (calibCountdown) { clearTimeout(calibCountdown); calibCountdown = null; }
   if (calibRAF) { cancelAnimationFrame(calibRAF); calibRAF = null; }
   $('calib-wizard').style.display = 'none';
 }
