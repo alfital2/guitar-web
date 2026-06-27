@@ -1,5 +1,6 @@
 { "name": "Henson — Sparkle Clean", "artist": "Tim Henson", "song": "Playing God", "chain": [
   { "type": "compressor", "params": { "threshold": -22, "ratio": 6, "attack": 0.005, "release": 0.12, "makeup": 9 } },
+  { "type": "chorus",     "params": { "rate": 1.2, "depth": 5, "mix": 0.35 } },
   { "type": "drive",      "params": { "amount": 1.5, "tone": 7, "level": 7.5, "blend": 1.0, "midBump": 3.5 } },
   { "type": "eq",         "params": { "bass": 4, "mid": 3.5, "midFreq": 800, "treble": 7.5 } },
   { "type": "cabinet",    "params": { "brightness": 7, "body": 4, "mix": 1 } },

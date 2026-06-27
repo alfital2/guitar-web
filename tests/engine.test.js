@@ -5,8 +5,8 @@ import { buildChain } from '../src/engine.js';
 import { FakeAudioContext } from './fake-audio-context.js';
 
 describe('registry', () => {
-  it('contains all six effect types', () => {
-    expect(Object.keys(registry).sort()).toEqual(['cabinet', 'compressor', 'delay', 'drive', 'eq', 'reverb']);
+  it('contains all effect types', () => {
+    expect(Object.keys(registry).sort()).toEqual(['cabinet', 'chorus', 'compressor', 'delay', 'drive', 'eq', 'reverb']);
   });
 });
 
