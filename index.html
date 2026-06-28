@@ -107,9 +107,10 @@
   .dot { display: none; }
 
   /* Cards */
-  .cards { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; padding: 20px; align-items: start; }
-  .guitar-card #tone-card { margin-top: 14px; }
-  @media (max-width: 720px) { .cards { grid-template-columns: 1fr; } }
+  .guitar-strip { margin: 18px 20px 6px; display: grid; grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.1fr); gap: 22px; align-items: center; }
+  .gs-controls h2 { margin-top: 0; }
+  @media (max-width: 720px) { .guitar-strip { grid-template-columns: 1fr; } }
+  .amp-strip { padding: 10px 20px 4px; }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
   @media (prefers-reduced-motion: no-preference) {
     .card { transition: transform .18s ease, box-shadow .18s ease, background-color .3s ease, border-color .3s ease; }
@@ -223,32 +224,36 @@
   .settings-section { padding: 14px 0; border-top: 1px solid var(--line); }
   .settings-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
 
-  /* Amp head */
-  .amp-host { min-width: 0; }
-  .amp { border-radius: 16px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 10px 28px rgba(0,0,0,0.4); }
+  /* Amp head — faceplate */
+  .amp-host, .amp { min-width: 0; }
+  .amp { border-radius: 14px; overflow: hidden; border: 1px solid #0b0b0c; background: #121113; box-shadow: 0 14px 32px rgba(0,0,0,0.5); }
   .amp-grille {
-    position: relative; height: 86px; display: flex; align-items: center; justify-content: flex-end; padding: 0 16px;
-    background-color: #1a1714;
-    background-image:
-      repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 5px),
-      repeating-linear-gradient(-45deg, rgba(0,0,0,0.45) 0 2px, transparent 2px 5px),
-      radial-gradient(circle at 50% 35%, rgba(255,255,255,0.07), transparent 72%);
+    position: relative; height: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px), linear-gradient(180deg, #1d1b18, #131210);
+    border-bottom: 1px solid #000;
   }
   .amp-badge {
-    font-size: 11px; font-weight: 700; letter-spacing: .14em; color: #d6c19a;
-    padding: 5px 11px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.55);
-    background: linear-gradient(180deg, #3c3527, #241f16);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.22), 0 1px 2px rgba(0,0,0,0.6);
+    font-size: 10px; font-weight: 700; letter-spacing: .16em; color: #d6c19a;
+    padding: 3px 9px; border-radius: 5px; border: 1px solid rgba(0,0,0,0.6);
+    background: linear-gradient(180deg, #3c3527, #241f16); box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
   }
+  .amp-led { width: 8px; height: 8px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffd27a, #d98a1a); box-shadow: 0 0 8px #f0a93a, inset 0 0 2px #fff; }
   .amp-panel {
-    display: flex; flex-wrap: wrap; align-items: stretch; padding: 14px 6px;
-    background: linear-gradient(180deg, #4b4e53, #2f3135 60%, #3b3e43);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -3px 8px rgba(0,0,0,0.5);
+    display: flex; flex-wrap: wrap; justify-content: space-around; align-items: stretch; gap: 8px; padding: 18px 18px 20px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.10), rgba(0,0,0,0.30)),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #494c51, #34363b);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -3px 8px rgba(0,0,0,0.5);
   }
-  .amp-section { display: flex; flex-direction: column; align-items: center; padding: 2px 12px; border-right: 1px solid rgba(0,0,0,0.4); }
-  .amp-section:last-child { border-right: none; }
-  .amp-section-label { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #ececed; margin-bottom: 8px; text-shadow: 0 1px 1px rgba(0,0,0,0.7); }
-  .amp-knobs { display: flex; flex-wrap: wrap; gap: 10px 8px; justify-content: center; }
+  .amp-section { flex: 0 1 auto; display: flex; flex-direction: column; align-items: center; padding: 0 16px; }
+  .amp-section + .amp-section { border-left: 1px solid rgba(0,0,0,0.4); box-shadow: -1px 0 0 rgba(255,255,255,0.06); }
+  .amp-section-label {
+    position: relative; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #f2f2f3;
+    margin-bottom: 12px; padding-bottom: 5px; text-shadow: 0 1px 1px rgba(0,0,0,0.8);
+  }
+  .amp-section-label::after { content: ""; position: absolute; left: 12%; right: 12%; bottom: 0; height: 1px; background: rgba(255,255,255,0.28); }
+  .amp-knobs { display: flex; flex-wrap: wrap; gap: 14px 10px; justify-content: center; }
   .amp-panel .knob .label { color: #c2c5cb; }
   .amp-panel .knob .val { color: #fff; }
 
@@ -300,14 +305,17 @@
     </div>
   </section>
 
-  <div class="cards">
-    <section class="card guitar-card">
+  <section class="card guitar-strip">
+    <div class="gs-controls">
       <h2>Guitar</h2>
       <div id="calibration"></div>
-      <div id="tone-card"><p class="caption">Calibrate a guitar in Settings to see its tone card.</p></div>
-    </section>
+    </div>
+    <div id="tone-card"><p class="caption">Calibrate a guitar in Settings to see its tone card.</p></div>
+  </section>
+
+  <section class="amp-strip">
     <div id="amp" class="amp-host"></div>
-  </div>
+  </section>
 
   <section class="pedalboard-strip">
     <div class="strip-head">
