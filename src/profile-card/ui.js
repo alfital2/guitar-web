@@ -13,7 +13,7 @@ export function renderProfileCard(container, { name, stats, archetype }) {
   const nameEl = document.createElement('div'); nameEl.className = 'tc-name'; nameEl.textContent = name;
   const archEl = document.createElement('div'); archEl.className = 'tc-archetype'; archEl.textContent = archetype;
 
-  const size = 180, cx = 90, cy = 90, R = 70;
+  const size = 132, cx = 66, cy = 66, R = 50;
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
   svg.setAttribute('width', String(size)); svg.setAttribute('height', String(size));
