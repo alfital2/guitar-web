@@ -38,9 +38,9 @@ function loadPreset(preset) {
     try { engine.output.disconnect(); } catch {}
   }
   engine = buildChain(ctx, preset.chain, registry);
-  calibrationEq.output.connect(engine.input);
-  engine.output.connect(gainOut);
   renderPedalboard($('chain'), engine.modules, (i, k, v) => engine.setParam(i, k, v));
+  if (calibrationEq) calibrationEq.output.connect(engine.input);
+  if (gainOut) engine.output.connect(gainOut);
 }
 
 function showStats() {
@@ -111,6 +111,7 @@ function startMeter() {
 // ---- Calibration ----
 
 function applyActiveCalibration() {
+  if (!calibrationEq) return; // not started yet — nothing to apply to
   const p = profiles.getActive();
   calibrationEq.apply(p ? computeCorrection(p.fingerprint, p.strength) : []);
 }
@@ -122,7 +123,7 @@ function renderCalibControls() {
     activeName: active ? active.name : null,
     strength: active ? active.strength : 0.65,
   }, {
-    onSelect: (name) => { profiles.setActive(name); applyActiveCalibration(); renderCalibControls(); },
+    onSelect: (name) => { profiles.setActive(name); renderCalibControls(); applyActiveCalibration(); },
     onStrength: (s) => { const a = profiles.getActive(); if (a) profiles.setStrength(a.name, s); applyActiveCalibration(); },
   });
   renderToneCard();
