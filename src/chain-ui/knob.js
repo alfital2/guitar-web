@@ -88,7 +88,7 @@ export function createKnob(param, value, onChange, small = false) {
   }
 
   const track = svgEl('path', { class: 'knob-track', d: arcPath(C, C, RTR, -135, 135), fill: 'none', stroke: 'rgba(255,255,255,0.06)', 'stroke-width': '3.5', 'stroke-linecap': 'round' });
-  const arc = svgEl('path', { class: 'knob-arc', fill: 'none', stroke: '#ff9f0a', 'stroke-width': '3.5', 'stroke-linecap': 'round', filter: `url(#${uid}-g)` });
+  const arc = svgEl('path', { class: 'knob-arc', fill: 'none', 'stroke-width': '3.5', 'stroke-linecap': 'round', filter: `url(#${uid}-g)` });
   const cap = svgEl('circle', { class: 'knob-cap', cx: String(C), cy: String(C), r: String(RC), fill: `url(#${uid}-c)`, stroke: 'rgba(0,0,0,0.6)', 'stroke-width': '0.75' });
   const spec = svgEl('circle', { class: 'knob-spec', cx: (C - RC * 0.15).toFixed(2), cy: (C - RC * 0.22).toFixed(2), r: (RC * 0.52).toFixed(2), fill: `url(#${uid}-h)` });
   const ptr = svgEl('line', { class: 'knob-pointer', stroke: 'rgba(255,255,255,0.9)', 'stroke-width': '2', 'stroke-linecap': 'round' });

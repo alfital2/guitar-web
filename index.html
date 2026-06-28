@@ -9,17 +9,25 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
+    /* Theme-able palette (Studio = default). Overridden per [data-theme] below. */
+    --accent: #ff9f0a;
+    --accent-rgb: 255,159,10;
     --bg: #6a6a6e;
+    --bg-grad: linear-gradient(180deg, #7c7c7e 0%, #646466 32%, #5a5a5c 100%);
     --window: #1e1e20;
+    --library: #34343a;
+    --library-input: #27272b;
+    --recessed: #18181a;
     --surface: #2c2c2e;
     --surface-hi: #38383a;
+    --toolbar: rgba(30,30,32,0.92);
+
     --border: rgba(255,255,255,0.06);
     --border-hi: rgba(255,255,255,0.1);
     --text: #f2f2f7;
     --text-secondary: #c8c8cc;
     --muted: #48484e;
     --very-muted: #3a3a40;
-    --accent: #ff9f0a;
     --green: #32d74b;
     --red: #ff453a;
     --yellow: #ffd60a;
@@ -28,9 +36,41 @@
     --mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, monospace;
   }
 
+  /* ── Color themes ─────────────────────────────────────── */
+  :root[data-theme="midnight"] {
+    --accent: #3b9eff; --accent-rgb: 59,158,255;
+    --bg: #585e6a; --bg-grad: linear-gradient(180deg, #6b7180 0%, #565c68 32%, #4a4f5a 100%);
+    --window: #15171d; --library: #2a3140; --library-input: #1d222c;
+    --recessed: #11131a; --surface: #232733; --surface-hi: #2e3340; --toolbar: rgba(21,23,29,0.92);
+  }
+  :root[data-theme="sunset"] {
+    --accent: #ff7a3c; --accent-rgb: 255,122,60;
+    --bg: #6e645e; --bg-grad: linear-gradient(180deg, #807468 0%, #6a605a 32%, #5c524c 100%);
+    --window: #201b18; --library: #3a322c; --library-input: #2a231e;
+    --recessed: #191412; --surface: #2e2722; --surface-hi: #3a322c; --toolbar: rgba(32,27,24,0.92);
+  }
+  :root[data-theme="emerald"] {
+    --accent: #2fd16f; --accent-rgb: 47,209,111;
+    --bg: #5e6a62; --bg-grad: linear-gradient(180deg, #6e7c72 0%, #586259 32%, #4c544d 100%);
+    --window: #161c18; --library: #2a352e; --library-input: #1c241f;
+    --recessed: #121814; --surface: #222a25; --surface-hi: #2e382f; --toolbar: rgba(22,28,24,0.92);
+  }
+  :root[data-theme="violet"] {
+    --accent: #ff4d9d; --accent-rgb: 255,77,157;
+    --bg: #645e6e; --bg-grad: linear-gradient(180deg, #767084 0%, #5e586a 32%, #524c5c 100%);
+    --window: #1a1622; --library: #332c3e; --library-input: #241e2c;
+    --recessed: #141019; --surface: #272030; --surface-hi: #332b3e; --toolbar: rgba(26,22,34,0.92);
+  }
+  :root[data-theme="ocean"] {
+    --accent: #34c8e0; --accent-rgb: 52,200,224;
+    --bg: #5c656a; --bg-grad: linear-gradient(180deg, #6c767c 0%, #566066 32%, #4a5258 100%);
+    --window: #15191c; --library: #2b343a; --library-input: #1d242a;
+    --recessed: #111619; --surface: #232a2f; --surface-hi: #2e373c; --toolbar: rgba(21,25,28,0.92);
+  }
+
   @keyframes led-amber {
-    0%, 100% { box-shadow: 0 0 8px rgba(255,159,10,0.9), 0 0 3px rgba(255,255,255,0.3); }
-    50%      { box-shadow: 0 0 3px rgba(255,159,10,0.4); }
+    0%, 100% { box-shadow: 0 0 8px rgba(var(--accent-rgb),0.9), 0 0 3px rgba(255,255,255,0.3); }
+    50%      { box-shadow: 0 0 3px rgba(var(--accent-rgb),0.4); }
   }
 
   * { box-sizing: border-box; }
@@ -38,7 +78,7 @@
   body {
     margin: 0; color: var(--text); font: 14px/1.5 var(--font);
     background: var(--bg);
-    background-image: linear-gradient(180deg, #7c7c7e 0%, #646466 32%, #5a5a5c 100%);
+    background-image: var(--bg-grad);
     background-attachment: fixed;
     display: flex; align-items: flex-start; justify-content: center;
     padding: 20px 12px 48px; -webkit-font-smoothing: antialiased;
@@ -56,7 +96,7 @@
   /* ── Toolbar ────────────────────────────────────────── */
   .toolbar {
     position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px;
-    padding: 10px 18px; background: rgba(30,30,32,0.92);
+    padding: 10px 18px; background: var(--toolbar);
     -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
     border-bottom: 1px solid rgba(255,255,255,0.055);
   }
@@ -94,12 +134,12 @@
   }
   button.icon { padding: 6px 10px; font-size: 14px; }
   button[disabled] { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.2); cursor: default; filter: none; }
-  button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,159,10,0.4); }
+  button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.4); }
   @media (prefers-reduced-motion: no-preference) { button:active { transform: scale(.97); } }
 
   /* ── Spectrum hero ──────────────────────────────────── */
   .hero {
-    position: relative; background: #18181a; border-bottom: 1px solid rgba(255,255,255,0.055);
+    position: relative; background: var(--recessed); border-bottom: 1px solid rgba(255,255,255,0.055);
   }
   #spectrum { display: block; width: 100%; height: 180px; }
   .hero-badge { position: absolute; top: 12px; left: 14px; display: flex; align-items: center; gap: 6px; }
@@ -187,7 +227,7 @@
     background:
       repeating-linear-gradient(45deg, rgba(0,0,0,0.15) 0 2px, transparent 2px 6px),
       repeating-linear-gradient(-45deg, rgba(0,0,0,0.1) 0 2px, transparent 2px 6px),
-      #18181a;
+      var(--recessed);
     border-radius: 10px; border: 1px solid rgba(255,255,255,0.04);
     box-shadow: inset 0 2px 12px rgba(0,0,0,0.7), 0 1px 8px rgba(0,0,0,0.4);
   }
@@ -225,8 +265,8 @@
   .amp-anchor {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
     min-width: 56px; align-self: stretch; padding: 8px 10px; border-radius: 11px;
-    background: linear-gradient(180deg, rgba(255,159,10,0.12), rgba(255,159,10,0.04));
-    border: 1px dashed rgba(255,159,10,0.4); color: var(--accent);
+    background: linear-gradient(180deg, rgba(var(--accent-rgb),0.12), rgba(var(--accent-rgb),0.04));
+    border: 1px dashed rgba(var(--accent-rgb),0.4); color: var(--accent);
   }
   .amp-anchor-icon { font-size: 14px; line-height: 1; }
   .amp-anchor-label { font-size: 8px; font-weight: 800; letter-spacing: 0.16em; }
@@ -241,16 +281,16 @@
   /* Patch library (left of the window) — GarageBand-style master/detail */
   .preset-browser {
     width: 368px; flex: 0 0 368px; display: flex; flex-direction: column;
-    background: #34343a; border-right: 1px solid rgba(0,0,0,0.35); overflow: hidden;
+    background: var(--library); border-right: 1px solid rgba(0,0,0,0.35); overflow: hidden;
   }
   .pb-search { padding: 12px 12px 10px; border-bottom: 1px solid rgba(0,0,0,0.28); }
   .pb-search input {
     width: 100%; font: 13px var(--font); color: var(--text); appearance: none; -webkit-appearance: none;
-    background: #27272b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%2392929a' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat 10px center;
+    background: var(--library-input) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%2392929a' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat 10px center;
     border: 1px solid rgba(0,0,0,0.3); border-radius: 8px; padding: 8px 11px 8px 32px;
   }
   .pb-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
-  .pb-search input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,159,10,0.3); }
+  .pb-search input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.3); }
   .pb-split { display: flex; flex: 1; min-height: 0; }
   .pb-cats {
     width: 150px; flex: 0 0 150px; border-right: 1px solid rgba(0,0,0,0.28);
@@ -325,7 +365,7 @@
   /* Slot the lifted pedal leaves behind; other pedals flow around it. */
   .pedal-placeholder {
     align-self: stretch; box-sizing: border-box; border-radius: 11px;
-    background: rgba(255,255,255,0.03); border: 1.5px dashed rgba(255,159,10,0.4);
+    background: rgba(255,255,255,0.03); border: 1.5px dashed rgba(var(--accent-rgb),0.4);
   }
   .pedalboard.removing { outline: 1.5px dashed var(--red); outline-offset: -4px; }
 
@@ -357,11 +397,11 @@
     background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a8a8e' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 11px center;
     border: 1px solid rgba(255,255,255,0.08); border-radius: 7px; padding: 8px 28px 8px 11px; cursor: pointer;
   }
-  select:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,159,10,0.35); }
+  select:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.35); }
   input[type=range] { width: 100%; accent-color: var(--accent); }
   #calibration input[type=range] { margin-bottom: 10px; }
 
-  .hint { margin-top: 10px; padding: 10px 12px; background: rgba(255,159,10,0.06); border: 1px solid rgba(255,159,10,0.14); border-radius: 7px; font-size: 11px; color: #7a6030; line-height: 1.55; }
+  .hint { margin-top: 10px; padding: 10px 12px; background: rgba(var(--accent-rgb),0.06); border: 1px solid rgba(var(--accent-rgb),0.14); border-radius: 7px; font-size: 11px; color: #7a6030; line-height: 1.55; }
   .hint b { color: #cc8000; }
   .hint b.off { color: var(--text-secondary); }
   #safari-warn { background: rgba(255,69,58,0.06); border-color: rgba(255,69,58,0.15); color: #8a3030; }
@@ -389,10 +429,22 @@
   .tc-name { font-weight: 700; font-size: 16px; }
   .tc-archetype { color: var(--accent); font-size: 13px; margin-bottom: 8px; }
   .tc-grid { fill: rgba(128,128,128,0.08); stroke: var(--border); }
-  .tc-poly { fill: rgba(255,159,10,0.32); stroke: var(--accent); stroke-width: 2; }
+  .tc-poly { fill: rgba(var(--accent-rgb),0.32); stroke: var(--accent); stroke-width: 2; }
   .tc-stats { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; font-size: 12px; color: var(--very-muted); }
   .tc-stat { display: flex; justify-content: space-between; }
   .tc-stat b { color: var(--text); }
+
+  .knob-arc { stroke: var(--accent); }
+
+  /* Theme swatches */
+  .theme-swatches { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: 4px; }
+  .theme-swatch {
+    width: 15px; height: 15px; border-radius: 50%; padding: 0; cursor: pointer;
+    border: 1.5px solid rgba(255,255,255,0.25); background: var(--sw);
+    transition: transform .12s ease, border-color .12s ease;
+  }
+  .theme-swatch:hover { transform: scale(1.15); }
+  .theme-swatch.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,0.4); }
 
   .hidden { display: none !important; }
 </style>
@@ -403,6 +455,14 @@
   <div class="window-main">
   <div class="toolbar">
     <div class="traffic"><span></span><span></span><span></span></div>
+    <div id="theme-swatches" class="theme-swatches">
+      <button class="theme-swatch" data-theme="studio" style="--sw:#ff9f0a" title="Studio" aria-label="Studio theme"></button>
+      <button class="theme-swatch" data-theme="midnight" style="--sw:#3b9eff" title="Midnight" aria-label="Midnight theme"></button>
+      <button class="theme-swatch" data-theme="sunset" style="--sw:#ff7a3c" title="Sunset" aria-label="Sunset theme"></button>
+      <button class="theme-swatch" data-theme="emerald" style="--sw:#2fd16f" title="Emerald" aria-label="Emerald theme"></button>
+      <button class="theme-swatch" data-theme="violet" style="--sw:#ff4d9d" title="Violet" aria-label="Violet theme"></button>
+      <button class="theme-swatch" data-theme="ocean" style="--sw:#34c8e0" title="Ocean" aria-label="Ocean theme"></button>
+    </div>
     <div class="title">Guitar Studio</div>
     <div class="toolbar-actions">
       <div id="presets"></div>

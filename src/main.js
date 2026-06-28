@@ -16,7 +16,6 @@ import { autoCorrelate } from './pitch/detector.js';
 import { freqToNote, noteLabel } from './pitch/note.js';
 import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
-import { resolveTheme } from './theme.js';
 import { spectrumBars } from './spectrum.js';
 import { measureLoudnessGain } from './normalize.js';
 import * as chainState from './chain-state.js';
@@ -28,6 +27,7 @@ let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
 let calibrationEq, calibRAF, calibState, calibCountdown;
 let pitchBuf, lastNoteMs = 0;
 let prevBars = null;
+let accentRGB = '255,159,10'; // current theme accent for canvas drawing
 
 let currentChain = [];   // array of units (chain-state model) — source of truth
 let nextId = 1;          // monotonic instanceId source
@@ -201,29 +201,31 @@ function drawSpectrum(freqBytes) {
 
   const pts = sm.map((v, i) => ({ x: (i / (N - 1)) * W, y: H - v * H * 0.92 }));
 
-  // Filled area (cubic Bézier, control points at x midpoints)
+  // Filled area (cubic Bézier, control points at x midpoints). Colored by the
+  // active theme's accent.
+  const a = accentRGB;
   const grad = c.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, 'rgba(255,140,0,0.75)');
-  grad.addColorStop(0.25, 'rgba(255,90,10,0.5)');
-  grad.addColorStop(0.65, 'rgba(255,159,10,0.18)');
-  grad.addColorStop(1, 'rgba(255,159,10,0)');
+  grad.addColorStop(0, `rgba(${a},0.75)`);
+  grad.addColorStop(0.25, `rgba(${a},0.5)`);
+  grad.addColorStop(0.65, `rgba(${a},0.18)`);
+  grad.addColorStop(1, `rgba(${a},0)`);
   c.beginPath(); c.moveTo(0, H);
   pts.forEach((p, i) => { if (i === 0) c.lineTo(p.x, p.y); else { const px = pts[i - 1]; c.bezierCurveTo((px.x + p.x) / 2, px.y, (px.x + p.x) / 2, p.y, p.x, p.y); } });
   c.lineTo(W, H); c.closePath(); c.fillStyle = grad; c.fill();
 
   // Mirror reflection (subtle)
   const rGrad = c.createLinearGradient(0, H, 0, H - H * 0.2);
-  rGrad.addColorStop(0, 'rgba(255,159,10,0.08)'); rGrad.addColorStop(1, 'rgba(255,159,10,0)');
+  rGrad.addColorStop(0, `rgba(${a},0.08)`); rGrad.addColorStop(1, `rgba(${a},0)`);
   c.beginPath(); c.moveTo(0, H);
   pts.forEach((p, i) => { const ry = H + (H - p.y) * 0.18; if (i === 0) c.lineTo(p.x, ry); else { const px = pts[i - 1]; const pry = H + (H - px.y) * 0.18; c.bezierCurveTo((px.x + p.x) / 2, pry, (px.x + p.x) / 2, ry, p.x, ry); } });
   c.lineTo(W, H); c.closePath(); c.fillStyle = rGrad; c.fill();
 
   // Glowing top edge
   c.save();
-  c.shadowColor = 'rgba(255,140,0,0.7)'; c.shadowBlur = 8;
+  c.shadowColor = `rgba(${a},0.7)`; c.shadowBlur = 8;
   c.beginPath();
   pts.forEach((p, i) => { if (i === 0) c.moveTo(p.x, p.y); else { const px = pts[i - 1]; c.bezierCurveTo((px.x + p.x) / 2, px.y, (px.x + p.x) / 2, p.y, p.x, p.y); } });
-  c.strokeStyle = 'rgba(255,159,10,0.7)'; c.lineWidth = 1.5; c.stroke();
+  c.strokeStyle = `rgba(${a},0.7)`; c.lineWidth = 1.5; c.stroke();
   c.restore();
 
   // Peak frequency readout
@@ -233,7 +235,7 @@ function drawSpectrum(freqBytes) {
   if (fl && peakV > 0.08 && ctx && analyser) {
     const binHz = ctx.sampleRate / (2 * analyser.frequencyBinCount);
     const peakHz = Math.round(peakBin / N * analyser.frequencyBinCount * binHz);
-    fl.style.color = `rgba(255,159,10,${Math.min(0.6, peakV * 1.5)})`;
+    fl.style.color = `rgba(${a},${Math.min(0.6, peakV * 1.5)})`;
     fl.textContent = peakHz < 1000 ? `${peakHz} Hz` : `${(peakHz / 1000).toFixed(1)} kHz`;
   }
 }
@@ -479,21 +481,20 @@ $('settings-backdrop').addEventListener('click', () => setSettings(false));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setSettings(false); });
 $('diag').textContent = `${isSafari ? 'Safari' : 'Chrome'} · setSinkId: ${hasSetSinkId ? 'yes' : 'no'}`;
 
-// Appearance: follow system, with a persisted manual override.
-const prefersDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
-function applyTheme() {
-  const override = localStorage.getItem('ui-theme'); // 'light' | 'dark' | null
-  document.documentElement.setAttribute('data-theme', resolveTheme(prefersDark(), override));
+// Color themes: set [data-theme] on the root, persist, sync the canvas accent
+// and the active swatch. Studio is the default.
+const THEMES = ['studio', 'midnight', 'sunset', 'emerald', 'violet', 'ocean'];
+function applyColorTheme(name) {
+  const theme = THEMES.includes(name) ? name : 'studio';
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('gs-theme', theme);
+  accentRGB = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim() || '255,159,10';
+  document.querySelectorAll('.theme-swatch').forEach((b) => b.classList.toggle('active', b.dataset.theme === theme));
 }
-applyTheme();
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-  if (!localStorage.getItem('ui-theme')) applyTheme();
+document.querySelectorAll('.theme-swatch').forEach((b) => {
+  b.addEventListener('click', () => applyColorTheme(b.dataset.theme));
 });
-$('theme-toggle').addEventListener('click', () => {
-  const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-  localStorage.setItem('ui-theme', next);
-  applyTheme();
-});
+applyColorTheme(localStorage.getItem('gs-theme') || 'studio');
 
 navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
 
