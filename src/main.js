@@ -4,6 +4,7 @@ import { buildChain } from './engine.js';
 import { PRESETS, validatePreset } from './presets.js';
 import { renderPresetPicker } from './ui.js';
 import { renderPedalboard } from './chain-ui/pedalboard.js';
+import { renderAmp } from './chain-ui/amp.js';
 import { createCalibrationEq } from './calibration/calibration-eq.js';
 import { computeCorrection } from './calibration/correction.js';
 import { bandPowersFromMagnitudes } from './calibration/bands.js';
@@ -38,7 +39,14 @@ function loadPreset(preset) {
     try { engine.output.disconnect(); } catch {}
   }
   engine = buildChain(ctx, preset.chain, registry);
-  renderPedalboard($('chain'), engine.modules, (i, k, v) => engine.setParam(i, k, v));
+  const AMP_TYPES = new Set(['drive', 'eq', 'cabinet']);
+  const amp = [], ampIdx = [], ped = [], pedIdx = [];
+  engine.modules.forEach((m, i) => {
+    if (AMP_TYPES.has(m.type)) { amp.push(m); ampIdx.push(i); }
+    else { ped.push(m); pedIdx.push(i); }
+  });
+  renderAmp($('amp'), amp, (j, k, v) => engine.setParam(ampIdx[j], k, v));
+  renderPedalboard($('chain'), ped, (j, k, v) => engine.setParam(pedIdx[j], k, v));
   if (calibrationEq) calibrationEq.output.connect(engine.input);
   if (gainOut) engine.output.connect(gainOut);
 }
