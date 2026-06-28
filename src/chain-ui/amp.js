@@ -11,7 +11,9 @@ export function renderAmp(container, modules, onParamChange) {
   const badge = document.createElement('div');
   badge.className = 'amp-badge';
   badge.textContent = 'GTR · STUDIO';
-  grille.appendChild(badge);
+  const led = document.createElement('div');
+  led.className = 'amp-led';
+  grille.append(badge, led);
 
   const panel = document.createElement('div');
   panel.className = 'amp-panel';
