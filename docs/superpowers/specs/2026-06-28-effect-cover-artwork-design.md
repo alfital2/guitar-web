@@ -52,9 +52,10 @@ Each effect *category* gets a font personality. Confirmed: **Fuzz → Bungee**.
 | Funk | wah, autowah | **Bungee Inline** | funky |
 | Utility/tech | compressor, gate, limiter, pitchshift, looper, ringmod | **Major Mono Display** | technical mono |
 
-Fonts are **self-hosted woff2** (downloaded into `src/fonts/`), not loaded from the
-Google CDN — the app runs offline (audio worklets, local processing) and a network
-font dep would risk FOUT/missing labels. `@font-face` declared in `index.html`.
+Fonts load from **Google Fonts CDN** by extending the existing `<link>` in
+`index.html:9` (the app already depends on the Google CDN for Inter + JetBrains Mono,
+so this follows the established pattern — self-hosting would diverge for no gain).
+A monospace system fallback in the `font-family` stack covers a CDN miss.
 
 ### Motif table
 
