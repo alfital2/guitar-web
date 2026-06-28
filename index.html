@@ -6,7 +6,7 @@
 <title>Guitar Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Bungee&family=Bungee+Inline&family=Audiowide&family=Orbitron:wght@600;800&family=Special+Elite&family=Major+Mono+Display&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0a0a0c;
@@ -190,31 +190,40 @@
   }
   .connector { display: flex; align-items: center; color: #252528; font-size: 18px; padding-top: 32px; flex-shrink: 0; }
   .pedal {
-    position: relative; min-width: 122px; border-radius: 11px; overflow: hidden; padding: 8px 10px 0;
-    background: linear-gradient(150deg, #2c2c31 0%, #212124 55%, #1a1a1e 100%);
-    border: 1px solid rgba(255,255,255,0.06); border-top: 2.5px solid var(--pedal-color, #636368);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.05);
+    position: relative; width: 132px; min-width: 132px; border-radius: 13px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
   }
+  /* full-bleed cover art fills the enclosure; controls layer on top */
+  .pedal-art { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+  .pedal-scrim { position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0.12) 55%, rgba(0,0,0,0.62) 100%); }
+  /* anodized inner rim (replaces the old colored top bar) */
+  .pedal-rim { position: absolute; inset: 0; z-index: 1; border-radius: 13px; pointer-events: none;
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--pedal-color) 55%, transparent), inset 0 0 12px color-mix(in srgb, var(--pedal-color) 22%, transparent); }
   .pedal::before, .pedal::after {
-    content: ""; position: absolute; top: 7px; width: 4px; height: 4px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #38383c, #0e0e11); box-shadow: inset 0 0.5px 1px rgba(0,0,0,0.9);
+    content: ""; position: absolute; top: 8px; width: 5px; height: 5px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 35% 30%, #4a4a50, #0e0e11); box-shadow: 0 1px 2px rgba(0,0,0,0.7);
   }
-  .pedal::before { left: 7px; } .pedal::after { right: 7px; }
+  .pedal::before { left: 8px; } .pedal::after { right: 8px; }
+  .pedal-inner { position: relative; z-index: 2; display: flex; flex-direction: column; min-height: 150px; }
   .pedal-name {
-    text-align: center; font-size: 8px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase;
-    color: rgba(255,255,255,0.75); background: rgba(0,0,0,0.4); border: 1px solid rgba(0,0,0,0.55);
-    border-radius: 4px; padding: 3px 6px; margin: 6px 0 7px;
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.6); text-shadow: 0 1px 1px rgba(0,0,0,0.9);
+    align-self: center; margin-top: auto;
+    font-family: var(--font, inherit); font-size: 13px; font-weight: 800; letter-spacing: var(--font-ls, 0.04em);
+    text-transform: uppercase; line-height: 1; color: rgba(255,255,255,0.96);
+    background: rgba(8,4,4,0.62); border: 1px solid rgba(0,0,0,0.6); border-radius: 5px; padding: 4px 11px 3px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.95); box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
   }
-  .knobs { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; padding-bottom: 7px; }
+  .knobs { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 10px 8px 8px; }
   .pedal-foot {
-    margin: 0 -10px; height: 20px; position: relative; display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(180deg, rgba(0,0,0,0.24), rgba(0,0,0,0.5));
+    height: 22px; position: relative; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.72)); border-top: 1px solid rgba(255,255,255,0.04);
   }
-  .pedal-foot::after { content: ""; width: 42%; height: 4px; border-radius: 3px; background: rgba(0,0,0,0.45); box-shadow: inset 0 1px 2px rgba(0,0,0,0.7); }
+  .pedal-foot::after { content: ""; width: 44%; height: 4px; border-radius: 3px; background: rgba(0,0,0,0.5); box-shadow: inset 0 1px 2px rgba(0,0,0,0.8); }
   .pedal-led {
     position: absolute; top: -3px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; border-radius: 50%;
-    background: var(--pedal-color, #636368); box-shadow: 0 0 5px var(--pedal-color, #636368);
+    background: var(--pedal-color, #636368); box-shadow: 0 0 7px var(--pedal-color, #636368), 0 0 2px #fff;
   }
   .pedalboard-empty { color: #242428; font-size: 12px; padding: 16px 0; text-align: center; letter-spacing: 0.04em; font-style: italic; }
 
@@ -282,6 +291,8 @@
   .fx-tile:hover { background: var(--surface-hi); color: var(--text); border-color: var(--border-hi); }
   .fx-tile:active { cursor: grabbing; }
   .fx-tile-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; background: var(--pedal-color, #636368); box-shadow: 0 0 7px var(--pedal-color, #636368); }
+  .fx-tile .fx-art { width: 42px; height: 30px; flex: 0 0 auto; border-radius: 5px; display: block; }
+  .fx-tile-label { font-family: var(--font, inherit); letter-spacing: var(--font-ls, 0); }
   /* Drag ghost following the cursor */
   .fx-ghost {
     position: fixed; z-index: 70; pointer-events: none; padding: 9px 13px; border-radius: 9px;
