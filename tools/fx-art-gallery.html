@@ -1,108 +1,54 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>FX Art Gallery — dev QA</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<html lang="en"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>FX Faceplate Gallery — dev QA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Bungee+Inline&family=Audiowide&family=Orbitron:wght@600;800&family=Special+Elite&family=Major+Mono+Display&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0d0d10;--window:#161619;--surface:#1b1b1f;--surface-hi:#232329;
-    --border:rgba(255,255,255,.06);--border-hi:rgba(255,255,255,.14);
-    --text:#f2f2f4;--text-secondary:#c7c7cc;--muted:#6a6a70}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:32px}
-  h1{font-size:14px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 24px}
-  h2{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:28px 0 12px}
-  .fx-art{display:block}
-
-  /* palette tiles */
-  .fx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;max-width:900px}
-  .fx-tile{display:flex;align-items:center;gap:10px;text-align:left;padding:9px 11px;
-    background:var(--surface);border:1px solid var(--border);border-radius:9px;font-size:13px;font-weight:600;color:var(--text-secondary)}
-  .fx-tile .fx-art{width:42px;height:30px;flex:0 0 auto;border-radius:5px}
-  .fx-tile-label{font-family:var(--font,inherit);letter-spacing:var(--font-ls,0)}
-
-  /* board pedals */
-  .pedals{display:flex;flex-wrap:wrap;gap:16px}
-  .pedal{position:relative;width:132px;border-radius:13px;overflow:hidden;
-    border:1px solid rgba(255,255,255,.08);
-    box-shadow:0 8px 24px rgba(0,0,0,.6),inset 0 0 0 1px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.08)}
-  .pedal-art{position:absolute;inset:0;width:100%;height:100%;z-index:0}
-  .pedal-scrim{position:absolute;inset:0;z-index:1;pointer-events:none;
-    background:linear-gradient(180deg,rgba(0,0,0,.18) 0%,rgba(0,0,0,0) 30%,rgba(0,0,0,.12) 55%,rgba(0,0,0,.62) 100%)}
-  .pedal-rim{position:absolute;inset:0;z-index:1;border-radius:13px;pointer-events:none;
-    box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--c) 55%,transparent),inset 0 0 12px color-mix(in srgb,var(--c) 22%,transparent)}
-  .pedal::before,.pedal::after{content:"";position:absolute;top:8px;width:5px;height:5px;border-radius:50%;z-index:3;
-    background:radial-gradient(circle at 35% 30%,#4a4a50,#0e0e11);box-shadow:0 1px 2px rgba(0,0,0,.7)}
-  .pedal::before{left:8px}.pedal::after{right:8px}
-  .pedal-inner{position:relative;z-index:2;display:flex;flex-direction:column;min-height:150px}
-  .pedal-name{align-self:center;margin-top:auto;font-family:var(--font,inherit);font-size:13px;font-weight:800;
-    letter-spacing:var(--font-ls,.04em);text-transform:uppercase;line-height:1;color:rgba(255,255,255,.96);
-    background:rgba(8,4,4,.62);border:1px solid rgba(0,0,0,.6);border-radius:5px;padding:4px 11px 3px;
-    text-shadow:0 1px 2px rgba(0,0,0,.95);box-shadow:0 2px 6px rgba(0,0,0,.5);backdrop-filter:blur(2px)}
-  .knobs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:10px 8px 8px}
-  .knob{width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 38% 30%,#3a3a40,#141417);
-    border:1px solid rgba(0,0,0,.65);box-shadow:inset 0 1px 1px rgba(255,255,255,.1),0 3px 6px rgba(0,0,0,.55);position:relative}
-  .knob::after{content:"";position:absolute;top:3px;left:50%;width:1.6px;height:8px;background:var(--c);transform:translateX(-50%) rotate(28deg);transform-origin:bottom;border-radius:1px}
-  .pedal-foot{height:22px;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.72));position:relative;display:flex;align-items:center;justify-content:center;border-top:1px solid rgba(255,255,255,.04)}
-  .pedal-foot::after{content:"";width:44%;height:4px;border-radius:3px;background:rgba(0,0,0,.5);box-shadow:inset 0 1px 2px rgba(0,0,0,.8)}
-  .pedal-led{position:absolute;top:-3px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--c);box-shadow:0 0 7px var(--c),0 0 2px #fff}
-</style>
-</head>
+  body{margin:0;background:#0d0d10;color:#e8e8ea;font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;padding:28px}
+  h1{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#6a6a70;margin:0 0 20px}
+  .grid{display:flex;flex-wrap:wrap;gap:18px 16px;align-items:flex-start;max-width:1180px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .cap{font-size:11px;color:#8a8a90}
+  .pedal{position:relative;border-radius:14px;overflow:hidden;box-shadow:0 14px 36px rgba(0,0,0,.66)}
+  .pedal svg.face{display:block;width:100%;height:auto}
+  .knobs{position:absolute;left:0;right:0;display:flex;justify-content:center;gap:15px;z-index:2}
+  .knob{width:27px;height:27px;border-radius:50%;background:radial-gradient(circle at 38% 28%,#4a4a52,#141417 75%);
+    border:1px solid rgba(0,0,0,.7);box-shadow:inset 0 1px 1px rgba(255,255,255,.18),0 3px 6px rgba(0,0,0,.6);position:relative}
+  .knob::after{content:"";position:absolute;top:2px;left:50%;width:2px;height:9px;background:var(--c,#f4f4f6);transform:translateX(-50%) rotate(22deg);transform-origin:bottom;border-radius:1px;box-shadow:0 0 3px var(--c)}
+  .foot{position:absolute;left:0;right:0;bottom:0;height:18px;background:linear-gradient(180deg,rgba(0,0,0,.4),rgba(0,0,0,.78));display:flex;align-items:center;justify-content:center;z-index:2}
+  .foot::after{content:"";width:44%;height:4px;border-radius:3px;background:rgba(0,0,0,.55)}
+  .led{position:absolute;top:-3px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:var(--c);box-shadow:0 0 7px var(--c),0 0 2px #fff}
+</style></head>
 <body>
-<h1>FX Cover Art Gallery</h1>
-<h2>Palette tiles</h2>
-<div class="fx-grid" id="grid"></div>
-<h2>Board pedals</h2>
-<div class="pedals" id="pedals"></div>
-
+<h1>FX Faceplate Gallery — bespoke</h1>
+<div class="grid" id="grid"></div>
 <script type="module">
-  import { FX_FONTS, FX_COLORS, fxArtSvg, ensureFxArtSheet } from '../src/chain-ui/fx-art.js';
+  import { FX_COLORS, FX_KNOBS, fxWidth, fxArtSvg, ensureFxArtSheet } from '../src/chain-ui/fx-art.js';
   ensureFxArtSheet();
-
-  // Order mirrors PEDAL_TYPES.
   const TYPES = [
-    ['compressor','Compressor'],['boost','Boost'],['gate','Noise Gate'],
-    ['fuzz','Fuzz'],['octave','Octave Fuzz'],['wah','Wah'],['autowah','Auto-Wah'],
-    ['chorus','Chorus'],['flanger','Flanger'],['phaser','Phaser'],
-    ['tremolo','Tremolo'],['vibrato','Vibrato'],['autopan','Auto-Pan'],
-    ['rotary','Rotary'],['ringmod','Ring Mod'],
-    ['delay','Delay'],['tape-echo','Tape Echo'],['pingpong','Ping-Pong'],
-    ['reverb','Reverb'],['widener','Widener'],['limiter','Limiter'],
-    ['pitchshift','Pitch Shift'],['looper','Looper'],
+    ['compressor','Compressor'],['boost','Boost'],['gate','Noise Gate'],['fuzz','Fuzz'],['octave','Octave Fuzz'],
+    ['wah','Wah'],['autowah','Auto-Wah'],['chorus','Chorus'],['flanger','Flanger'],['phaser','Phaser'],
+    ['tremolo','Tremolo'],['vibrato','Vibrato'],['autopan','Auto-Pan'],['rotary','Rotary'],['ringmod','Ring Mod'],
+    ['delay','Delay'],['tape-echo','Tape Echo'],['pingpong','Ping-Pong'],['reverb','Reverb'],['widener','Widener'],
+    ['limiter','Limiter'],['pitchshift','Pitch Shift'],['looper','Looper'],
   ];
+  const ART_H = 248, KNOB_CY = 134; // knob-band center in art coords
   const grid = document.getElementById('grid');
-  const pedals = document.getElementById('pedals');
-
-  for (const [type, label] of TYPES) {
-    const c = FX_COLORS[type] ?? '#636368';
-    const f = FX_FONTS[type] ?? {};
-    // tile
-    const tile = document.createElement('div');
-    tile.className = 'fx-tile';
-    tile.style.setProperty('--c', c);
-    if (f.family) { tile.style.setProperty('--font', f.family); tile.style.setProperty('--font-ls', f.ls); }
-    tile.appendChild(fxArtSvg(type));
-    const lab = document.createElement('span'); lab.className = 'fx-tile-label'; lab.textContent = label;
-    tile.appendChild(lab);
-    grid.appendChild(tile);
-    // pedal
-    const pedal = document.createElement('div');
-    pedal.className = 'pedal';
-    pedal.style.setProperty('--c', c);
-    if (f.family) { pedal.style.setProperty('--font', f.family); pedal.style.setProperty('--font-ls', f.ls); }
-    const art = fxArtSvg(type); art.classList.add('pedal-art');
-    pedal.innerHTML = '<div class="pedal-scrim"></div><div class="pedal-rim"></div>';
-    pedal.prepend(art);
-    const inner = document.createElement('div'); inner.className = 'pedal-inner';
-    inner.innerHTML = `<div class="pedal-name">${label}</div>
-      <div class="knobs"><div class="knob"></div><div class="knob"></div><div class="knob"></div></div>
-      <div class="pedal-foot"><div class="pedal-led"></div></div>`;
-    pedal.appendChild(inner);
-    pedals.appendChild(pedal);
+  for (const [type,label] of TYPES) {
+    const c = FX_COLORS[type] ?? '#aaa';
+    const aw = fxWidth(type), n = FX_KNOBS[type] ?? 3;
+    const cell = document.createElement('div'); cell.className='cell';
+    const pedal = document.createElement('div'); pedal.className='pedal'; pedal.style.width = aw+'px'; pedal.style.setProperty('--c', c);
+    const art = fxArtSvg(type); art.classList.add('face');
+    pedal.appendChild(art);
+    const knobs = document.createElement('div'); knobs.className='knobs';
+    knobs.style.top = (KNOB_CY - 13.5) + 'px';
+    knobs.innerHTML = Array.from({length:n}, ()=> '<div class="knob"></div>').join('');
+    const foot = document.createElement('div'); foot.className='foot'; foot.innerHTML='<div class="led"></div>';
+    pedal.append(knobs, foot);
+    const cap = document.createElement('div'); cap.className='cap'; cap.textContent=`${label} · ${n}k`;
+    cell.append(pedal, cap); grid.appendChild(cell);
   }
 </script>
-</body>
-</html>
+</body></html>
