@@ -40,17 +40,18 @@
     background: var(--bg);
     background-image: linear-gradient(180deg, #7c7c7e 0%, #646466 32%, #5a5a5c 100%);
     background-attachment: fixed;
-    display: flex; align-items: flex-start; justify-content: center; gap: 16px; flex-wrap: wrap;
+    display: flex; align-items: flex-start; justify-content: center;
     padding: 20px 12px 48px; -webkit-font-smoothing: antialiased;
   }
 
   /* ── Window ─────────────────────────────────────────── */
   .window {
-    width: 100%; max-width: 1140px; background: var(--window);
+    width: 100%; max-width: 1524px; background: var(--window);
     border-radius: 16px; border: 1px solid rgba(255,255,255,0.07);
     box-shadow: 0 48px 120px rgba(0,0,0,0.92), 0 0 0 0.5px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.06);
-    overflow: hidden;
+    overflow: hidden; display: flex; align-items: stretch;
   }
+  .window-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
   /* ── Toolbar ────────────────────────────────────────── */
   .toolbar {
@@ -239,11 +240,8 @@
   .pedal-add:hover { color: var(--text-secondary); border-color: rgba(255,255,255,0.22); }
   /* Patch library (left of the window) — GarageBand-style master/detail */
   .preset-browser {
-    width: 384px; flex: 0 0 384px; align-self: stretch; height: calc(100vh - 68px);
-    position: sticky; top: 20px; display: flex; flex-direction: column;
-    background: #34343a; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
-    box-shadow: 0 48px 120px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
-    overflow: hidden;
+    width: 368px; flex: 0 0 368px; display: flex; flex-direction: column;
+    background: #34343a; border-right: 1px solid rgba(0,0,0,0.35); overflow: hidden;
   }
   .pb-search { padding: 12px 12px 10px; border-bottom: 1px solid rgba(0,0,0,0.28); }
   .pb-search input {
@@ -276,7 +274,10 @@
   .pb-patch:hover { background: rgba(255,255,255,0.06); }
   .pb-patch.active { background: rgba(255,255,255,0.14); font-weight: 600; color: #fff; }
   .pb-empty { padding: 12px; font-size: 12px; color: rgba(255,255,255,0.4); font-style: italic; }
-  @media (max-width: 1100px) { .preset-browser { width: 100%; flex-basis: 100%; position: static; height: 420px; } }
+  @media (max-width: 1100px) {
+    .window { flex-direction: column; }
+    .preset-browser { width: 100%; flex: 0 0 auto; height: 320px; border-right: none; border-bottom: 1px solid rgba(0,0,0,0.35); }
+  }
 
   /* Add Effect window */
   .fx-modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,0.6); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
@@ -397,9 +398,9 @@
 </style>
 </head>
 <body>
-<aside id="preset-browser" class="preset-browser" aria-label="Patches"></aside>
-
 <div class="window">
+  <aside id="preset-browser" class="preset-browser" aria-label="Patches"></aside>
+  <div class="window-main">
   <div class="toolbar">
     <div class="traffic"><span></span><span></span><span></span></div>
     <div class="title">Guitar Studio</div>
@@ -448,6 +449,7 @@
     </div>
     <div id="chain"></div>
   </section>
+  </div>
 </div>
 
 <div id="settings-backdrop" class="settings-backdrop" hidden></div>
