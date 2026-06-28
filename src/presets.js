@@ -21,8 +21,8 @@ export const PRESETS = [clean, mayerEdge, mayerLead, knopflerSultans, asatoClean
 
 // GarageBand patches grouped by browser category, for the preset browser panel.
 export const GB_CATEGORIES = [
-  { id: 'clean', label: 'Clean Guitar', presets: GB_PRESETS.filter((p) => p.category === 'clean') },
-  { id: 'crunch', label: 'Crunch & Distorted', presets: GB_PRESETS.filter((p) => p.category === 'crunch') },
+  { id: 'clean', label: '01 Clean Guitar', presets: GB_PRESETS.filter((p) => p.category === 'clean') },
+  { id: 'crunch', label: '02 Crunch Guitar', presets: GB_PRESETS.filter((p) => p.category === 'crunch') },
 ];
 
 export function validatePreset(preset, registry) {
