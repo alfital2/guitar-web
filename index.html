@@ -173,6 +173,22 @@
   .knob .label { font-size: 10px; color: var(--muted); margin-top: 1px; text-align: center; }
   .knob.dragging .val { color: var(--accent); }
 
+  /* Settings slide-in */
+  #calib-start { width: 100%; }
+  .settings-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 40; opacity: 0; transition: opacity .2s ease; }
+  .settings-backdrop.open { opacity: 1; }
+  .settings-panel {
+    position: fixed; top: 0; right: 0; height: 100%; width: 360px; max-width: 88vw; z-index: 50;
+    background: var(--bg); border-left: 1px solid var(--line); box-shadow: -12px 0 40px rgba(0,0,0,0.35);
+    padding: 18px 20px; overflow-y: auto; transform: translateX(100%);
+  }
+  @media (prefers-reduced-motion: no-preference) { .settings-panel { transition: transform .28s cubic-bezier(.2,.85,.25,1); } }
+  .settings-panel.open { transform: translateX(0); }
+  .settings-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .settings-head h2 { font-size: 15px; font-weight: 700; margin: 0; }
+  .settings-section { padding: 14px 0; border-top: 1px solid var(--line); }
+  .settings-section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+
   /* Tone card */
   .tone-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 16px; text-align: center; }
   .tc-name { font-weight: 700; font-size: 16px; }
@@ -197,6 +213,7 @@
     <div class="toolbar-actions">
       <button id="start" class="primary">Start</button>
       <button id="stop" disabled>Stop</button>
+      <button id="settings-toggle" class="icon" aria-label="Settings" title="Settings">⚙</button>
       <button id="theme-toggle" class="icon" aria-label="Toggle appearance" title="Toggle light/dark">◐</button>
     </div>
   </div>
@@ -206,7 +223,6 @@
       <div id="note-circle" class="note-circle">—</div>
       <div class="hero-meta">
         <div id="status" class="status">Idle</div>
-        <div id="diag" class="caption"></div>
         <span id="status-dot" class="dot"></span>
       </div>
     </div>
@@ -221,44 +237,13 @@
 
   <div class="cards">
     <section class="card">
-      <h2>Devices</h2>
-      <label for="input">Input</label>
-      <select id="input"></select>
-      <label for="output">Output</label>
-      <select id="output"></select>
-      <div class="hint"><b>Focusrite tip:</b> turn <b>Direct Monitor</b> off so you only hear the processed signal.</div>
-      <div id="safari-warn" class="hint" style="display:none;border-left-color:#ff5f57">
-        <b>Safari can't choose the output device</b> — set the Focusrite as your Mac's system default output.
-      </div>
-      <div id="error" class="err"></div>
-      <div class="meter"><div id="meter" class="meter-fill"></div></div>
-      <div class="stats">
-        <div class="stat"><span>Sample rate</span><b id="sr">—</b></div>
-        <div class="stat"><span>Base latency</span><b id="base">—</b></div>
-        <div class="stat"><span>Output latency</span><b id="out">—</b></div>
-        <div class="stat"><span>Round trip</span><b id="total">—</b></div>
-      </div>
-      <div id="verdict" class="verdict"></div>
-    </section>
-
-    <section class="card">
-      <h2>Calibration</h2>
+      <h2>Guitar</h2>
       <div id="calibration"></div>
-      <div id="calib-wizard" style="display:none">
-        <p id="calib-instr" class="caption">Play across the whole neck — low to high — for ~12s.</p>
-        <div class="meter"><div id="calib-coverage" class="meter-fill"></div></div>
-        <div class="row">
-          <button id="calib-save" class="primary" disabled>Save guitar…</button>
-          <button id="calib-cancel">Cancel</button>
-        </div>
-      </div>
     </section>
-
     <section class="card">
       <h2>Tone Card</h2>
-      <div id="tone-card"><p class="caption">Calibrate a guitar to see its tone card.</p></div>
+      <div id="tone-card"><p class="caption">Calibrate a guitar in Settings to see its tone card.</p></div>
     </section>
-
   </div>
 
   <section class="pedalboard-strip">
@@ -269,6 +254,53 @@
     <div id="chain"></div>
   </section>
 </div>
+
+<div id="settings-backdrop" class="settings-backdrop" hidden></div>
+<aside id="settings-panel" class="settings-panel" aria-label="Settings">
+  <div class="settings-head">
+    <h2>Settings</h2>
+    <button id="settings-close" class="icon" aria-label="Close settings">✕</button>
+  </div>
+
+  <section class="settings-section">
+    <h3>Devices</h3>
+    <label for="input">Input</label>
+    <select id="input"></select>
+    <label for="output">Output</label>
+    <select id="output"></select>
+    <div class="hint"><b>Focusrite tip:</b> turn <b>Direct Monitor</b> off so you only hear the processed signal.</div>
+    <div id="safari-warn" class="hint" style="display:none;border-left-color:#ff5f57">
+      <b>Safari can't choose the output device</b> — set the Focusrite as your Mac's system default output.
+    </div>
+    <div id="error" class="err"></div>
+  </section>
+
+  <section class="settings-section">
+    <h3>Diagnostics</h3>
+    <div class="meter"><div id="meter" class="meter-fill"></div></div>
+    <div class="stats">
+      <div class="stat"><span>Sample rate</span><b id="sr">—</b></div>
+      <div class="stat"><span>Base latency</span><b id="base">—</b></div>
+      <div class="stat"><span>Output latency</span><b id="out">—</b></div>
+      <div class="stat"><span>Round trip</span><b id="total">—</b></div>
+    </div>
+    <div id="verdict" class="verdict"></div>
+    <div id="diag" class="caption" style="margin-top:8px"></div>
+  </section>
+
+  <section class="settings-section">
+    <h3>Calibration</h3>
+    <button id="calib-start">Calibrate New Guitar</button>
+    <div id="calib-wizard" style="display:none;margin-top:12px">
+      <p id="calib-instr" class="caption">Play across the whole neck — low to high — for ~12s.</p>
+      <div class="meter"><div id="calib-coverage" class="meter-fill"></div></div>
+      <div class="row">
+        <button id="calib-save" class="primary" disabled>Save guitar…</button>
+        <button id="calib-cancel">Cancel</button>
+      </div>
+    </div>
+  </section>
+</aside>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>
