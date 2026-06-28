@@ -77,19 +77,14 @@
   html, body { height: 100%; }
   body {
     margin: 0; color: var(--text); font: 14px/1.5 var(--font);
-    background: var(--bg);
-    background-image: var(--bg-grad);
-    background-attachment: fixed;
-    display: flex; align-items: flex-start; justify-content: center;
-    padding: 20px 12px 48px; -webkit-font-smoothing: antialiased;
+    background: var(--window);
+    -webkit-font-smoothing: antialiased;
   }
 
-  /* ── Window ─────────────────────────────────────────── */
+  /* ── Window (fills the viewport) ────────────────────── */
   .window {
-    width: 100%; max-width: 1524px; background: var(--window);
-    border-radius: 16px; border: 1px solid rgba(255,255,255,0.07);
-    box-shadow: 0 48px 120px rgba(0,0,0,0.92), 0 0 0 0.5px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.06);
-    overflow: hidden; display: flex; align-items: stretch;
+    width: 100%; min-height: 100vh; background: var(--window);
+    display: flex; align-items: stretch;
   }
   .window-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
