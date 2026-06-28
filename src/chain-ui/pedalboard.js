@@ -24,6 +24,8 @@ const COLORS = {
   pingpong: '#ffc857',
   widener: '#5e5ce6',
   limiter: '#0a84ff',
+  pitchshift: '#ff2d55',
+  looper: '#34c759',
 };
 
 // Pedal (addable) types and their display labels. Amp types (drive/eq/cabinet)
@@ -37,6 +39,7 @@ const PEDAL_TYPES = [
   ['tremolo', 'Tremolo'], ['vibrato', 'Vibrato'], ['ringmod', 'Ring Mod'],
   ['delay', 'Delay'], ['tape-echo', 'Tape Echo'], ['pingpong', 'Ping-Pong'],
   ['reverb', 'Reverb'], ['widener', 'Widener'], ['limiter', 'Limiter'],
+  ['pitchshift', 'Pitch Shift'], ['looper', 'Looper'],
 ];
 
 function connector() {
@@ -61,35 +64,127 @@ function outsideBoard(board, e) {
   return e.clientY < r.top - 24 || e.clientY > r.bottom + 24 || e.clientX < r.left - 24 || e.clientX > r.right + 24;
 }
 
-// Pointer-drag a pedal by its nameplate: reorder within the board, or drag off
-// the board to delete. Knobs handle their own pointer events independently.
+const FLIP_EASE = 'transform .19s cubic-bezier(.2,.85,.25,1)';
+
+// Slot items the placeholder can sit among: real pedals (not the lifted one) and
+// the AMP anchor. Connectors and the add tile are excluded from slot math.
+function slotItems(board, lifted) {
+  return [...board.children].filter((c) =>
+    (c.classList.contains('pedal') && c !== lifted) || c.classList.contains('amp-anchor'));
+}
+
+// The chain id the placeholder drops "before": a pedal's instanceId, the amp
+// block's first id (drop into the pre-amp slot), or null for end-of-row.
+function nextDropId(ph) {
+  let n = ph.nextElementSibling;
+  while (n && n.classList.contains('connector')) n = n.nextElementSibling;
+  if (!n) return null;
+  if (n.classList.contains('amp-anchor')) return Number(n.dataset.beforeId);
+  if (n.classList.contains('pedal')) return Number(n.dataset.instanceId);
+  return null;
+}
+
+// Move the placeholder to the slot under the cursor and animate the displaced
+// items into their new positions (FLIP) so the row flows like rearranging apps.
+function repositionPlaceholder(board, lifted, ph, clientX) {
+  const items = slotItems(board, lifted);
+  let target = null;
+  for (const it of items) {
+    const r = it.getBoundingClientRect();
+    if (clientX < r.left + r.width / 2) { target = it; break; }
+  }
+  const anchor = target || board.querySelector('.pedal-add-wrap');
+  if (ph.nextElementSibling === anchor || (target && target.previousElementSibling === ph)) return;
+
+  // FLIP: record, move, invert+play.
+  const flippers = [...board.children].filter((c) =>
+    (c.classList.contains('pedal') && c !== lifted) || c.classList.contains('amp-anchor') || c.classList.contains('connector'));
+  const first = new Map(flippers.map((el) => [el, el.getBoundingClientRect().left]));
+  board.insertBefore(ph, anchor);
+  for (const el of flippers) {
+    const dx = first.get(el) - el.getBoundingClientRect().left;
+    if (!dx) continue;
+    el.style.transition = 'none';
+    el.style.transform = `translateX(${dx}px)`;
+    requestAnimationFrame(() => { el.style.transition = FLIP_EASE; el.style.transform = ''; });
+  }
+}
+
+// Pointer-drag a pedal by its nameplate. The pedal lifts and follows the cursor;
+// a placeholder holds its slot and the other pedals flow aside in real time.
+// Dragging off the board deletes it.
 function enableDrag(pedal, plate, unit, handlers, getBoard) {
-  let dragging = false;
+  let drag = null;
   plate.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
-    dragging = true;
-    pedal.classList.add('dragging');
+    const rect = pedal.getBoundingClientRect();
+    drag = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+
+    const ph = document.createElement('div');
+    ph.className = 'pedal-placeholder';
+    ph.style.width = `${rect.width}px`;
+    ph.style.height = `${rect.height}px`;
+    pedal.before(ph);
+    drag.ph = ph;
+
+    pedal.classList.add('lifting');
+    pedal.style.width = `${rect.width}px`;
+    pedal.style.height = `${rect.height}px`;
+    pedal.style.left = `${rect.left}px`;
+    pedal.style.top = `${rect.top}px`;
     try { plate.setPointerCapture(e.pointerId); } catch {}
     e.preventDefault();
   });
+
   plate.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    getBoard().classList.toggle('removing', outsideBoard(getBoard(), e));
-  });
-  plate.addEventListener('pointerup', (e) => {
-    if (!dragging) return;
-    dragging = false;
-    pedal.classList.remove('dragging');
+    if (!drag) return;
+    pedal.style.left = `${e.clientX - drag.dx}px`;
+    pedal.style.top = `${e.clientY - drag.dy}px`;
     const board = getBoard();
     const outside = outsideBoard(board, e);
-    board.classList.remove('removing');
-    if (outside) { handlers.onRemove(unit.instanceId); return; }
-    const before = computeDrop(board, e.clientX);
-    if (before !== unit.instanceId) handlers.onMove(unit.instanceId, before);
+    board.classList.toggle('removing', outside);
+    pedal.classList.toggle('will-delete', outside);
+    if (!outside) repositionPlaceholder(board, pedal, drag.ph, e.clientX);
   });
+
+  plate.addEventListener('pointerup', (e) => {
+    if (!drag) return;
+    const board = getBoard();
+    const ph = drag.ph;
+    const outside = outsideBoard(board, e);
+    board.classList.remove('removing');
+    drag = null;
+
+    if (outside) {
+      pedal.style.transition = 'transform .15s ease, opacity .15s ease';
+      pedal.style.transform = 'scale(.55)';
+      pedal.style.opacity = '0';
+      ph.remove();
+      handlers.onRemove(unit.instanceId); // re-render replaces the faded element
+      return;
+    }
+
+    const before = nextDropId(ph);
+    // Glide the lifted pedal into the placeholder slot, then commit (re-render).
+    const pr = ph.getBoundingClientRect();
+    pedal.style.transition = 'left .19s cubic-bezier(.2,.85,.25,1), top .19s cubic-bezier(.2,.85,.25,1)';
+    pedal.style.left = `${pr.left}px`;
+    pedal.style.top = `${pr.top}px`;
+    let done = false;
+    const commit = () => {
+      if (done) return; done = true;
+      ph.remove();
+      handlers.onMove(unit.instanceId, before);
+    };
+    pedal.addEventListener('transitionend', commit, { once: true });
+    setTimeout(commit, 240); // safety if transitionend doesn't fire
+  });
+
   plate.addEventListener('pointercancel', () => {
-    dragging = false; pedal.classList.remove('dragging');
-    const board = getBoard(); if (board) board.classList.remove('removing');
+    if (!drag) return;
+    drag.ph.remove();
+    drag = null;
+    handlers.onMove(unit.instanceId, unit.instanceId); // re-render to reset
   });
 }
 
@@ -118,9 +213,11 @@ function buildPedal(unit, handlers) {
   return { pedal, plate };
 }
 
-function ampAnchor() {
+function ampAnchor(beforeId) {
   const a = document.createElement('div');
   a.className = 'amp-anchor';
+  // Dropping "before" the amp targets this id → the pre-amp slot.
+  if (beforeId != null) a.dataset.beforeId = String(beforeId);
   a.innerHTML = '<span class="amp-anchor-icon">▣</span><span class="amp-anchor-label">AMP</span>';
   a.title = 'Amp head — fixed in the signal chain';
   return a;
@@ -151,6 +248,7 @@ export function renderPedalboard(container, units, handlers) {
   const board = document.createElement('div');
   board.className = 'pedalboard';
 
+  const firstLockedId = units.find((u) => u.locked)?.instanceId;
   let placedAmp = false;
   let prevPlaced = false; // whether a connector should precede the next item
   units.forEach((u) => {
@@ -158,7 +256,7 @@ export function renderPedalboard(container, units, handlers) {
       // Place the AMP anchor once, at the first locked module's position.
       if (!placedAmp) {
         if (prevPlaced) board.appendChild(connector());
-        board.appendChild(ampAnchor());
+        board.appendChild(ampAnchor(firstLockedId));
         placedAmp = true; prevPlaced = true;
       }
       return; // locked modules render in the amp head, not as pedals

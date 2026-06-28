@@ -249,7 +249,18 @@
   /* Drag affordances */
   .pedal-name[data-drag-handle] { cursor: grab; }
   .pedal-name[data-drag-handle]:active { cursor: grabbing; }
-  .pedal.dragging { opacity: 0.5; }
+  /* Lifted pedal: out of flow, pinned to the cursor (set via inline left/top). */
+  .pedal.lifting {
+    position: fixed; z-index: 100; margin: 0 !important; pointer-events: none; cursor: grabbing;
+    box-shadow: 0 22px 55px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06);
+    transform: scale(1.05) rotate(0.5deg);
+  }
+  .pedal.lifting.will-delete { transform: scale(0.8) rotate(-3deg); opacity: 0.55; box-shadow: 0 0 0 2px var(--red); }
+  /* Slot the lifted pedal leaves behind; other pedals flow around it. */
+  .pedal-placeholder {
+    align-self: stretch; box-sizing: border-box; border-radius: 11px;
+    background: rgba(255,255,255,0.03); border: 1.5px dashed rgba(255,159,10,0.4);
+  }
   .pedalboard.removing { outline: 1.5px dashed var(--red); outline-offset: -4px; }
 
   /* ── Settings panel ─────────────────────────────────── */
