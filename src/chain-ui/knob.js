@@ -31,50 +31,80 @@ function arcPath(cx, cy, r, startDeg, endDeg) {
 }
 function svgEl(name, attrs) { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
 
-export function createKnob(param, value, onChange) {
+export function createKnob(param, value, onChange, small = false) {
   const { min, max, step, unit, label } = param;
   const uid = `knob${knobSeq++}`;
   let current = clampSnap(value, min, max, step);
 
+  // Geometry — amp knobs are 54px, pedal knobs 44px.
+  const SZ = small ? 44 : 54, C = SZ / 2;
+  const RTO = small ? 19 : 23;   // tick outer
+  const RTI = small ? 16 : 19;   // tick inner
+  const RTR = small ? 13.5 : 17; // track / arc radius
+  const RC = small ? 9 : 12;     // cap radius
+
   const el = document.createElement('div');
   el.className = 'knob';
+  el.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:3px;cursor:ns-resize;user-select:none;touch-action:none;outline:none;';
   el.setAttribute('role', 'slider');
   el.setAttribute('tabindex', '0');
   el.setAttribute('aria-label', label);
   el.setAttribute('aria-valuemin', String(min));
   el.setAttribute('aria-valuemax', String(max));
 
-  const svg = svgEl('svg', { viewBox: '0 0 56 56', class: 'knob-dial' });
+  const svg = svgEl('svg', { viewBox: `0 0 ${SZ} ${SZ}`, width: String(SZ), height: String(SZ), class: 'knob-dial' });
+  svg.style.overflow = 'visible';
 
   const defs = svgEl('defs', {});
-  const grad = svgEl('radialGradient', { id: `${uid}-cap`, cx: '38%', cy: '32%', r: '75%' });
+  const grad = svgEl('radialGradient', { id: `${uid}-c`, cx: '34%', cy: '26%', r: '72%' });
   grad.append(
-    svgEl('stop', { offset: '0%', 'stop-color': 'var(--knob-cap-hi)' }),
-    svgEl('stop', { offset: '100%', 'stop-color': 'var(--knob-cap-lo)' }),
+    svgEl('stop', { offset: '0%', 'stop-color': '#58585f' }),
+    svgEl('stop', { offset: '50%', 'stop-color': '#2a2a2f' }),
+    svgEl('stop', { offset: '100%', 'stop-color': '#0f0f12' }),
   );
-  defs.append(grad);
+  const hi = svgEl('radialGradient', { id: `${uid}-h`, cx: '28%', cy: '22%', r: '55%' });
+  hi.append(
+    svgEl('stop', { offset: '0%', 'stop-color': 'rgba(255,255,255,0.2)' }),
+    svgEl('stop', { offset: '100%', 'stop-color': 'rgba(255,255,255,0)' }),
+  );
+  const glow = svgEl('filter', { id: `${uid}-g`, x: '-100%', y: '-100%', width: '300%', height: '300%' });
+  glow.append(
+    svgEl('feGaussianBlur', { stdDeviation: '2', result: 'b' }),
+  );
+  const merge = svgEl('feMerge', {});
+  merge.append(svgEl('feMergeNode', { in: 'b' }), svgEl('feMergeNode', { in: 'SourceGraphic' }));
+  glow.append(merge);
+  defs.append(grad, hi, glow);
 
   const ticks = svgEl('g', { class: 'knob-ticks' });
   for (let i = 0; i <= 10; i++) {
     const ang = -135 + i * 27;
-    const a = polar(28, 28, 25, ang), b = polar(28, 28, 22, ang);
-    ticks.append(svgEl('line', { x1: a.x.toFixed(2), y1: a.y.toFixed(2), x2: b.x.toFixed(2), y2: b.y.toFixed(2) }));
+    const a = polar(C, C, RTO, ang), b = polar(C, C, RTI, ang);
+    ticks.append(svgEl('line', {
+      x1: a.x.toFixed(2), y1: a.y.toFixed(2), x2: b.x.toFixed(2), y2: b.y.toFixed(2),
+      stroke: i === 5 ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)',
+      'stroke-width': '1.5', 'stroke-linecap': 'round',
+    }));
   }
 
-  const track = svgEl('path', { class: 'knob-track', d: arcPath(28, 28, 19, -135, 135) });
-  const arc = svgEl('path', { class: 'knob-arc' });
-  const cap = svgEl('circle', { class: 'knob-cap', cx: '28', cy: '28', r: '13', fill: `url(#${uid}-cap)` });
-  const ptr = svgEl('line', { class: 'knob-pointer', x1: '28', y1: '28' });
-  svg.append(defs, ticks, track, arc, cap, ptr);
+  const track = svgEl('path', { class: 'knob-track', d: arcPath(C, C, RTR, -135, 135), fill: 'none', stroke: 'rgba(255,255,255,0.06)', 'stroke-width': '3.5', 'stroke-linecap': 'round' });
+  const arc = svgEl('path', { class: 'knob-arc', fill: 'none', stroke: '#ff9f0a', 'stroke-width': '3.5', 'stroke-linecap': 'round', filter: `url(#${uid}-g)` });
+  const cap = svgEl('circle', { class: 'knob-cap', cx: String(C), cy: String(C), r: String(RC), fill: `url(#${uid}-c)`, stroke: 'rgba(0,0,0,0.6)', 'stroke-width': '0.75' });
+  const spec = svgEl('circle', { class: 'knob-spec', cx: (C - RC * 0.15).toFixed(2), cy: (C - RC * 0.22).toFixed(2), r: (RC * 0.52).toFixed(2), fill: `url(#${uid}-h)` });
+  const ptr = svgEl('line', { class: 'knob-pointer', stroke: 'rgba(255,255,255,0.9)', 'stroke-width': '2', 'stroke-linecap': 'round' });
+  svg.append(defs, ticks, track, arc, cap, spec, ptr);
 
   const valEl = document.createElement('span'); valEl.className = 'val';
+  valEl.style.cssText = `font-size:${small ? 9 : 10}px;font-weight:600;color:#c8c8cc;font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;`;
   const labelEl = document.createElement('span'); labelEl.className = 'label'; labelEl.textContent = label;
+  labelEl.style.cssText = `font-size:${small ? 8 : 9}px;color:#48484e;text-transform:uppercase;letter-spacing:.06em;text-align:center;`;
   el.append(svg, valEl, labelEl);
 
   function paint() {
     const ang = valueToAngle(current, min, max);
-    arc.setAttribute('d', arcPath(28, 28, 19, -135, ang));
-    const p1 = polar(28, 28, 6, ang), p2 = polar(28, 28, 12, ang);
+    const t = max === min ? 0 : (current - min) / (max - min);
+    arc.setAttribute('d', t > 0 ? arcPath(C, C, RTR, -135, ang) : 'M0 0');
+    const p1 = polar(C, C, RC - 3.5, ang), p2 = polar(C, C, RC, ang);
     ptr.setAttribute('x1', p1.x.toFixed(2)); ptr.setAttribute('y1', p1.y.toFixed(2));
     ptr.setAttribute('x2', p2.x.toFixed(2)); ptr.setAttribute('y2', p2.y.toFixed(2));
     const text = format(current, step, unit);
@@ -106,7 +136,7 @@ export function createKnob(param, value, onChange) {
   });
   el.addEventListener('pointermove', (e) => {
     if (!el.classList.contains('dragging')) return;
-    change(dragStartVal + ((dragStartY - e.clientY) / 150) * (max - min));
+    change(dragStartVal + ((dragStartY - e.clientY) / 140) * (max - min));
   });
   const endDrag = () => el.classList.remove('dragging');
   el.addEventListener('pointerup', endDrag);

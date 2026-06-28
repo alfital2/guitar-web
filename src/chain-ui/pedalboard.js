@@ -30,7 +30,13 @@ const COLORS = {
 // are excluded — they live in the amp head. Keep this in sync with the effects
 // registry: only list types that have a registered effect.
 const PEDAL_TYPES = [
-  ['compressor', 'Compressor'], ['delay', 'Delay'], ['reverb', 'Reverb'], ['chorus', 'Chorus'],
+  ['compressor', 'Compressor'], ['boost', 'Boost'], ['gate', 'Noise Gate'],
+  ['fuzz', 'Fuzz'], ['octave', 'Octave Fuzz'],
+  ['wah', 'Wah'], ['autowah', 'Auto-Wah'],
+  ['chorus', 'Chorus'], ['flanger', 'Flanger'], ['phaser', 'Phaser'],
+  ['tremolo', 'Tremolo'], ['vibrato', 'Vibrato'], ['ringmod', 'Ring Mod'],
+  ['delay', 'Delay'], ['tape-echo', 'Tape Echo'], ['pingpong', 'Ping-Pong'],
+  ['reverb', 'Reverb'], ['widener', 'Widener'], ['limiter', 'Limiter'],
 ];
 
 function connector() {
