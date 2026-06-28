@@ -9,10 +9,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #6c6c70;
-    --window: #313137;
-    --surface: #41414a;
-    --surface-hi: #4d4d55;
+    --bg: #6a6a6e;
+    --window: #1e1e20;
+    --surface: #2c2c2e;
+    --surface-hi: #38383a;
     --border: rgba(255,255,255,0.06);
     --border-hi: rgba(255,255,255,0.1);
     --text: #f2f2f7;
@@ -38,7 +38,7 @@
   body {
     margin: 0; color: var(--text); font: 14px/1.5 var(--font);
     background: var(--bg);
-    background-image: linear-gradient(180deg, #828287 0%, #6c6c70 22%, #5c5c60 100%);
+    background-image: linear-gradient(180deg, #7c7c7e 0%, #646466 32%, #5a5a5c 100%);
     background-attachment: fixed;
     display: flex; align-items: flex-start; justify-content: center; gap: 16px; flex-wrap: wrap;
     padding: 20px 12px 48px; -webkit-font-smoothing: antialiased;
@@ -55,7 +55,7 @@
   /* ── Toolbar ────────────────────────────────────────── */
   .toolbar {
     position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px;
-    padding: 10px 18px; background: rgba(58,58,62,0.92);
+    padding: 10px 18px; background: rgba(30,30,32,0.92);
     -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
     border-bottom: 1px solid rgba(255,255,255,0.055);
   }
@@ -98,7 +98,7 @@
 
   /* ── Spectrum hero ──────────────────────────────────── */
   .hero {
-    position: relative; background: #1c1c24; border-bottom: 1px solid rgba(255,255,255,0.055);
+    position: relative; background: #18181a; border-bottom: 1px solid rgba(255,255,255,0.055);
   }
   #spectrum { display: block; width: 100%; height: 180px; }
   .hero-badge { position: absolute; top: 12px; left: 14px; display: flex; align-items: center; gap: 6px; }
@@ -110,7 +110,7 @@
   }
   .hero-strip {
     position: absolute; bottom: 0; left: 0; right: 0; height: 52px;
-    background: linear-gradient(0deg, rgba(8,8,16,0.96) 0%, rgba(8,8,16,0.7) 70%, transparent 100%);
+    background: linear-gradient(0deg, rgba(18,18,20,0.96) 0%, rgba(18,18,20,0.7) 70%, transparent 100%);
     display: flex; align-items: center; gap: 16px; padding: 0 16px;
   }
   .note-wrap { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
@@ -186,7 +186,7 @@
     background:
       repeating-linear-gradient(45deg, rgba(0,0,0,0.15) 0 2px, transparent 2px 6px),
       repeating-linear-gradient(-45deg, rgba(0,0,0,0.1) 0 2px, transparent 2px 6px),
-      #26262b;
+      #18181a;
     border-radius: 10px; border: 1px solid rgba(255,255,255,0.04);
     box-shadow: inset 0 2px 12px rgba(0,0,0,0.7), 0 1px 8px rgba(0,0,0,0.4);
   }
@@ -241,41 +241,41 @@
   .preset-browser {
     width: 384px; flex: 0 0 384px; align-self: stretch; height: calc(100vh - 68px);
     position: sticky; top: 20px; display: flex; flex-direction: column;
-    background: var(--window); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px;
-    box-shadow: 0 48px 120px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+    background: #34343a; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px;
+    box-shadow: 0 48px 120px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
     overflow: hidden;
   }
-  .pb-search { padding: 12px 12px 10px; border-bottom: 1px solid var(--border); }
+  .pb-search { padding: 12px 12px 10px; border-bottom: 1px solid rgba(0,0,0,0.28); }
   .pb-search input {
     width: 100%; font: 13px var(--font); color: var(--text); appearance: none; -webkit-appearance: none;
-    background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%238a8a8e' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat 10px center;
-    border: 1px solid var(--border-hi); border-radius: 8px; padding: 8px 11px 8px 32px;
+    background: #27272b url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%2392929a' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat 10px center;
+    border: 1px solid rgba(0,0,0,0.3); border-radius: 8px; padding: 8px 11px 8px 32px;
   }
   .pb-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
   .pb-search input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255,159,10,0.3); }
   .pb-split { display: flex; flex: 1; min-height: 0; }
   .pb-cats {
-    width: 150px; flex: 0 0 150px; border-right: 1px solid var(--border);
+    width: 150px; flex: 0 0 150px; border-right: 1px solid rgba(0,0,0,0.28);
     padding: 8px 6px; display: flex; flex-direction: column; gap: 2px;
   }
   .pb-cat {
     display: flex; align-items: center; justify-content: space-between; gap: 6px; text-align: left; cursor: pointer;
     background: transparent; border: none; border-radius: 7px; padding: 8px 9px;
-    font-size: 12.5px; font-weight: 500; color: var(--text-secondary);
+    font-size: 12.5px; font-weight: 500; color: #d4d4d8;
   }
   .pb-cat-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pb-cat:hover { background: rgba(255,255,255,0.04); }
-  .pb-cat.active { background: rgba(255,255,255,0.09); color: var(--text); }
-  .pb-chev { color: var(--muted); font-size: 14px; }
+  .pb-cat:hover { background: rgba(255,255,255,0.05); }
+  .pb-cat.active { background: rgba(255,255,255,0.12); color: #fff; }
+  .pb-chev { color: rgba(255,255,255,0.35); font-size: 14px; }
   .pb-patches { flex: 1; min-width: 0; overflow-y: auto; padding: 8px 6px; display: flex; flex-direction: column; gap: 1px; }
   .pb-patch {
     text-align: left; cursor: pointer; background: transparent; border: none; border-radius: 7px;
-    padding: 8px 11px; font-size: 13.5px; color: var(--text);
+    padding: 8px 11px; font-size: 13.5px; color: #e8e8ea;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .pb-patch:hover { background: rgba(255,255,255,0.05); }
-  .pb-patch.active { background: rgba(255,255,255,0.12); font-weight: 600; }
-  .pb-empty { padding: 12px; font-size: 12px; color: var(--muted); font-style: italic; }
+  .pb-patch:hover { background: rgba(255,255,255,0.06); }
+  .pb-patch.active { background: rgba(255,255,255,0.14); font-weight: 600; color: #fff; }
+  .pb-empty { padding: 12px; font-size: 12px; color: rgba(255,255,255,0.4); font-style: italic; }
   @media (max-width: 1100px) { .preset-browser { width: 100%; flex-basis: 100%; position: static; height: 420px; } }
 
   /* Add Effect window */
@@ -340,7 +340,7 @@
   .settings-panel.open { transform: translateX(0); }
   .settings-head {
     position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between;
-    padding: 15px 18px; background: rgba(58,58,62,0.92); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+    padding: 15px 18px; background: rgba(30,30,32,0.92); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--border);
   }
   .settings-head h2 { font-size: 14px; font-weight: 700; margin: 0; color: var(--text); letter-spacing: 0.01em; }
