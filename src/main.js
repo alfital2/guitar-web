@@ -20,6 +20,7 @@ import { spectrumBars } from './spectrum.js';
 import { measureLoudnessGain } from './normalize.js';
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
+import { loadWorklets } from './effects/worklets/index.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
@@ -90,10 +91,17 @@ function setParamLive(instanceId, key, value) {
   chainStore.save(currentChain);
 }
 
-function addEffect(type) {
+function addEffect(type, beforeId) {
   if (!registry[type]) { $('error').textContent = `"${type}" not available yet`; return; }
+  const newId = nextId;
   const r = chainState.add(currentChain, type, defaultParams(type), nextId);
-  currentChain = r.chain; nextId = r.nextId;
+  let chain = r.chain; nextId = r.nextId;
+  // Insert at a drop position when dragged onto the board; else append.
+  if (beforeId != null) {
+    const target = chain.findIndex((u) => u.instanceId === beforeId);
+    chain = chainState.move(chain, newId, target < 0 ? chain.length : target);
+  }
+  currentChain = chain;
   rebuildGraph();
 }
 
@@ -356,6 +364,10 @@ async function start() {
     });
     ctx = new AudioContext({ latencyHint: 'interactive' });
     await ctx.resume();
+
+    // Preload AudioWorklet processors (pitch shift, looper) before any chain is
+    // built, so their nodes can be constructed synchronously in buildChain.
+    try { await loadWorklets(ctx); } catch (e) { console.warn('worklet load failed:', e); }
 
     $('sr').textContent = ctx.sampleRate + ' Hz';
 

@@ -229,18 +229,115 @@ function addTile(handlers) {
   const btn = document.createElement('button');
   btn.className = 'pedal-add'; btn.type = 'button'; btn.textContent = '＋';
   btn.setAttribute('aria-label', 'Add effect');
-
-  const palette = document.createElement('div');
-  palette.className = 'pedal-palette'; palette.hidden = true;
-  for (const [type, label] of PEDAL_TYPES) {
-    const opt = document.createElement('button');
-    opt.type = 'button'; opt.dataset.type = type; opt.textContent = label;
-    opt.addEventListener('click', () => { palette.hidden = true; handlers.onAdd(type); });
-    palette.appendChild(opt);
-  }
-  btn.addEventListener('click', () => { palette.hidden = !palette.hidden; });
-  wrap.append(btn, palette);
+  btn.addEventListener('click', () => openEffectsModal(handlers));
+  wrap.append(btn);
   return wrap;
+}
+
+// A floating chip that follows the cursor while dragging an effect from the
+// window onto the board.
+function makeGhost(label, type) {
+  const g = document.createElement('div');
+  g.className = 'fx-ghost';
+  g.style.setProperty('--pedal-color', COLORS[type] ?? '#636368');
+  g.textContent = label;
+  document.body.appendChild(g);
+  return g;
+}
+
+// Wire a window tile: click adds (append); drag carries it onto the board and
+// drops it at the hovered slot (insert), with the same flow/placeholder feel.
+function attachTileDrag(tile, type, label, handlers, getBoard, close) {
+  let st = null;
+  tile.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    st = { x: e.clientX, y: e.clientY, dragging: false };
+    try { tile.setPointerCapture(e.pointerId); } catch {}
+  });
+  tile.addEventListener('pointermove', (e) => {
+    if (!st) return;
+    const board = getBoard();
+    if (!st.dragging) {
+      if (Math.hypot(e.clientX - st.x, e.clientY - st.y) < 6) return;
+      st.dragging = true;
+      document.querySelector('.fx-modal-backdrop')?.classList.add('hidden');
+      tile.closest('.fx-modal')?.classList.add('hidden');
+      st.ghost = makeGhost(label, type);
+      const sample = board && board.querySelector('.pedal');
+      const r = sample ? sample.getBoundingClientRect() : { width: 122, height: 120 };
+      st.ph = document.createElement('div');
+      st.ph.className = 'pedal-placeholder';
+      st.ph.style.width = `${r.width}px`; st.ph.style.height = `${r.height}px`;
+    }
+    st.ghost.style.left = `${e.clientX + 10}px`;
+    st.ghost.style.top = `${e.clientY + 10}px`;
+    if (board && overBoard(board, e)) repositionPlaceholder(board, null, st.ph, e.clientX);
+    else st.ph.remove();
+  });
+  tile.addEventListener('pointerup', (e) => {
+    if (!st) return;
+    const board = getBoard();
+    if (!st.dragging) { handlers.onAdd(type); close(); st = null; return; }
+    const over = board && overBoard(board, e) && st.ph.parentNode;
+    const beforeId = over ? nextDropId(st.ph) : undefined;
+    st.ghost?.remove(); st.ph?.remove();
+    if (over) handlers.onAdd(type, beforeId);
+    close();
+    st = null;
+  });
+  tile.addEventListener('pointercancel', () => { st?.ghost?.remove(); st?.ph?.remove(); st = null; });
+}
+
+function overBoard(board, e) {
+  const r = board.getBoundingClientRect();
+  return e.clientY > r.top - 30 && e.clientY < r.bottom + 30 && e.clientX > r.left - 30 && e.clientX < r.right + 30;
+}
+
+// The "Add Effect" window: a modal listing every pedal effect. Click to append,
+// or drag a tile onto the board to insert it at a chosen position.
+export function openEffectsModal(handlers) {
+  document.querySelectorAll('.fx-modal-backdrop, .fx-modal, .fx-ghost').forEach((n) => n.remove());
+  const getBoard = () => document.querySelector('.pedalboard');
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'fx-modal-backdrop';
+
+  const modal = document.createElement('div');
+  modal.className = 'fx-modal';
+  const head = document.createElement('div');
+  head.className = 'fx-modal-head';
+  head.innerHTML = '<span>Add Effect</span>';
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'fx-modal-close'; closeBtn.type = 'button'; closeBtn.setAttribute('aria-label', 'Close'); closeBtn.textContent = '✕';
+  head.appendChild(closeBtn);
+  const hint = document.createElement('div');
+  hint.className = 'fx-modal-hint'; hint.textContent = 'Click to add, or drag onto the board';
+  const grid = document.createElement('div');
+  grid.className = 'fx-grid';
+
+  const close = () => {
+    backdrop.remove(); modal.remove();
+    document.querySelectorAll('.fx-ghost').forEach((n) => n.remove());
+    document.removeEventListener('keydown', onKey);
+  };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+
+  for (const [type, label] of PEDAL_TYPES) {
+    const tile = document.createElement('button');
+    tile.className = 'fx-tile'; tile.type = 'button'; tile.dataset.type = type;
+    tile.style.setProperty('--pedal-color', COLORS[type] ?? '#636368');
+    tile.innerHTML = `<span class="fx-tile-dot"></span><span class="fx-tile-label"></span>`;
+    tile.querySelector('.fx-tile-label').textContent = label;
+    attachTileDrag(tile, type, label, handlers, getBoard, close);
+    grid.appendChild(tile);
+  }
+
+  modal.append(head, hint, grid);
+  backdrop.addEventListener('click', close);
+  closeBtn.addEventListener('click', close);
+  document.addEventListener('keydown', onKey);
+  document.body.append(backdrop, modal);
+  return close;
 }
 
 export function renderPedalboard(container, units, handlers) {

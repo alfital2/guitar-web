@@ -1,6 +1,10 @@
 // tests/pedalboard.test.js
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderPedalboard, computeDrop } from '../src/chain-ui/pedalboard.js';
+
+afterEach(() => {
+  document.querySelectorAll('.fx-modal, .fx-modal-backdrop, .fx-ghost').forEach((n) => n.remove());
+});
 
 const units = [
   { instanceId: 1, type: 'compressor', locked: false, schema: { label: 'Compressor', params: [
@@ -35,26 +39,31 @@ describe('renderPedalboard', () => {
       .map(c => c.classList.contains('amp-anchor') ? 'AMP' : (c.classList.contains('pedal') ? c.dataset.instanceId : '>'));
     expect(kinds).toEqual(['1', '>', 'AMP', '>', '4']);
   });
-  it('renders a + add tile that reveals the palette of pedal types', () => {
+  it('renders a + add tile that opens the effects window with pedal types', () => {
     const el = document.createElement('div');
     renderPedalboard(el, units, noop);
     const add = el.querySelector('.pedal-add');
     expect(add).toBeTruthy();
     add.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    const opts = [...el.querySelectorAll('.pedal-palette button')].map(b => b.dataset.type);
+    const modal = document.querySelector('.fx-modal');
+    expect(modal).toBeTruthy();
+    const opts = [...document.querySelectorAll('.fx-tile')].map(b => b.dataset.type);
     for (const t of ['compressor', 'delay', 'reverb', 'chorus']) expect(opts).toContain(t);
-    // amp types never appear in the pedal palette
+    // amp types never appear in the effects window
     expect(opts).not.toContain('drive');
     expect(opts).not.toContain('eq');
     expect(opts).not.toContain('cabinet');
   });
-  it('clicking a palette option calls onAdd(type)', () => {
+  it('clicking an effects-window tile calls onAdd(type) and closes', () => {
     const el = document.createElement('div');
     const onAdd = vi.fn();
     renderPedalboard(el, units, { ...noop, onAdd });
     el.querySelector('.pedal-add').dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    el.querySelector('.pedal-palette button[data-type="reverb"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const tile = document.querySelector('.fx-tile[data-type="reverb"]');
+    tile.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 0, clientY: 0 }));
+    tile.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0, clientX: 0, clientY: 0 }));
     expect(onAdd).toHaveBeenCalledWith('reverb');
+    expect(document.querySelector('.fx-modal')).toBeNull();
   });
   it('a knob change calls onParamChange(instanceId, key, value)', () => {
     const el = document.createElement('div');
