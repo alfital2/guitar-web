@@ -163,15 +163,24 @@
   .pedal::before { left: 9px; } .pedal::after { right: 9px; }
   .pedal-name { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text); text-align: center; margin-bottom: 12px; }
   .knobs { display: flex; flex-wrap: wrap; gap: 12px 14px; justify-content: center; }
-  .knob { display: flex; flex-direction: column; align-items: center; width: 60px; cursor: ns-resize; outline: none; user-select: none; touch-action: none; }
-  .knob .knob-dial { width: 48px; height: 48px; border-radius: 50%; }
-  .knob:focus-visible .knob-dial { box-shadow: 0 0 0 3px rgba(255,122,69,0.45); }
-  .knob-track { fill: none; stroke: var(--line); stroke-width: 5; stroke-linecap: round; }
-  .knob-arc { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; }
+  :root[data-theme="dark"] { --knob-cap-hi: #3b3b3f; --knob-cap-lo: #161618; }
+  :root[data-theme="light"] { --knob-cap-hi: #ffffff; --knob-cap-lo: #c9c9d0; }
+  .knob { display: flex; flex-direction: column; align-items: center; width: 62px; cursor: ns-resize; outline: none; user-select: none; touch-action: none; }
+  .knob .knob-dial { width: 50px; height: 50px; overflow: visible; }
+  .knob-ticks line { stroke: var(--line); stroke-width: 1.5; stroke-linecap: round; }
+  .knob-track { fill: none; stroke: var(--line); stroke-width: 4; stroke-linecap: round; }
+  .knob-arc { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; filter: drop-shadow(0 0 3px var(--accent)); }
+  .knob-cap { stroke: rgba(0,0,0,0.35); stroke-width: 0.75; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.45)); }
   .knob-pointer { stroke: var(--text); stroke-width: 2.5; stroke-linecap: round; }
-  .knob .val { font-size: 11px; font-weight: 600; color: var(--text); margin-top: 4px; }
+  .knob:focus-visible .knob-cap { stroke: var(--accent); stroke-width: 1.5; }
+  .knob .val { font-size: 11px; font-weight: 600; color: var(--text); margin-top: 5px; }
   .knob .label { font-size: 10px; color: var(--muted); margin-top: 1px; text-align: center; }
-  .knob.dragging .val { color: var(--accent); }
+  @media (prefers-reduced-motion: no-preference) {
+    .knob-cap, .knob-arc { transition: filter .12s ease, transform .12s ease; transform-origin: 28px 28px; }
+    .knob.dragging .knob-cap { transform: scale(1.06); }
+    .knob.dragging .knob-arc { filter: drop-shadow(0 0 6px var(--accent)); }
+    .knob.dragging .val { color: var(--accent); }
+  }
 
   /* Settings slide-in */
   #calib-start { width: 100%; }
