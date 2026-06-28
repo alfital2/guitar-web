@@ -4,7 +4,7 @@ import { renderCalibrationControls } from '../src/calibration/ui.js';
 
 function setup(over = {}) {
   const el = document.createElement('div');
-  const handlers = { onSelect: vi.fn(), onStrength: vi.fn(), onCalibrate: vi.fn() };
+  const handlers = { onSelect: vi.fn(), onStrength: vi.fn() };
   renderCalibrationControls(el, { profiles: [{ name: 'Strat' }, { name: 'LP' }], activeName: 'LP', strength: 0.65, ...over }, handlers);
   return { el, handlers };
 }
@@ -12,8 +12,7 @@ function setup(over = {}) {
 describe('renderCalibrationControls', () => {
   it('lists None + profiles and preselects active', () => {
     const { el } = setup();
-    const opts = [...el.querySelectorAll('option')].map(o => o.textContent);
-    expect(opts).toEqual(['None', 'Strat', 'LP']);
+    expect([...el.querySelectorAll('option')].map(o => o.textContent)).toEqual(['None', 'Strat', 'LP']);
     expect(el.querySelector('select').value).toBe('LP');
   });
   it('select change fires onSelect (None -> null)', () => {
@@ -30,9 +29,8 @@ describe('renderCalibrationControls', () => {
     r.value = '0.4'; r.dispatchEvent(new Event('input'));
     expect(handlers.onStrength).toHaveBeenCalledWith(0.4);
   });
-  it('calibrate button fires onCalibrate', () => {
-    const { el, handlers } = setup();
-    el.querySelector('button').dispatchEvent(new Event('click'));
-    expect(handlers.onCalibrate).toHaveBeenCalled();
+  it('renders no calibrate button', () => {
+    const { el } = setup();
+    expect(el.querySelector('button')).toBeNull();
   });
 });
