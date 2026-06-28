@@ -44,6 +44,21 @@
     transition: background-color .3s ease, color .25s ease, border-color .3s ease;
   }
 
+  /* Jazz-club backdrop (dark theme only) */
+  :root[data-theme="dark"] body {
+    background-color: #120d0a;
+    background-image:
+      radial-gradient(70% 50% at 50% -8%, rgba(255,206,130,0.13), transparent 60%),
+      radial-gradient(26% 26% at 12% 9%, rgba(70,140,255,0.12), transparent 70%),
+      radial-gradient(120% 90% at 50% 38%, transparent 45%, rgba(0,0,0,0.55) 100%),
+      linear-gradient(180deg, transparent 0 76%, #3a2412 80%, #221409 100%),
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.28) 0 1px, transparent 1px 16px),
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.5) 0 2px, transparent 2px 44px),
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.45) 0 2px, transparent 2px 92px),
+      linear-gradient(180deg, #2a1d16, #1c1310);
+    background-attachment: fixed;
+  }
+
   /* Window */
   .window {
     width: 100%; max-width: 940px; background: var(--bg); border-radius: var(--radius);
