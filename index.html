@@ -81,15 +81,17 @@
 
   /* Hero */
   .hero {
-    display: grid; grid-template-columns: auto 1fr; gap: 26px; align-items: center;
-    padding: 26px 24px; border-bottom: 1px solid var(--line);
+    display: grid; grid-template-columns: auto minmax(190px, 240px) 1fr; gap: 22px; align-items: center;
+    padding: 22px 24px; border-bottom: 1px solid var(--line);
   }
-  .hero-note { display: flex; align-items: center; gap: 18px; }
+  .hero-note { display: flex; align-items: center; gap: 14px; }
   .note-circle {
-    width: 118px; height: 118px; border-radius: 50%; border: 2px solid var(--line);
+    width: 72px; height: 72px; border-radius: 50%; border: 2px solid var(--line);
     background: var(--surface-2); display: flex; align-items: center; justify-content: center;
-    font-size: 40px; font-weight: 700; color: var(--muted);
+    font-size: 26px; font-weight: 700; color: var(--muted);
   }
+  .hero-guitar h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+  .hero-guitar #calibration label:first-of-type { margin-top: 0; }
   @media (prefers-reduced-motion: no-preference) {
     .note-circle { transition: transform .25s cubic-bezier(.2,.85,.25,1), color .15s, border-color .15s; }
     .note-circle.active { transform: scale(1.06); }
@@ -107,9 +109,9 @@
   .dot { display: none; }
 
   /* Cards */
-  .guitar-strip { margin: 18px 20px 6px; display: grid; grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.1fr); gap: 22px; align-items: center; }
-  .gs-controls h2 { margin-top: 0; }
-  @media (max-width: 720px) { .guitar-strip { grid-template-columns: 1fr; } }
+  .tone-strip { padding: 12px 20px 0; }
+  .tone-strip #tone-card { max-width: 440px; }
+  @media (max-width: 720px) { .hero { grid-template-columns: 1fr; } }
   .amp-strip { padding: 10px 20px 4px; }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
   @media (prefers-reduced-motion: no-preference) {
@@ -296,6 +298,10 @@
         <span id="status-dot" class="dot"></span>
       </div>
     </div>
+    <div class="hero-guitar">
+      <h2>Guitar</h2>
+      <div id="calibration"></div>
+    </div>
     <div class="hero-viz">
       <canvas id="spectrum" width="640" height="140"></canvas>
       <div class="gain-row">
@@ -305,11 +311,7 @@
     </div>
   </section>
 
-  <section class="card guitar-strip">
-    <div class="gs-controls">
-      <h2>Guitar</h2>
-      <div id="calibration"></div>
-    </div>
+  <section class="tone-strip">
     <div id="tone-card"><p class="caption">Calibrate a guitar in Settings to see its tone card.</p></div>
   </section>
 
