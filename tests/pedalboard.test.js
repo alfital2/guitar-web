@@ -79,6 +79,21 @@ describe('renderPedalboard', () => {
     renderPedalboard(el, units, noop);
     expect(el.querySelectorAll('.pedalboard')).toHaveLength(1);
   });
+  it('renders cover art on a pedal card and sets its font', () => {
+    const el = document.createElement('div');
+    renderPedalboard(el, units, noop);
+    const pedal = el.querySelector('.pedal');
+    expect(pedal.querySelector('.pedal-art use').getAttribute('href')).toBe('#fx-art-compressor');
+    expect(pedal.querySelector('.pedal-inner .pedal-name')).toBeTruthy();
+    expect(pedal.style.getPropertyValue('--font')).toContain('Major Mono');
+  });
+  it('renders cover art thumbnails in the palette tiles', () => {
+    const el = document.createElement('div');
+    renderPedalboard(el, units, noop);
+    el.querySelector('.pedal-add').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const tile = document.querySelector('.fx-tile[data-type="reverb"]');
+    expect(tile.querySelector('.fx-art use').getAttribute('href')).toBe('#fx-art-reverb');
+  });
 });
 
 describe('computeDrop', () => {

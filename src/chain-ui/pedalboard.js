@@ -1,5 +1,6 @@
 // src/chain-ui/pedalboard.js
 import { createKnob } from './knob.js';
+import { fxArtSvg, FX_FONTS } from './fx-art.js';
 
 const COLORS = {
   compressor: '#0a84ff',
@@ -192,7 +193,20 @@ function buildPedal(unit, handlers) {
   const pedal = document.createElement('div');
   pedal.className = 'pedal';
   pedal.dataset.instanceId = String(unit.instanceId);
-  pedal.style.setProperty('--pedal-color', COLORS[unit.type] ?? '#636368');
+  const color = COLORS[unit.type] ?? '#636368';
+  pedal.style.setProperty('--pedal-color', color); // rim + LED + knob pointer
+  pedal.style.setProperty('--c', color);           // cover art tint
+  const font = FX_FONTS[unit.type];
+  if (font) { pedal.style.setProperty('--font', font.family); pedal.style.setProperty('--font-ls', font.ls); }
+
+  // Full-bleed cover art behind a readability scrim + anodized rim.
+  const art = fxArtSvg(unit.type);
+  art.classList.add('pedal-art');
+  const scrim = document.createElement('div'); scrim.className = 'pedal-scrim';
+  const rim = document.createElement('div'); rim.className = 'pedal-rim';
+
+  const inner = document.createElement('div');
+  inner.className = 'pedal-inner';
 
   const plate = document.createElement('div');
   plate.className = 'pedal-name'; plate.textContent = unit.schema.label;
@@ -209,7 +223,9 @@ function buildPedal(unit, handlers) {
   const led = document.createElement('div');
   led.className = 'pedal-led';
   foot.appendChild(led);
-  pedal.append(plate, knobs, foot);
+
+  inner.append(plate, knobs, foot);
+  pedal.append(art, scrim, rim, inner);
   return { pedal, plate };
 }
 
@@ -325,9 +341,15 @@ export function openEffectsModal(handlers) {
   for (const [type, label] of PEDAL_TYPES) {
     const tile = document.createElement('button');
     tile.className = 'fx-tile'; tile.type = 'button'; tile.dataset.type = type;
-    tile.style.setProperty('--pedal-color', COLORS[type] ?? '#636368');
-    tile.innerHTML = `<span class="fx-tile-dot"></span><span class="fx-tile-label"></span>`;
-    tile.querySelector('.fx-tile-label').textContent = label;
+    const color = COLORS[type] ?? '#636368';
+    tile.style.setProperty('--pedal-color', color);
+    tile.style.setProperty('--c', color);
+    const font = FX_FONTS[type];
+    if (font) { tile.style.setProperty('--font', font.family); tile.style.setProperty('--font-ls', font.ls); }
+    tile.appendChild(fxArtSvg(type));
+    const span = document.createElement('span');
+    span.className = 'fx-tile-label'; span.textContent = label;
+    tile.appendChild(span);
     attachTileDrag(tile, type, label, handlers, getBoard, close);
     grid.appendChild(tile);
   }
