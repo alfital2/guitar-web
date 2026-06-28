@@ -5,8 +5,13 @@ import { buildChain } from '../src/engine.js';
 import { FakeAudioContext } from './fake-audio-context.js';
 
 describe('registry', () => {
-  it('contains all effect types', () => {
-    expect(Object.keys(registry).sort()).toEqual(['cabinet', 'chorus', 'compressor', 'delay', 'drive', 'eq', 'reverb']);
+  it('contains the core effect types', () => {
+    // Core set must always be registered; more effects may be added over time,
+    // so assert presence (superset) rather than an exact list.
+    const keys = new Set(Object.keys(registry));
+    for (const t of ['cabinet', 'chorus', 'compressor', 'delay', 'drive', 'eq', 'reverb']) {
+      expect(keys.has(t)).toBe(true);
+    }
   });
 });
 

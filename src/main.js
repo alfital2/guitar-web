@@ -17,11 +17,20 @@ import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
 import { resolveTheme } from './theme.js';
 import { spectrumBars } from './spectrum.js';
+import { measureLoudnessGain } from './normalize.js';
+import * as chainState from './chain-state.js';
+import * as chainStore from './chain-store.js';
 
 const $ = id => document.getElementById(id);
-let ctx, stream, source, engine, gainOut, analyser, rafId;
+let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
 let calibrationEq, calibRAF, calibState, calibCountdown;
 let pitchBuf, lastNoteMs = 0;
+let prevBars = null;
+
+let currentChain = [];   // array of units (chain-state model) — source of truth
+let nextId = 1;          // monotonic instanceId source
+let normTimer = null;    // debounce handle for loudness re-measure
+let normSig = null;      // last-measured chain structure signature
 
 const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
 const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
@@ -31,29 +40,106 @@ $('safari-warn').style.display = hasSetSinkId ? 'none' : 'block';
 // The artist chain is fed by the calibration EQ (source -> calibrationEq -> engine).
 // We never disconnect `source` here, so the analyser tap and calibration EQ stay live
 // across preset switches.
-function loadPreset(preset) {
-  const errors = validatePreset(preset, registry);
-  if (errors.length) { $('error').textContent = errors.join('; '); return; }
-  if (engine) {
-    try { calibrationEq.output.disconnect(); } catch {}
-    try { engine.output.disconnect(); } catch {}
+// Default schema params for a type, used when adding an effect.
+function defaultParams(type) {
+  const out = {};
+  for (const p of registry[type].schema.params) out[p.key] = p.default;
+  return out;
+}
+
+// Build the locked (amp-head) module list and the full pedalboard list from the
+// current chain, then (re)build the audio graph if audio is running. Editing
+// works before Start too — then only the model + UI update.
+function rebuildGraph() {
+  const view = currentChain.map((u) => ({ ...u, schema: registry[u.type].schema }));
+  const locked = view.filter((u) => u.locked);
+
+  if (ctx) {
+    if (engine) {
+      try { calibrationEq.output.disconnect(); } catch {}
+      try { engine.output.disconnect(); } catch {}
+    }
+    engine = buildChain(ctx, chainState.toEngineChain(currentChain), registry);
+    if (calibrationEq) calibrationEq.output.connect(engine.input);
+    if (normGain) engine.output.connect(normGain);
   }
-  engine = buildChain(ctx, preset.chain, registry);
-  const AMP_TYPES = new Set(['drive', 'eq', 'cabinet']);
-  const amp = [], ampIdx = [], ped = [], pedIdx = [];
-  engine.modules.forEach((m, i) => {
-    if (AMP_TYPES.has(m.type)) { amp.push(m); ampIdx.push(i); }
-    else { ped.push(m); pedIdx.push(i); }
-  });
+
   try {
-    renderAmp($('amp'), amp, (j, k, v) => engine.setParam(ampIdx[j], k, v));
-    renderPedalboard($('chain'), ped, (j, k, v) => engine.setParam(pedIdx[j], k, v));
+    renderAmp($('amp'), locked, setParamLive);
+    renderPedalboard($('chain'), view, {
+      onParamChange: setParamLive,
+      onAdd: addEffect,
+      onRemove: removeEffect,
+      onMove: moveEffect,
+    });
   } catch (e) {
     $('error').textContent = 'render: ' + e.message;
     console.error(e);
   }
-  if (calibrationEq) calibrationEq.output.connect(engine.input);
-  if (gainOut) engine.output.connect(gainOut);
+
+  chainStore.save(currentChain);
+  scheduleNormalize();
+}
+
+function setParamLive(instanceId, key, value) {
+  currentChain = chainState.setParam(currentChain, instanceId, key, value);
+  if (engine) {
+    const idx = currentChain.findIndex((u) => u.instanceId === instanceId);
+    if (idx >= 0) engine.setParam(idx, key, value);
+  }
+  chainStore.save(currentChain);
+}
+
+function addEffect(type) {
+  if (!registry[type]) { $('error').textContent = `"${type}" not available yet`; return; }
+  const r = chainState.add(currentChain, type, defaultParams(type), nextId);
+  currentChain = r.chain; nextId = r.nextId;
+  rebuildGraph();
+}
+
+function removeEffect(instanceId) {
+  currentChain = chainState.remove(currentChain, instanceId);
+  rebuildGraph();
+}
+
+function moveEffect(instanceId, beforeInstanceId) {
+  const target = beforeInstanceId == null
+    ? currentChain.length
+    : currentChain.findIndex((u) => u.instanceId === beforeInstanceId);
+  currentChain = chainState.move(currentChain, instanceId, target < 0 ? currentChain.length : target);
+  rebuildGraph();
+}
+
+function loadPreset(preset) {
+  const errors = validatePreset(preset, registry);
+  if (errors.length) { $('error').textContent = errors.join('; '); return; }
+  const r = chainState.fromPreset(preset.chain, nextId);
+  currentChain = r.chain; nextId = r.nextId;
+  rebuildGraph();
+}
+
+// Restore a persisted chain (array of {type, params}) into the model.
+function loadStoredChain(data) {
+  const valid = data.filter((e) => registry[e.type]); // drop unknown types defensively
+  const r = chainState.fromPreset(valid, nextId);
+  currentChain = r.chain; nextId = r.nextId;
+  rebuildGraph();
+}
+
+// Re-measure loudness normalization whenever the chain STRUCTURE changes
+// (debounced). Param-only edits keep the signature, so they don't re-measure.
+function scheduleNormalize() {
+  if (!normGain) return;
+  const sig = chainState.signature(currentChain);
+  if (sig === normSig) return;
+  normSig = sig;
+  clearTimeout(normTimer);
+  normTimer = setTimeout(async () => {
+    try {
+      const g = await measureLoudnessGain(chainState.toEngineChain(currentChain), { sampleRate: ctx ? ctx.sampleRate : 48000 });
+      if (normGain && chainState.signature(currentChain) === sig) normGain.gain.value = g;
+    } catch (e) { console.warn('loudness normalize failed:', e); }
+  }, 150);
 }
 
 function showStats() {
@@ -72,20 +158,67 @@ function showStats() {
 function drawSpectrum(freqBytes) {
   const canvas = $('spectrum');
   if (!canvas) return;
-  const ctx2d = canvas.getContext('2d');
+  const c = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
-  ctx2d.clearRect(0, 0, W, H);
-  const N = 48;
-  const bars = spectrumBars(freqBytes, N);
-  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#ff7a45';
-  ctx2d.fillStyle = accent;
-  const bw = W / N;
-  for (let i = 0; i < N; i++) {
-    const h = Math.max(2, bars[i] * H);
-    ctx2d.globalAlpha = 0.35 + 0.65 * bars[i];
-    ctx2d.fillRect(i * bw + 1, H - h, bw - 2, h);
+  c.clearRect(0, 0, W, H);
+
+  // Subtle scan grid: 3 horizontal + 7 vertical
+  c.strokeStyle = 'rgba(255,255,255,0.022)'; c.lineWidth = 1;
+  for (let i = 1; i < 4; i++) { const y = Math.round(H / 4 * i) + 0.5; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+  for (let i = 1; i < 8; i++) { const x = Math.round(W / 8 * i) + 0.5; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
+
+  const N = 80;
+  let bars = spectrumBars(freqBytes, N);
+
+  // Temporal smoothing: 40% new + 60% previous frame
+  if (prevBars) bars = bars.map((v, i) => v * 0.4 + prevBars[i] * 0.6);
+  prevBars = [...bars];
+
+  // Gaussian smooth across adjacent bins (7-tap)
+  const sm = bars.map((_, i) => {
+    const w = [0.06, 0.12, 0.22, 0.28, 0.22, 0.12, 0.06];
+    let s = 0, wt = 0;
+    w.forEach((ww, o) => { const idx = i + o - 3; if (idx >= 0 && idx < N) { s += bars[idx] * ww; wt += ww; } });
+    return s / wt;
+  });
+
+  const pts = sm.map((v, i) => ({ x: (i / (N - 1)) * W, y: H - v * H * 0.92 }));
+
+  // Filled area (cubic Bézier, control points at x midpoints)
+  const grad = c.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, 'rgba(255,140,0,0.75)');
+  grad.addColorStop(0.25, 'rgba(255,90,10,0.5)');
+  grad.addColorStop(0.65, 'rgba(255,159,10,0.18)');
+  grad.addColorStop(1, 'rgba(255,159,10,0)');
+  c.beginPath(); c.moveTo(0, H);
+  pts.forEach((p, i) => { if (i === 0) c.lineTo(p.x, p.y); else { const px = pts[i - 1]; c.bezierCurveTo((px.x + p.x) / 2, px.y, (px.x + p.x) / 2, p.y, p.x, p.y); } });
+  c.lineTo(W, H); c.closePath(); c.fillStyle = grad; c.fill();
+
+  // Mirror reflection (subtle)
+  const rGrad = c.createLinearGradient(0, H, 0, H - H * 0.2);
+  rGrad.addColorStop(0, 'rgba(255,159,10,0.08)'); rGrad.addColorStop(1, 'rgba(255,159,10,0)');
+  c.beginPath(); c.moveTo(0, H);
+  pts.forEach((p, i) => { const ry = H + (H - p.y) * 0.18; if (i === 0) c.lineTo(p.x, ry); else { const px = pts[i - 1]; const pry = H + (H - px.y) * 0.18; c.bezierCurveTo((px.x + p.x) / 2, pry, (px.x + p.x) / 2, ry, p.x, ry); } });
+  c.lineTo(W, H); c.closePath(); c.fillStyle = rGrad; c.fill();
+
+  // Glowing top edge
+  c.save();
+  c.shadowColor = 'rgba(255,140,0,0.7)'; c.shadowBlur = 8;
+  c.beginPath();
+  pts.forEach((p, i) => { if (i === 0) c.moveTo(p.x, p.y); else { const px = pts[i - 1]; c.bezierCurveTo((px.x + p.x) / 2, px.y, (px.x + p.x) / 2, p.y, p.x, p.y); } });
+  c.strokeStyle = 'rgba(255,159,10,0.7)'; c.lineWidth = 1.5; c.stroke();
+  c.restore();
+
+  // Peak frequency readout
+  let peakBin = 0, peakV = 0;
+  sm.forEach((v, i) => { if (v > peakV) { peakV = v; peakBin = i; } });
+  const fl = $('freq-label');
+  if (fl && peakV > 0.08 && ctx && analyser) {
+    const binHz = ctx.sampleRate / (2 * analyser.frequencyBinCount);
+    const peakHz = Math.round(peakBin / N * analyser.frequencyBinCount * binHz);
+    fl.style.color = `rgba(255,159,10,${Math.min(0.6, peakV * 1.5)})`;
+    fl.textContent = peakHz < 1000 ? `${peakHz} Hz` : `${(peakHz / 1000).toFixed(1)} kHz`;
   }
-  ctx2d.globalAlpha = 1;
 }
 
 function startMeter() {
@@ -240,6 +373,12 @@ async function start() {
     gainOut.gain.value = parseFloat($('gain').value);
     gainOut.connect(ctx.destination);
 
+    // Per-preset loudness normalization sits before the user Vol control:
+    // engine.output -> normGain -> gainOut -> destination.
+    normGain = ctx.createGain();
+    normGain.gain.value = 1;
+    normGain.connect(gainOut);
+
     // Calibration EQ sits between source and the artist chain.
     calibrationEq = createCalibrationEq(ctx);
     source.connect(calibrationEq.input);
@@ -247,7 +386,10 @@ async function start() {
 
     const defaultPreset = PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0];
     renderPresetPicker($('presets'), PRESETS, loadPreset);
-    loadPreset(defaultPreset);
+    // The chain may already be populated (edited before Start). If so, just wire
+    // the existing model to audio; otherwise fall back to the default preset.
+    if (currentChain.length === 0) loadPreset(defaultPreset);
+    else rebuildGraph();
     const sel = $('presets').querySelector('select');
     if (sel) sel.selectedIndex = PRESETS.indexOf(defaultPreset);
 
@@ -257,7 +399,7 @@ async function start() {
     setTimeout(showStats, 600);
 
     $('start').disabled = true; $('stop').disabled = false;
-    $('status').textContent = 'Live — play your guitar'; $('status-dot').classList.add('live');
+    $('status').textContent = 'Live — play your guitar'; $('status').classList.add('live'); $('status-dot').classList.add('live');
     listDevices();
   } catch (e) {
     $('error').textContent = 'Could not start: ' + e.message;
@@ -272,9 +414,11 @@ function stop() {
   { const c = $('note-circle'); if (c) { c.textContent = '—'; c.classList.remove('active'); } }
   if (stream) stream.getTracks().forEach(t => t.stop());
   if (ctx) ctx.close();
-  ctx = stream = source = engine = gainOut = analyser = calibrationEq = null;
+  ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = null;
   $('start').disabled = false; $('stop').disabled = true;
-  $('status').textContent = 'Stopped'; $('status-dot').classList.remove('live');
+  prevBars = null;
+  { const fl = $('freq-label'); if (fl) { fl.textContent = '— Hz'; fl.style.color = ''; } }
+  $('status').textContent = 'Stopped'; $('status').classList.remove('live'); $('status-dot').classList.remove('live');
 }
 
 async function listDevices() {
@@ -290,7 +434,11 @@ async function listDevices() {
   }
 }
 
-$('gain').addEventListener('input', e => { if (gainOut) gainOut.gain.value = parseFloat(e.target.value); });
+$('gain').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  if (gainOut) gainOut.gain.value = v;
+  const gl = $('gain-label'); if (gl) gl.textContent = v.toFixed(1) + '×';
+});
 $('start').addEventListener('click', start);
 $('stop').addEventListener('click', stop);
 $('calib-save').addEventListener('click', saveCalibration);
@@ -327,3 +475,11 @@ $('theme-toggle').addEventListener('click', () => {
 });
 
 navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
+
+// Initialize the editable chain on load (works before Start; audio wires up on
+// Start). Restore a persisted chain if present, else load the default preset.
+(function initChain() {
+  const stored = chainStore.load();
+  if (stored && Array.isArray(stored) && stored.length) loadStoredChain(stored);
+  else loadPreset(PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0]);
+})();

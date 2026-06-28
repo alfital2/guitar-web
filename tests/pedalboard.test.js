@@ -42,7 +42,11 @@ describe('renderPedalboard', () => {
     expect(add).toBeTruthy();
     add.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const opts = [...el.querySelectorAll('.pedal-palette button')].map(b => b.dataset.type);
-    expect(opts).toEqual(['compressor', 'delay', 'reverb', 'chorus']);
+    for (const t of ['compressor', 'delay', 'reverb', 'chorus']) expect(opts).toContain(t);
+    // amp types never appear in the pedal palette
+    expect(opts).not.toContain('drive');
+    expect(opts).not.toContain('eq');
+    expect(opts).not.toContain('cabinet');
   });
   it('clicking a palette option calls onAdd(type)', () => {
     const el = document.createElement('div');
