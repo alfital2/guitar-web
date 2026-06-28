@@ -39,6 +39,9 @@ export function renderProfileCard(container, { name, stats, archetype }) {
     list.appendChild(row);
   }
 
-  card.append(nameEl, archEl, svg, list);
+  const body = document.createElement('div'); body.className = 'tc-body';
+  body.append(svg, list);
+
+  card.append(nameEl, archEl, body);
   container.appendChild(card);
 }

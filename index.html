@@ -96,7 +96,7 @@
 
   /* Hero */
   .hero {
-    display: grid; grid-template-columns: auto minmax(160px, 200px) minmax(150px, 1fr) minmax(230px, 290px);
+    display: grid; grid-template-columns: auto minmax(160px, 1fr) minmax(280px, 360px);
     gap: 18px; align-items: center; padding: 18px 22px; border-bottom: 1px solid var(--line);
   }
   .hero-note { display: flex; flex-direction: column; align-items: center; gap: 8px; }
@@ -105,8 +105,10 @@
     background: var(--surface-2); display: flex; align-items: center; justify-content: center;
     font-size: 22px; font-weight: 700; color: var(--muted);
   }
-  .hero-guitar h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+  .hero-guitar { align-self: stretch; }
+  .hero-guitar h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
   .hero-guitar #calibration label:first-of-type { margin-top: 0; }
+  .hero-guitar #tone-card { margin-top: 14px; }
   @media (prefers-reduced-motion: no-preference) {
     .note-circle { transition: transform .25s cubic-bezier(.2,.85,.25,1), color .15s, border-color .15s; }
     .note-circle.active { transform: scale(1.06); }
@@ -125,7 +127,6 @@
   .dot { display: none; }
 
   /* Cards */
-  .hero-tone { align-self: stretch; }
   @media (max-width: 900px) { .hero { grid-template-columns: 1fr; } }
   .amp-strip { padding: 10px 20px 4px; }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
@@ -276,13 +277,13 @@
 
   /* Tone card */
   .tone-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; text-align: center; }
-  .tone-card svg { display: block; margin: 4px auto; }
-  .tc-stats { gap: 3px 16px; margin-top: 8px; }
+  .tone-card svg { display: block; flex: 0 0 auto; }
+  .tc-body { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
   .tc-name { font-weight: 700; font-size: 16px; }
   .tc-archetype { color: var(--accent); font-size: 13px; margin-bottom: 8px; }
   .tc-grid { fill: rgba(128,128,128,0.08); stroke: var(--line); }
   .tc-poly { fill: rgba(255,122,69,0.32); stroke: var(--accent); stroke-width: 2; }
-  .tc-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .tc-stats { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; font-size: 12px; color: var(--muted); }
   .tc-stat { display: flex; justify-content: space-between; }
   .tc-stat b { color: var(--text); }
 
@@ -313,10 +314,6 @@
         <span id="status-dot" class="dot"></span>
       </div>
     </div>
-    <div class="hero-guitar">
-      <h2>Guitar</h2>
-      <div id="calibration"></div>
-    </div>
     <div class="hero-viz">
       <canvas id="spectrum" width="640" height="120"></canvas>
       <div class="gain-row">
@@ -324,7 +321,11 @@
         <input id="gain" type="range" min="0" max="2" step="0.01" value="1">
       </div>
     </div>
-    <div id="tone-card" class="hero-tone"><p class="caption">Calibrate a guitar in Settings to see its tone card.</p></div>
+    <section class="card hero-guitar">
+      <h2>Guitar</h2>
+      <div id="calibration"></div>
+      <div id="tone-card"><p class="caption">Calibrate a guitar in Settings to see its tone card.</p></div>
+    </section>
   </section>
 
   <section class="amp-strip">

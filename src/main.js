@@ -45,8 +45,13 @@ function loadPreset(preset) {
     if (AMP_TYPES.has(m.type)) { amp.push(m); ampIdx.push(i); }
     else { ped.push(m); pedIdx.push(i); }
   });
-  renderAmp($('amp'), amp, (j, k, v) => engine.setParam(ampIdx[j], k, v));
-  renderPedalboard($('chain'), ped, (j, k, v) => engine.setParam(pedIdx[j], k, v));
+  try {
+    renderAmp($('amp'), amp, (j, k, v) => engine.setParam(ampIdx[j], k, v));
+    renderPedalboard($('chain'), ped, (j, k, v) => engine.setParam(pedIdx[j], k, v));
+  } catch (e) {
+    $('error').textContent = 'render: ' + e.message;
+    console.error(e);
+  }
   if (calibrationEq) calibrationEq.output.connect(engine.input);
   if (gainOut) engine.output.connect(gainOut);
 }
