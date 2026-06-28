@@ -124,7 +124,6 @@ function renderCalibControls() {
   }, {
     onSelect: (name) => { profiles.setActive(name); applyActiveCalibration(); renderCalibControls(); },
     onStrength: (s) => { const a = profiles.getActive(); if (a) profiles.setStrength(a.name, s); applyActiveCalibration(); },
-    onCalibrate: startCalibration,
   });
   renderToneCard();
 }
@@ -282,6 +281,19 @@ $('start').addEventListener('click', start);
 $('stop').addEventListener('click', stop);
 $('calib-save').addEventListener('click', saveCalibration);
 $('calib-cancel').addEventListener('click', stopCalibration);
+$('calib-start').addEventListener('click', startCalibration);
+
+// Settings slide-in panel
+function setSettings(open) {
+  $('settings-panel').classList.toggle('open', open);
+  const bd = $('settings-backdrop');
+  if (open) { bd.hidden = false; requestAnimationFrame(() => bd.classList.add('open')); }
+  else { bd.classList.remove('open'); setTimeout(() => { bd.hidden = true; }, 220); }
+}
+$('settings-toggle').addEventListener('click', () => setSettings(!$('settings-panel').classList.contains('open')));
+$('settings-close').addEventListener('click', () => setSettings(false));
+$('settings-backdrop').addEventListener('click', () => setSettings(false));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setSettings(false); });
 $('diag').textContent = `${isSafari ? 'Safari' : 'Chrome'} · setSinkId: ${hasSetSinkId ? 'yes' : 'no'}`;
 
 // Appearance: follow system, with a persisted manual override.
