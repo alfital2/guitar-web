@@ -27,7 +27,12 @@ export function renderPedalboard(container, modules, onParamChange) {
       const { el } = createKnob(p, m.params[p.key] ?? p.default, (v) => onParamChange(i, p.key, v));
       knobs.appendChild(el);
     }
-    pedal.append(plate, knobs);
+    const foot = document.createElement('div');
+    foot.className = 'pedal-foot';
+    const led = document.createElement('div');
+    led.className = 'pedal-led';
+    foot.appendChild(led);
+    pedal.append(plate, knobs, foot);
     board.appendChild(pedal);
   });
 
