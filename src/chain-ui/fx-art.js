@@ -50,6 +50,67 @@ const WIDTHS = { 1: 108, 2: 128, 3: 152, 4: 190, 5: 228 };
 const HEIGHT = 248;
 export const fxWidth = (type) => WIDTHS[FX_KNOBS[type] ?? 3] ?? 152;
 
+// Per-pedal knob styling — cap gradient, arc accent, pointer color, shape.
+const DARK = ['#58585f', '#2a2a2f', '#0f0f12'];
+const CHROME = ['#f2f4f6', '#aeb4ba', '#5d646b'];
+const CREAM = ['#f6ecd2', '#e7c79a', '#b98a3a'];
+const BLACK = ['#3a3a40', '#1a1a1e', '#08080a'];
+export const FX_KNOB_STYLE = {
+  compressor: { cap: CHROME, accent: '#2e9bff', pointer: '#222' },
+  boost: { cap: BLACK, accent: '#6db3ff', pointer: '#fff' },
+  gate: { cap: BLACK, accent: '#e9c93a', pointer: '#1a1a1a' },
+  fuzz: { cap: CREAM, accent: '#d97a1f', pointer: '#5e360c', shape: 'chicken' },
+  octave: { cap: CREAM, accent: '#e8c878', pointer: '#5e360c', shape: 'chicken' },
+  wah: { cap: CHROME, accent: '#ff5a4d', pointer: '#222' },
+  autowah: { cap: CREAM, accent: '#2f9e44', pointer: '#5e360c' },
+  chorus: { cap: CHROME, accent: '#3f86c4', pointer: '#16364f' },
+  flanger: { cap: BLACK, accent: '#c9b6ff', pointer: '#fff' },
+  phaser: { cap: BLACK, accent: '#ffe3f7', pointer: '#fff' },
+  tremolo: { cap: CREAM, accent: '#e8c07a', pointer: '#5e360c', shape: 'chicken' },
+  vibrato: { cap: CREAM, accent: '#ffae57', pointer: '#5e360c', shape: 'chicken' },
+  rotary: { cap: CREAM, accent: '#ffe6c4', pointer: '#5e360c', shape: 'chicken' },
+  autopan: { cap: CREAM, accent: '#ff7eb0', pointer: '#5e360c' },
+  delay: { cap: BLACK, accent: '#39d98a', pointer: '#fff' },
+  'tape-echo': { cap: CHROME, accent: '#7fd8c6', pointer: '#222', shape: 'chicken' },
+  pingpong: { cap: BLACK, accent: '#ff8a3d', pointer: '#fff' },
+  reverb: { cap: BLACK, accent: '#b9aaff', pointer: '#fff' },
+  widener: { cap: BLACK, accent: '#39d3ff', pointer: '#fff' },
+  limiter: { cap: CHROME, accent: '#d6b3aa', pointer: '#222' },
+  pitchshift: { cap: BLACK, accent: '#33e0c8', pointer: '#fff' },
+  looper: { cap: BLACK, accent: '#8af0b8', pointer: '#fff' },
+  ringmod: { cap: BLACK, accent: '#ffe18a', pointer: '#fff' },
+};
+
+// Per-pedal knob positions {x, y[, r]} in art coords (0..width, 0..248),
+// matching the param order. Lets each faceplate place its controls distinctly
+// (rows, 2x2 grids, a single feature knob) instead of one uniform band.
+const row = (cx, y, n, gap = 44, r) => Array.from({ length: n }, (_, i) => ({ x: +(cx + (i - (n - 1) / 2) * gap).toFixed(1), y, r }));
+export const FX_KNOB_LAYOUT = {
+  compressor: row(114, 138, 5, 44, 34),
+  boost: row(76, 120, 3, 38),
+  gate: row(64, 124, 2, 44),
+  fuzz: [{ x: 40, y: 132, r: 32 }, { x: 76, y: 128, r: 46 }, { x: 112, y: 132, r: 32 }],
+  octave: [{ x: 70, y: 82, r: 30 }, { x: 120, y: 82, r: 30 }, { x: 70, y: 126, r: 30 }, { x: 120, y: 126, r: 30 }],
+  wah: row(76, 126, 3, 38),
+  autowah: row(95, 124, 4, 41),
+  chorus: row(76, 128, 3, 38),
+  flanger: row(95, 128, 4, 41),
+  phaser: row(95, 130, 4, 41),
+  tremolo: row(76, 130, 3, 38),
+  vibrato: row(64, 128, 2, 46),
+  rotary: row(76, 134, 3, 38),
+  autopan: row(76, 118, 3, 38),
+  delay: row(95, 134, 4, 41),
+  'tape-echo': row(114, 150, 5, 44, 34),
+  pingpong: row(95, 128, 4, 41),
+  reverb: row(64, 130, 2, 46),
+  widener: [{ x: 54, y: 120, r: 40 }],
+  limiter: row(64, 128, 2, 46),
+  pitchshift: row(64, 128, 2, 46),
+  looper: row(64, 128, 2, 46),
+  ringmod: row(64, 128, 2, 46),
+};
+
 // ---- shared texture filters (neutral: alpha from noise; tints any solid rect) --
 const FILTERS = `
   <filter id="nz-fine"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/>
@@ -190,8 +251,8 @@ const VIBRATO = plate('vibrato', {
   defs: `<linearGradient id="vi-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8732e"/><stop offset="1" stop-color="#7a481a"/></linearGradient>`,
   body: 'url(#vi-b)', screw: '#2e1a07',
   bg: (w) => texW(w, '#3a2208', 'nz-streak', .5) + texW(w, '#ffd9a8', 'nz-streak', .12),
-  motif: `<path d="M28 108 q 15 -26 30 0 t 30 0 t 30 0 t 30 0" fill="none" stroke="#2e1a07" stroke-width="9" stroke-linecap="round" opacity=".6"/>
-    <path d="M28 104 q 15 -26 30 0 t 30 0 t 30 0 t 30 0" fill="none" stroke="#ffae57" stroke-width="8" stroke-linecap="round"/>`,
+  motif: `<path d="M36 108 q 13 -24 26 0 t 26 0 t 26 0 t 26 0" fill="none" stroke="#2e1a07" stroke-width="9" stroke-linecap="round" opacity=".6"/>
+    <path d="M36 104 q 13 -24 26 0 t 26 0 t 26 0 t 26 0" fill="none" stroke="#ffae57" stroke-width="8" stroke-linecap="round"/>`,
   word: (cx, f) => wm(cx, f, 'VIBRATO', 20, '#2e1a07', '#ffe6c4', 200) + tag(cx, 'RATE · DEPTH', '#ffae57', 218),
 });
 

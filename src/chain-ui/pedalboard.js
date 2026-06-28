@@ -1,6 +1,6 @@
 // src/chain-ui/pedalboard.js
 import { createKnob } from './knob.js';
-import { fxArtSvg, FX_FONTS, fxWidth } from './fx-art.js';
+import { fxArtSvg, FX_FONTS, fxWidth, FX_KNOB_STYLE, FX_KNOB_LAYOUT } from './fx-art.js';
 
 const COLORS = {
   compressor: '#0a84ff',
@@ -215,10 +215,18 @@ function buildPedal(unit, handlers) {
 
   const knobs = document.createElement('div');
   knobs.className = 'pedal-knobs';
-  for (const p of unit.schema.params) {
-    const { el } = createKnob(p, unit.params[p.key] ?? p.default, (v) => handlers.onParamChange(unit.instanceId, p.key, v), PEDAL_KNOB_SIZE);
+  const layout = FX_KNOB_LAYOUT[unit.type];
+  const style = FX_KNOB_STYLE[unit.type] || {};
+  const params = unit.schema.params;
+  params.forEach((p, i) => {
+    // Per-pedal slot; fall back to an evenly-spaced row if a layout slot is missing.
+    const slot = (layout && layout[i]) || { x: fxWidth(unit.type) / 2 + (i - (params.length - 1) / 2) * 40, y: 128 };
+    const size = slot.r || PEDAL_KNOB_SIZE;
+    const { el } = createKnob(p, unit.params[p.key] ?? p.default, (v) => handlers.onParamChange(unit.instanceId, p.key, v), size, style);
+    el.style.left = `${slot.x}px`;
+    el.style.top = `${slot.y - size / 2}px`;
     knobs.appendChild(el);
-  }
+  });
 
   const led = document.createElement('div');
   led.className = 'pedal-led';

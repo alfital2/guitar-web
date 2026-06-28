@@ -31,10 +31,16 @@ function arcPath(cx, cy, r, startDeg, endDeg) {
 }
 function svgEl(name, attrs) { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
 
-export function createKnob(param, value, onChange, small = false) {
+export function createKnob(param, value, onChange, small = false, style = {}) {
   const { min, max, step, unit, label } = param;
   const uid = `knob${knobSeq++}`;
   let current = clampSnap(value, min, max, step);
+
+  // Per-pedal styling: cap gradient stops, arc accent, pointer color, shape.
+  const capCols = style.cap || ['#58585f', '#2a2a2f', '#0f0f12'];
+  const accent = style.accent || '#ff9f0a';
+  const pointerCol = style.pointer || 'rgba(255,255,255,0.9)';
+  const shape = style.shape || 'round';
 
   // Geometry — amp knobs 54px, pedal knobs 44px; pass a number for a custom size.
   const numeric = typeof small === 'number';
@@ -59,9 +65,9 @@ export function createKnob(param, value, onChange, small = false) {
   const defs = svgEl('defs', {});
   const grad = svgEl('radialGradient', { id: `${uid}-c`, cx: '34%', cy: '26%', r: '72%' });
   grad.append(
-    svgEl('stop', { offset: '0%', 'stop-color': '#58585f' }),
-    svgEl('stop', { offset: '50%', 'stop-color': '#2a2a2f' }),
-    svgEl('stop', { offset: '100%', 'stop-color': '#0f0f12' }),
+    svgEl('stop', { offset: '0%', 'stop-color': capCols[0] }),
+    svgEl('stop', { offset: '50%', 'stop-color': capCols[1] }),
+    svgEl('stop', { offset: '100%', 'stop-color': capCols[2] }),
   );
   const hi = svgEl('radialGradient', { id: `${uid}-h`, cx: '28%', cy: '22%', r: '55%' });
   hi.append(
@@ -89,11 +95,25 @@ export function createKnob(param, value, onChange, small = false) {
   }
 
   const track = svgEl('path', { class: 'knob-track', d: arcPath(C, C, RTR, -135, 135), fill: 'none', stroke: 'rgba(255,255,255,0.06)', 'stroke-width': '3.5', 'stroke-linecap': 'round' });
-  const arc = svgEl('path', { class: 'knob-arc', fill: 'none', stroke: '#ff9f0a', 'stroke-width': '3.5', 'stroke-linecap': 'round', filter: `url(#${uid}-g)` });
-  const cap = svgEl('circle', { class: 'knob-cap', cx: String(C), cy: String(C), r: String(RC), fill: `url(#${uid}-c)`, stroke: 'rgba(0,0,0,0.6)', 'stroke-width': '0.75' });
-  const spec = svgEl('circle', { class: 'knob-spec', cx: (C - RC * 0.15).toFixed(2), cy: (C - RC * 0.22).toFixed(2), r: (RC * 0.52).toFixed(2), fill: `url(#${uid}-h)` });
-  const ptr = svgEl('line', { class: 'knob-pointer', stroke: 'rgba(255,255,255,0.9)', 'stroke-width': '2', 'stroke-linecap': 'round' });
-  svg.append(defs, ticks, track, arc, cap, spec, ptr);
+  const arc = svgEl('path', { class: 'knob-arc', fill: 'none', stroke: accent, 'stroke-width': '3.5', 'stroke-linecap': 'round', filter: `url(#${uid}-g)` });
+
+  // Cap. 'round' = circular cap + a pointer line; 'chicken' = a rotating
+  // chicken-head cap whose beak is the indicator (vintage vibe).
+  let capg = null, ptr = null;
+  if (shape === 'chicken') {
+    capg = svgEl('g', { class: 'knob-cap' });
+    capg.append(
+      svgEl('circle', { cx: String(C), cy: String(C), r: String(RC), fill: `url(#${uid}-c)`, stroke: 'rgba(0,0,0,0.6)', 'stroke-width': '0.75' }),
+      svgEl('path', { d: `M ${C} ${(C - RC - 4).toFixed(2)} L ${(C - 3.6).toFixed(2)} ${(C - RC + 2).toFixed(2)} L ${(C + 3.6).toFixed(2)} ${(C - RC + 2).toFixed(2)} Z`, fill: pointerCol, stroke: 'rgba(0,0,0,0.4)', 'stroke-width': '0.5' }),
+      svgEl('circle', { class: 'knob-spec', cx: (C - RC * 0.18).toFixed(2), cy: (C - RC * 0.24).toFixed(2), r: (RC * 0.5).toFixed(2), fill: `url(#${uid}-h)` }),
+    );
+    svg.append(defs, ticks, track, arc, capg);
+  } else {
+    const cap = svgEl('circle', { class: 'knob-cap', cx: String(C), cy: String(C), r: String(RC), fill: `url(#${uid}-c)`, stroke: 'rgba(0,0,0,0.6)', 'stroke-width': '0.75' });
+    const spec = svgEl('circle', { class: 'knob-spec', cx: (C - RC * 0.15).toFixed(2), cy: (C - RC * 0.22).toFixed(2), r: (RC * 0.52).toFixed(2), fill: `url(#${uid}-h)` });
+    ptr = svgEl('line', { class: 'knob-pointer', stroke: pointerCol, 'stroke-width': '2', 'stroke-linecap': 'round' });
+    svg.append(defs, ticks, track, arc, cap, spec, ptr);
+  }
 
   const valEl = document.createElement('span'); valEl.className = 'val';
   valEl.style.cssText = `font-size:${small ? 9 : 10}px;font-weight:600;color:#c8c8cc;font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;`;
@@ -105,9 +125,13 @@ export function createKnob(param, value, onChange, small = false) {
     const ang = valueToAngle(current, min, max);
     const t = max === min ? 0 : (current - min) / (max - min);
     arc.setAttribute('d', t > 0 ? arcPath(C, C, RTR, -135, ang) : 'M0 0');
-    const p1 = polar(C, C, RC - 3.5, ang), p2 = polar(C, C, RC, ang);
-    ptr.setAttribute('x1', p1.x.toFixed(2)); ptr.setAttribute('y1', p1.y.toFixed(2));
-    ptr.setAttribute('x2', p2.x.toFixed(2)); ptr.setAttribute('y2', p2.y.toFixed(2));
+    if (capg) {
+      capg.setAttribute('transform', `rotate(${ang.toFixed(1)} ${C} ${C})`);
+    } else {
+      const p1 = polar(C, C, RC - 3.5, ang), p2 = polar(C, C, RC, ang);
+      ptr.setAttribute('x1', p1.x.toFixed(2)); ptr.setAttribute('y1', p1.y.toFixed(2));
+      ptr.setAttribute('x2', p2.x.toFixed(2)); ptr.setAttribute('y2', p2.y.toFixed(2));
+    }
     const text = format(current, step, unit);
     valEl.textContent = text;
     el.setAttribute('aria-valuenow', String(current));

@@ -13,8 +13,8 @@
   .pedal{position:relative;border-radius:14px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.6),inset 0 0 0 1px rgba(0,0,0,.4)}
   .pedal-art{display:block;width:100%;height:auto}
   .pedal-grip{position:absolute;inset:0;z-index:1;cursor:grab}
-  .pedal-knobs{position:absolute;left:0;right:0;top:99px;z-index:2;display:flex;justify-content:center;align-items:flex-start;gap:6px;pointer-events:none}
-  .pedal-knobs .knob{pointer-events:auto}
+  .pedal-knobs{position:absolute;inset:0;z-index:2;pointer-events:none}
+  .pedal-knobs .knob{position:absolute;transform:translateX(-50%);pointer-events:auto}
   .pedal-knobs .knob .label{display:none}
   .pedal-knobs .knob .val{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 2px rgba(0,0,0,.7)}
   .pedal-led{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;z-index:2;background:var(--pedal-color);box-shadow:0 0 7px var(--pedal-color),0 0 2px #fff}

@@ -199,11 +199,10 @@
   .pedal-art { display: block; width: 100%; height: auto; }
   .pedal-grip { position: absolute; inset: 0; z-index: 1; cursor: grab; }
   .pedal.lifting .pedal-grip { cursor: grabbing; }
-  .pedal-knobs {
-    position: absolute; left: 0; right: 0; top: 99px; z-index: 2;
-    display: flex; justify-content: center; align-items: flex-start; gap: 6px; pointer-events: none;
-  }
-  .pedal-knobs .knob { pointer-events: auto; }
+  .pedal-knobs { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+  /* each knob is absolutely placed (left/top set inline per the pedal's layout),
+     centered horizontally on its slot x */
+  .pedal-knobs .knob { position: absolute; transform: translateX(-50%); pointer-events: auto; }
   .pedal-knobs .knob .label { display: none; }
   .pedal-knobs .knob .val { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.7); }
   .pedal-led {
