@@ -1,42 +1,93 @@
 // tests/pedalboard.test.js
 import { describe, it, expect, vi } from 'vitest';
-import { renderPedalboard } from '../src/chain-ui/pedalboard.js';
+import { renderPedalboard, computeDrop } from '../src/chain-ui/pedalboard.js';
 
-const modules = [
-  { type: 'drive', schema: { label: 'Drive', params: [
+const units = [
+  { instanceId: 1, type: 'compressor', locked: false, schema: { label: 'Compressor', params: [
+    { key: 'threshold', label: 'Threshold', min: -60, max: 0, default: -24, step: 1 },
+  ] }, params: { threshold: -24 } },
+  { instanceId: 2, type: 'drive', locked: true, schema: { label: 'Drive', params: [
     { key: 'amount', label: 'Amount', min: 0, max: 10, default: 2.5, step: 0.1 },
-    { key: 'tone', label: 'Tone', min: 0, max: 10, default: 5, step: 0.1 },
-  ] }, params: { amount: 2.5, tone: 5 } },
-  { type: 'reverb', schema: { label: 'Reverb', params: [
-    { key: 'mix', label: 'Mix', min: 0, max: 1, default: 0.3, step: 0.01 },
-  ] }, params: { mix: 0.3 } },
+  ] }, params: { amount: 2.5 } },
+  { instanceId: 3, type: 'cabinet', locked: true, schema: { label: 'Cabinet', params: [
+    { key: 'mix', label: 'Mix', min: 0, max: 1, default: 1, step: 0.01 },
+  ] }, params: { mix: 1 } },
+  { instanceId: 4, type: 'delay', locked: false, schema: { label: 'Delay', params: [
+    { key: 'mix', label: 'Mix', min: 0, max: 1, default: 0.2, step: 0.01 },
+  ] }, params: { mix: 0.2 } },
 ];
+const noop = { onParamChange() {}, onAdd() {}, onRemove() {}, onMove() {} };
 
 describe('renderPedalboard', () => {
-  it('renders a brick per module with a knob per param', () => {
+  it('renders a card only for non-locked units', () => {
     const el = document.createElement('div');
-    renderPedalboard(el, modules, () => {});
-    expect(el.querySelectorAll('.pedal')).toHaveLength(2);
-    expect(el.querySelectorAll('.pedal')[0].querySelectorAll('[role=slider]')).toHaveLength(2);
-    expect(el.querySelector('.pedal-name').textContent).toBe('Drive');
+    renderPedalboard(el, units, noop);
+    expect(el.querySelectorAll('.pedal')).toHaveLength(2); // compressor + delay
+    expect(el.querySelector('.pedal').dataset.instanceId).toBe('1');
   });
-  it('puts a connector between bricks (n-1)', () => {
+  it('renders the AMP anchor at the amp block position', () => {
     const el = document.createElement('div');
-    renderPedalboard(el, modules, () => {});
-    expect(el.querySelectorAll('.connector')).toHaveLength(1);
+    renderPedalboard(el, units, noop);
+    expect(el.querySelectorAll('.amp-anchor')).toHaveLength(1);
+    // order: compressor card, connector, amp anchor, connector, delay card
+    const kinds = [...el.querySelector('.pedalboard').children]
+      .filter(c => c.classList.contains('pedal') || c.classList.contains('amp-anchor') || c.classList.contains('connector'))
+      .map(c => c.classList.contains('amp-anchor') ? 'AMP' : (c.classList.contains('pedal') ? c.dataset.instanceId : '>'));
+    expect(kinds).toEqual(['1', '>', 'AMP', '>', '4']);
   });
-  it('a knob change calls onParamChange(index, key, value)', () => {
+  it('renders a + add tile that reveals the palette of pedal types', () => {
     const el = document.createElement('div');
-    const cb = vi.fn();
-    renderPedalboard(el, modules, cb);
-    const firstKnob = el.querySelectorAll('.pedal')[0].querySelector('[role=slider]');
+    renderPedalboard(el, units, noop);
+    const add = el.querySelector('.pedal-add');
+    expect(add).toBeTruthy();
+    add.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const opts = [...el.querySelectorAll('.pedal-palette button')].map(b => b.dataset.type);
+    expect(opts).toEqual(['compressor', 'delay', 'reverb', 'chorus']);
+  });
+  it('clicking a palette option calls onAdd(type)', () => {
+    const el = document.createElement('div');
+    const onAdd = vi.fn();
+    renderPedalboard(el, units, { ...noop, onAdd });
+    el.querySelector('.pedal-add').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    el.querySelector('.pedal-palette button[data-type="reverb"]').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(onAdd).toHaveBeenCalledWith('reverb');
+  });
+  it('a knob change calls onParamChange(instanceId, key, value)', () => {
+    const el = document.createElement('div');
+    const onParamChange = vi.fn();
+    renderPedalboard(el, units, { ...noop, onParamChange });
+    const firstKnob = el.querySelector('.pedal [role=slider]');
     firstKnob.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
-    expect(cb).toHaveBeenCalledWith(0, 'amount', 2.6);
+    expect(onParamChange).toHaveBeenCalledWith(1, 'threshold', -23);
   });
   it('clears the container on re-render', () => {
     const el = document.createElement('div');
-    renderPedalboard(el, modules, () => {});
-    renderPedalboard(el, modules, () => {});
-    expect(el.querySelectorAll('.pedal')).toHaveLength(2);
+    renderPedalboard(el, units, noop);
+    renderPedalboard(el, units, noop);
+    expect(el.querySelectorAll('.pedalboard')).toHaveLength(1);
+  });
+});
+
+describe('computeDrop', () => {
+  function boardWith(ids) {
+    const board = document.createElement('div');
+    board.className = 'pedalboard';
+    ids.forEach((id, i) => {
+      const p = document.createElement('div');
+      p.className = 'pedal'; p.dataset.instanceId = String(id);
+      // 100px-wide cards starting at x=0,100,200…
+      p.getBoundingClientRect = () => ({ left: i * 100, right: i * 100 + 100, width: 100, top: 0, bottom: 50, height: 50, x: i * 100, y: 0 });
+      board.appendChild(p);
+    });
+    return board;
+  }
+  it('returns the id of the card whose left half the cursor is over', () => {
+    const board = boardWith([1, 4, 7]);
+    expect(computeDrop(board, 10)).toBe(1);   // left of card 1 -> before 1
+    expect(computeDrop(board, 160)).toBe(7);  // right half of card 4 -> before 7
+  });
+  it('returns null past the last card (drop at end)', () => {
+    const board = boardWith([1, 4, 7]);
+    expect(computeDrop(board, 290)).toBeNull();
   });
 });
