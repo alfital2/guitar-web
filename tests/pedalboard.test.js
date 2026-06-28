@@ -79,13 +79,14 @@ describe('renderPedalboard', () => {
     renderPedalboard(el, units, noop);
     expect(el.querySelectorAll('.pedalboard')).toHaveLength(1);
   });
-  it('renders cover art on a pedal card and sets its font', () => {
+  it('renders bespoke faceplate art, a drag grip, knobs, and width on a pedal', () => {
     const el = document.createElement('div');
     renderPedalboard(el, units, noop);
     const pedal = el.querySelector('.pedal');
     expect(pedal.querySelector('.pedal-art use').getAttribute('href')).toBe('#fx-art-compressor');
-    expect(pedal.querySelector('.pedal-inner .pedal-name')).toBeTruthy();
-    expect(pedal.style.getPropertyValue('--font')).toContain('Major Mono');
+    expect(pedal.querySelector('.pedal-grip[data-drag-handle]')).toBeTruthy();
+    expect(pedal.querySelector('.pedal-knobs .knob')).toBeTruthy();
+    expect(pedal.style.width).toMatch(/\d+px/); // width derives from knob count
   });
   it('renders cover art thumbnails in the palette tiles', () => {
     const el = document.createElement('div');

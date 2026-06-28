@@ -1,6 +1,6 @@
 // src/chain-ui/pedalboard.js
 import { createKnob } from './knob.js';
-import { fxArtSvg, FX_FONTS } from './fx-art.js';
+import { fxArtSvg, FX_FONTS, fxWidth } from './fx-art.js';
 
 const COLORS = {
   compressor: '#0a84ff',
@@ -189,44 +189,42 @@ function enableDrag(pedal, plate, unit, handlers, getBoard) {
   });
 }
 
+// Pedal knobs are rendered a touch smaller than amp knobs so the control band
+// fits inside the bespoke faceplate (which is sized to the knob count).
+const PEDAL_KNOB_SIZE = 36;
+
 function buildPedal(unit, handlers) {
   const pedal = document.createElement('div');
   pedal.className = 'pedal';
   pedal.dataset.instanceId = String(unit.instanceId);
   const color = COLORS[unit.type] ?? '#636368';
-  pedal.style.setProperty('--pedal-color', color); // rim + LED + knob pointer
-  pedal.style.setProperty('--c', color);           // cover art tint
-  const font = FX_FONTS[unit.type];
-  if (font) { pedal.style.setProperty('--font', font.family); pedal.style.setProperty('--font-ls', font.ls); }
+  pedal.style.setProperty('--pedal-color', color); // LED
+  pedal.style.setProperty('--c', color);           // (faceplate art uses baked colors)
+  pedal.style.width = `${fxWidth(unit.type)}px`;
 
-  // Full-bleed cover art behind a readability scrim + anodized rim.
+  // Bespoke faceplate art sizes the box; the wordmark is baked into the art.
   const art = fxArtSvg(unit.type);
   art.classList.add('pedal-art');
-  const scrim = document.createElement('div'); scrim.className = 'pedal-scrim';
-  const rim = document.createElement('div'); rim.className = 'pedal-rim';
 
-  const inner = document.createElement('div');
-  inner.className = 'pedal-inner';
-
-  const plate = document.createElement('div');
-  plate.className = 'pedal-name'; plate.textContent = unit.schema.label;
-  plate.dataset.dragHandle = 'true';
+  // The whole face is the drag handle; knobs sit above it (higher z) and
+  // capture their own pointer events, so dragging works everywhere else.
+  const grip = document.createElement('div');
+  grip.className = 'pedal-grip';
+  grip.dataset.dragHandle = 'true';
+  grip.setAttribute('aria-label', `${unit.schema.label} — drag to reorder`);
 
   const knobs = document.createElement('div');
-  knobs.className = 'knobs';
+  knobs.className = 'pedal-knobs';
   for (const p of unit.schema.params) {
-    const { el } = createKnob(p, unit.params[p.key] ?? p.default, (v) => handlers.onParamChange(unit.instanceId, p.key, v), true);
+    const { el } = createKnob(p, unit.params[p.key] ?? p.default, (v) => handlers.onParamChange(unit.instanceId, p.key, v), PEDAL_KNOB_SIZE);
     knobs.appendChild(el);
   }
-  const foot = document.createElement('div');
-  foot.className = 'pedal-foot';
+
   const led = document.createElement('div');
   led.className = 'pedal-led';
-  foot.appendChild(led);
 
-  inner.append(plate, knobs, foot);
-  pedal.append(art, scrim, rim, inner);
-  return { pedal, plate };
+  pedal.append(art, grip, knobs, led);
+  return { pedal, plate: grip };
 }
 
 function ampAnchor(beforeId) {

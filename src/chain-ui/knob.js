@@ -36,12 +36,13 @@ export function createKnob(param, value, onChange, small = false) {
   const uid = `knob${knobSeq++}`;
   let current = clampSnap(value, min, max, step);
 
-  // Geometry — amp knobs are 54px, pedal knobs 44px.
-  const SZ = small ? 44 : 54, C = SZ / 2;
-  const RTO = small ? 19 : 23;   // tick outer
-  const RTI = small ? 16 : 19;   // tick inner
-  const RTR = small ? 13.5 : 17; // track / arc radius
-  const RC = small ? 9 : 12;     // cap radius
+  // Geometry — amp knobs 54px, pedal knobs 44px; pass a number for a custom size.
+  const numeric = typeof small === 'number';
+  const SZ = numeric ? small : (small ? 44 : 54), C = SZ / 2;
+  const RTO = numeric ? SZ * 0.43 : (small ? 19 : 23);   // tick outer
+  const RTI = numeric ? SZ * 0.36 : (small ? 16 : 19);   // tick inner
+  const RTR = numeric ? SZ * 0.31 : (small ? 13.5 : 17); // track / arc radius
+  const RC = numeric ? SZ * 0.205 : (small ? 9 : 12);    // cap radius
 
   const el = document.createElement('div');
   el.className = 'knob';
