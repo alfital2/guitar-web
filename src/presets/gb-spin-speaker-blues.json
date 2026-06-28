@@ -1,0 +1,8 @@
+{ "name": "Spin Speaker Blues", "artist": "GarageBand", "song": "Leslie rotary blues", "chain": [
+  { "type": "compressor", "params": { "threshold": -20, "ratio": 3, "attack": 0.005, "release": 0.22, "makeup": 3 } },
+  { "type": "drive",      "params": { "amount": 2, "tone": 5, "level": 5, "blend": 0.45, "midBump": 2 } },
+  { "type": "eq",         "params": { "bass": 6, "mid": 6, "midFreq": 700, "treble": 4 } },
+  { "type": "cabinet",    "params": { "brightness": 4, "body": 7, "mix": 1 } },
+  { "type": "rotary",     "params": { "speed": 6, "depth": 6, "mix": 0.6 } },
+  { "type": "reverb",     "params": { "size": 0.4, "mix": 0.12 } }
+] }

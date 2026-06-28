@@ -1,8 +1,9 @@
 // src/main.js
 import { registry } from './effects/index.js';
 import { buildChain } from './engine.js';
-import { PRESETS, validatePreset } from './presets.js';
+import { PRESETS, validatePreset, GB_CATEGORIES } from './presets.js';
 import { renderPresetPicker } from './ui.js';
+import { renderPresetBrowser } from './preset-browser.js';
 import { renderPedalboard } from './chain-ui/pedalboard.js';
 import { renderAmp } from './chain-ui/amp.js';
 import { createCalibrationEq } from './calibration/calibration-eq.js';
@@ -118,12 +119,20 @@ function moveEffect(instanceId, beforeInstanceId) {
   rebuildGraph();
 }
 
+let activePresetName = null;
 function loadPreset(preset) {
   const errors = validatePreset(preset, registry);
   if (errors.length) { $('error').textContent = errors.join('; '); return; }
   const r = chainState.fromPreset(preset.chain, nextId);
   currentChain = r.chain; nextId = r.nextId;
+  activePresetName = preset.name;
   rebuildGraph();
+  renderBrowser();
+}
+
+function renderBrowser() {
+  const el = $('preset-browser');
+  if (el) renderPresetBrowser(el, GB_CATEGORIES, loadPreset, activePresetName);
 }
 
 // Restore a persisted chain (array of {type, params}) into the model.
@@ -494,4 +503,5 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
   const stored = chainStore.load();
   if (stored && Array.isArray(stored) && stored.length) loadStoredChain(stored);
   else loadPreset(PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0]);
+  renderBrowser();
 })();
