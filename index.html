@@ -36,38 +36,6 @@
     --mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, monospace;
   }
 
-  /* ── Color themes ─────────────────────────────────────── */
-  :root[data-theme="midnight"] {
-    --accent: #3b9eff; --accent-rgb: 59,158,255;
-    --bg: #585e6a; --bg-grad: linear-gradient(180deg, #6b7180 0%, #565c68 32%, #4a4f5a 100%);
-    --window: #15171d; --library: #2a3140; --library-input: #1d222c;
-    --recessed: #11131a; --surface: #232733; --surface-hi: #2e3340; --toolbar: rgba(21,23,29,0.92);
-  }
-  :root[data-theme="sunset"] {
-    --accent: #ff7a3c; --accent-rgb: 255,122,60;
-    --bg: #6e645e; --bg-grad: linear-gradient(180deg, #807468 0%, #6a605a 32%, #5c524c 100%);
-    --window: #201b18; --library: #3a322c; --library-input: #2a231e;
-    --recessed: #191412; --surface: #2e2722; --surface-hi: #3a322c; --toolbar: rgba(32,27,24,0.92);
-  }
-  :root[data-theme="emerald"] {
-    --accent: #2fd16f; --accent-rgb: 47,209,111;
-    --bg: #5e6a62; --bg-grad: linear-gradient(180deg, #6e7c72 0%, #586259 32%, #4c544d 100%);
-    --window: #161c18; --library: #2a352e; --library-input: #1c241f;
-    --recessed: #121814; --surface: #222a25; --surface-hi: #2e382f; --toolbar: rgba(22,28,24,0.92);
-  }
-  :root[data-theme="violet"] {
-    --accent: #ff4d9d; --accent-rgb: 255,77,157;
-    --bg: #645e6e; --bg-grad: linear-gradient(180deg, #767084 0%, #5e586a 32%, #524c5c 100%);
-    --window: #1a1622; --library: #332c3e; --library-input: #241e2c;
-    --recessed: #141019; --surface: #272030; --surface-hi: #332b3e; --toolbar: rgba(26,22,34,0.92);
-  }
-  :root[data-theme="ocean"] {
-    --accent: #34c8e0; --accent-rgb: 52,200,224;
-    --bg: #5c656a; --bg-grad: linear-gradient(180deg, #6c767c 0%, #566066 32%, #4a5258 100%);
-    --window: #15191c; --library: #2b343a; --library-input: #1d242a;
-    --recessed: #111619; --surface: #232a2f; --surface-hi: #2e373c; --toolbar: rgba(21,25,28,0.92);
-  }
-
   @keyframes led-amber {
     0%, 100% { box-shadow: 0 0 8px rgba(var(--accent-rgb),0.9), 0 0 3px rgba(255,255,255,0.3); }
     50%      { box-shadow: 0 0 3px rgba(var(--accent-rgb),0.4); }
@@ -275,7 +243,7 @@
   .pedal-add:hover { color: var(--text-secondary); border-color: rgba(255,255,255,0.22); }
   /* Patch library (left of the window) — GarageBand-style master/detail */
   .preset-browser {
-    width: 368px; flex: 0 0 368px; display: flex; flex-direction: column;
+    width: clamp(332px, 24vw, 368px); flex: 0 0 auto; display: flex; flex-direction: column;
     background: var(--library); border-right: 1px solid rgba(0,0,0,0.35); overflow: hidden;
   }
   .pb-search { padding: 12px 12px 10px; border-bottom: 1px solid rgba(0,0,0,0.28); }
@@ -309,9 +277,25 @@
   .pb-patch:hover { background: rgba(255,255,255,0.06); }
   .pb-patch.active { background: rgba(255,255,255,0.14); font-weight: 600; color: #fff; }
   .pb-empty { padding: 12px; font-size: 12px; color: rgba(255,255,255,0.4); font-style: italic; }
-  @media (max-width: 1100px) {
+  /* Tighten amp spacing on smaller widths so the knob rows stay together longer. */
+  @media (max-width: 1320px) {
+    .amp-section { padding: 0 9px; }
+    .amp-knobs { gap: 8px 8px; }
+    .amp-panel { padding: 16px 16px 20px; }
+  }
+  /* Stack the library above the workspace on narrow screens. */
+  @media (max-width: 1040px) {
     .window { flex-direction: column; }
-    .preset-browser { width: 100%; flex: 0 0 auto; height: 320px; border-right: none; border-bottom: 1px solid rgba(0,0,0,0.35); }
+    .preset-browser { width: 100%; flex: 0 0 auto; max-height: 38vh; border-right: none; border-bottom: 1px solid rgba(0,0,0,0.35); }
+    .pb-patches { overflow-y: auto; }
+  }
+  /* Phone: tighten paddings, let the effects chain scroll horizontally. */
+  @media (max-width: 680px) {
+    .toolbar { padding: 9px 12px; gap: 8px; }
+    .title { display: none; }
+    .amp-strip { padding: 12px 12px 10px; }
+    .pedalboard-strip { padding: 0 12px 20px; }
+    #presets select { min-width: 130px; }
   }
 
   /* Add Effect window */
@@ -431,16 +415,6 @@
 
   .knob-arc { stroke: var(--accent); }
 
-  /* Theme swatches */
-  .theme-swatches { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: 4px; }
-  .theme-swatch {
-    width: 15px; height: 15px; border-radius: 50%; padding: 0; cursor: pointer;
-    border: 1.5px solid rgba(255,255,255,0.25); background: var(--sw);
-    transition: transform .12s ease, border-color .12s ease;
-  }
-  .theme-swatch:hover { transform: scale(1.15); }
-  .theme-swatch.active { border-color: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,0.4); }
-
   .hidden { display: none !important; }
 </style>
 </head>
@@ -449,22 +423,12 @@
   <aside id="preset-browser" class="preset-browser" aria-label="Patches"></aside>
   <div class="window-main">
   <div class="toolbar">
-    <div class="traffic"><span></span><span></span><span></span></div>
-    <div id="theme-swatches" class="theme-swatches">
-      <button class="theme-swatch" data-theme="studio" style="--sw:#ff9f0a" title="Studio" aria-label="Studio theme"></button>
-      <button class="theme-swatch" data-theme="midnight" style="--sw:#3b9eff" title="Midnight" aria-label="Midnight theme"></button>
-      <button class="theme-swatch" data-theme="sunset" style="--sw:#ff7a3c" title="Sunset" aria-label="Sunset theme"></button>
-      <button class="theme-swatch" data-theme="emerald" style="--sw:#2fd16f" title="Emerald" aria-label="Emerald theme"></button>
-      <button class="theme-swatch" data-theme="violet" style="--sw:#ff4d9d" title="Violet" aria-label="Violet theme"></button>
-      <button class="theme-swatch" data-theme="ocean" style="--sw:#34c8e0" title="Ocean" aria-label="Ocean theme"></button>
-    </div>
     <div class="title">Guitar Studio</div>
     <div class="toolbar-actions">
       <div id="presets"></div>
       <button id="start" class="btn-start">▶ START</button>
       <button id="stop" class="btn-dim" disabled>■ STOP</button>
       <button id="settings-toggle" class="icon btn-dim" aria-label="Settings" title="Settings">⚙</button>
-      <button id="theme-toggle" class="icon btn-dim hidden" aria-label="Toggle appearance" title="Toggle light/dark">◐</button>
     </div>
   </div>
 

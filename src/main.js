@@ -481,20 +481,8 @@ $('settings-backdrop').addEventListener('click', () => setSettings(false));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setSettings(false); });
 $('diag').textContent = `${isSafari ? 'Safari' : 'Chrome'} · setSinkId: ${hasSetSinkId ? 'yes' : 'no'}`;
 
-// Color themes: set [data-theme] on the root, persist, sync the canvas accent
-// and the active swatch. Studio is the default.
-const THEMES = ['studio', 'midnight', 'sunset', 'emerald', 'violet', 'ocean'];
-function applyColorTheme(name) {
-  const theme = THEMES.includes(name) ? name : 'studio';
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('gs-theme', theme);
-  accentRGB = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim() || '255,159,10';
-  document.querySelectorAll('.theme-swatch').forEach((b) => b.classList.toggle('active', b.dataset.theme === theme));
-}
-document.querySelectorAll('.theme-swatch').forEach((b) => {
-  b.addEventListener('click', () => applyColorTheme(b.dataset.theme));
-});
-applyColorTheme(localStorage.getItem('gs-theme') || 'studio');
+// Read the theme accent once for canvas drawing (the spectrum).
+accentRGB = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim() || '255,159,10';
 
 navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
 
