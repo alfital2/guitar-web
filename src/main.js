@@ -28,6 +28,7 @@ import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
+import { attachGlassThumb } from './chain-ui/glass-thumb.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
@@ -305,7 +306,7 @@ function loadPreset(preset) {
 
 function renderBrowser() {
   const el = $('preset-browser');
-  if (el) renderPresetBrowser(el, GB_CATEGORIES, loadPreset, activePresetName);
+  if (el) renderPresetBrowser(el, GB_CATEGORIES, loadPreset, activePresetName, () => setPresetsHidden(true));
 }
 
 let snapOn = true;
@@ -694,13 +695,14 @@ function paintGain() {
   const pct = ((parseFloat(el.value) - el.min) / (el.max - el.min)) * 100;
   el.style.background = `linear-gradient(90deg, rgba(var(--accent-rgb),0.85) ${pct}%, rgba(255,255,255,0.16) ${pct}%)`;
 }
+const placeGainThumb = attachGlassThumb($('gain'));
 $('gain').addEventListener('input', e => {
   const v = parseFloat(e.target.value);
   if (gainOut) gainOut.gain.value = v;
   const gl = $('gain-label'); if (gl) gl.textContent = v.toFixed(1) + '×';
   paintGain();
 });
-paintGain();
+paintGain(); placeGainThumb();
 $('start').addEventListener('click', start);
 $('stop').addEventListener('click', stop);
 $('calib-save').addEventListener('click', saveCalibration);
@@ -725,9 +727,21 @@ function setPresets(open) {
   if (open) { bd.hidden = false; requestAnimationFrame(() => bd.classList.add('open')); }
   else { bd.classList.remove('open'); setTimeout(() => { bd.hidden = true; }, 220); }
 }
-$('presets-toggle').addEventListener('click', () => setPresets(!document.body.classList.contains('presets-open')));
+// Wide screens: the browser is a persistent sidebar, so the toolbar button
+// collapses/expands it (persisted). Narrow screens: it's a drawer, so the button
+// opens/closes the drawer.
+function setPresetsHidden(hidden) {
+  document.body.classList.toggle('presets-hidden', hidden);
+  chainStore.savePresetsHidden(hidden);
+}
+const isNarrow = () => window.matchMedia('(max-width: 1040px)').matches;
+$('presets-toggle').addEventListener('click', () => {
+  if (isNarrow()) setPresets(!document.body.classList.contains('presets-open'));
+  else setPresetsHidden(!document.body.classList.contains('presets-hidden'));
+});
 $('presets-close').addEventListener('click', () => setPresets(false));
 $('presets-backdrop').addEventListener('click', () => setPresets(false));
+if (chainStore.loadPresetsHidden()) document.body.classList.add('presets-hidden');
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { setSettings(false); setPresets(false); } });
 $('diag').textContent = `${isSafari ? 'Safari' : 'Chrome'} · setSinkId: ${hasSetSinkId ? 'yes' : 'no'}`;
 

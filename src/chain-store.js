@@ -3,6 +3,7 @@
 // replace the internals later without changing callers.
 const KEY = 'gs-chain';
 const REVERB_KEY = 'gs-amp-reverb';
+const PRESETS_HIDDEN_KEY = 'gs-presets-hidden';
 
 export function save(chain) {
   try {
@@ -37,4 +38,13 @@ export function loadReverb() {
   } catch {
     return null;
   }
+}
+
+// Preset-browser collapsed state (wide screens).
+export function savePresetsHidden(hidden) {
+  try { localStorage.setItem(PRESETS_HIDDEN_KEY, hidden ? '1' : '0'); } catch {}
+}
+
+export function loadPresetsHidden() {
+  try { return localStorage.getItem(PRESETS_HIDDEN_KEY) === '1'; } catch { return false; }
 }

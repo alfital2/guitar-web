@@ -186,17 +186,32 @@
   .vol-wrap .vol-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #2e2e36; }
   /* VOL: accent fill (painted in JS) under a translucent glass-bead thumb */
   #gain { -webkit-appearance: none; appearance: none; width: 92px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.16); cursor: pointer; }
-  /* Liquid-glass capsule thumb (shared look with .track-vol): a translucent
-     frosted lozenge so the accent track reads through it, with a lit rim. */
-  #gain::-webkit-slider-thumb, .track-vol::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 17px; height: 24px; border-radius: 8px; margin-top: -9px;
-    background: linear-gradient(180deg, rgba(78,78,90,0.5), rgba(24,24,32,0.55));
-    border: 1px solid rgba(255,255,255,0.5);
-    box-shadow: inset 0 1.5px 1.5px rgba(255,255,255,0.85), inset 0 -4px 8px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.55); cursor: pointer; }
-  #gain::-moz-range-thumb, .track-vol::-moz-range-thumb {
-    width: 17px; height: 24px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.5);
-    background: linear-gradient(180deg, rgba(78,78,90,0.5), rgba(24,24,32,0.55));
-    box-shadow: inset 0 1.5px 1.5px rgba(255,255,255,0.85), inset 0 -4px 8px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.55); cursor: pointer; }
+  /* Sliders with a real refracting liquid-glass thumb (see glass-thumb.js): the
+     native thumb is kept full-size as the invisible drag/hit target; the visible
+     glass lozenge is an overlay <span class=glass-thumb> that refracts the track. */
+  .has-glass::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 36px; height: 26px; border-radius: 13px; margin-top: -10px;
+    background: transparent; border: none; box-shadow: none; cursor: pointer; }
+  .has-glass::-moz-range-thumb {
+    width: 36px; height: 26px; border: none; background: transparent; cursor: pointer; }
+  .slider-wrap { position: relative; display: inline-flex; align-items: center; }
+  .glass-thumb {
+    position: absolute; top: 50%; left: 0; z-index: 3; pointer-events: none; border-radius: 13px;
+    background: linear-gradient(180deg, rgba(122,122,138,0.18), rgba(18,18,26,0.22));
+    border: 1px solid rgba(255,255,255,0.55);
+    box-shadow: inset 0 1.5px 1.5px rgba(255,255,255,0.8), inset 0 -5px 9px rgba(0,0,0,0.34), 0 2px 7px rgba(0,0,0,0.5);
+    will-change: transform;
+  }
+  /* The actual lens — Chrome only (html.liquid). Safari keeps the plain lozenge. */
+  html.liquid .glass-thumb { -webkit-backdrop-filter: blur(0.5px); backdrop-filter: url(#glass-thumb) blur(0.5px); }
+  /* During an active drag, drop the per-frame SVG filter (keeps the GPU cool). */
+  .slider-wrap.dragging .glass-thumb {
+    -webkit-backdrop-filter: none; backdrop-filter: none;
+    background: linear-gradient(180deg, rgba(122,122,138,0.42), rgba(18,18,26,0.52));
+  }
+  .slider-wrap:focus-within .glass-thumb {
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.9), inset 0 1.5px 1.5px rgba(255,255,255,0.8), inset 0 -5px 9px rgba(0,0,0,0.34), 0 2px 7px rgba(0,0,0,0.5);
+  }
   #gain-label { font: 10px var(--mono); color: #3a3a44; width: 28px; }
   .dot { display: none; }
 
@@ -462,9 +477,14 @@
     width: clamp(274px, 20vw, 304px); flex: 0 0 auto; display: flex; flex-direction: column;
     background: var(--library); border-right: 1px solid rgba(0,0,0,0.35); overflow: hidden;
   }
-  .pb-search { padding: 10px 10px 8px; border-bottom: 1px solid rgba(0,0,0,0.28); }
+  .pb-search { padding: 10px 10px 8px; border-bottom: 1px solid rgba(0,0,0,0.28); display: flex; align-items: center; gap: 7px; }
+  .pb-collapse {
+    flex: 0 0 auto; width: 26px; height: 30px; padding: 0; font-size: 14px; line-height: 1;
+    color: var(--text-secondary); background: var(--library-input); border: 1px solid rgba(0,0,0,0.3); border-radius: 8px;
+  }
+  .pb-collapse:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   .pb-search input {
-    width: 100%; font: 12px var(--font); color: var(--text); appearance: none; -webkit-appearance: none;
+    flex: 1; min-width: 0; font: 12px var(--font); color: var(--text); appearance: none; -webkit-appearance: none;
     background: var(--library-input) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%2392929a' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat 10px center;
     border: 1px solid rgba(0,0,0,0.3); border-radius: 8px; padding: 8px 11px 8px 32px;
   }
@@ -501,7 +521,7 @@
   }
   /* Preset library: a persistent left sidebar on wide screens; on narrow screens
      it becomes a slide-in drawer (like Settings), opened from the toolbar. */
-  .presets-toggle { display: none; font-size: 11px; padding: 6px 11px; }
+  .presets-toggle { display: inline-flex; font-size: 11px; padding: 6px 11px; }
   .presets-close { position: fixed; top: 11px; left: min(300px, calc(86vw - 40px)); z-index: 60; display: none; }
   @media (prefers-reduced-motion: no-preference) {
     .preset-browser { transition: transform .3s cubic-bezier(.2,.85,.25,1); }
@@ -516,7 +536,13 @@
     body.presets-open .presets-close { display: inline-flex; }
   }
   /* On wide screens the library is a static sidebar — never show drawer chrome. */
-  @media (min-width: 1041px) { #presets-backdrop, .presets-close { display: none !important; } }
+  @media (min-width: 1041px) {
+    #presets-backdrop, .presets-close { display: none !important; }
+    /* Wide screens: the persistent sidebar can be collapsed away. */
+    body.presets-hidden .preset-browser { display: none; }
+  }
+  /* On narrow screens the browser is a drawer; the collapse chevron is N/A. */
+  @media (max-width: 1040px) { .pb-collapse { display: none; } }
   /* Phone: tighten paddings, let the effects chain scroll horizontally. */
   @media (max-width: 680px) {
     .toolbar { padding: 9px 12px; gap: 8px; }
@@ -759,6 +785,7 @@
 <!-- Liquid-glass refraction filter (used via backdrop-filter on Chrome only) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <filter id="liquid-glass" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feImage href="data:image/png;base64,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" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="m"/><feDisplacementMap in="SourceGraphic" in2="m" scale="48" xChannelSelector="R" yChannelSelector="G"/></filter>
+  <filter id="glass-thumb" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feImage href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACQAAAAaCAYAAADfcP5FAAAE3UlEQVR42r2XzWsUWRtHz5/hSnDbGzdZCQO6U3QTPwgaFDGREGPMON02la7UR1eluou2e5wYYwgmIkqUxo9sFN0pjLjKxk2DK8GFCPNHnDGMwvAyrySDzuKsilv3cLnPc58faYrfIm9jt4+/vcZf32H5EdM/tk/wEX95hz+/xlofo/a39+P/fWh1cPUF9j/gvU94c4C9TWy9wfT37dN4g9VNvDDA059w5AOOv8BGZwdCK3fx+QA3Brj2ChefYfcxtvuY38d0fftE93G2j7XHOP0Mx17h8AAPDXDi7jaEHjzEzff46CWuPsHFdezexnIFi2XMljDdAfEShssYrGDtNk6v4/gTPP4Sh97jyYffEHr4AN++xY2nuLaO129hdwnLBSyuYd7D5lVMd0ByFaMehtcwWMDaEl66hWPrOPwU977FEw/+QejuCr7fxKcbeOcO3ljG7gKWPSw6mJeYtbDZwrTYPkkL4xZGJYYdDHpYW8CLy3j2Dh7ZwD2beGblb0KdFg6e48tHuL6Gyzew18Oyg0Ub8wKzeWzmmGY7J8kxnseowLCNQQerPZy8gaNreOARVp5jvfVF6MUqDjbwySreuo4LXeyU2GphPo9Zhs2tnzf/PUmGcYbRPDZaWC9xpovnr+PRVaxs4MFVpJ3jhz6+WsP1RVzqYq/EdoHz+ReZ5rd7x3ZJmn9JzeU4W2C1xKkuji7i/jXc3Uf6Xfx0D58t4u0uLpTYKbD4zjL/KxXmWC9wpsRzXTy8iLvuIa9/w8FNfNzFlRKvFVjmOJ9h9p1lvhI3cS7DIMfLBU6UeKyLlZvIu19xs4f9Ni4X2MuxlWHexGb6Y4SSFKMmNjKs5jhZ4Egbh3rIxxLftPB+jksZXm1iq4lZ+mOF4hQbTbzSxKkMT+W4b6vK/kjx9xTXU1xK8WqKRfrfCIUpXklxKsXRFH/a6kMfA3zTwPsRLsV4NcFW8h+dUIJXEpyK8VSE+xpbd+gX3KxifxaXQ+xF2IoxT37wHUqwEWM1wskQR2ZxqLpVZT/j4AI+ruFKgNdCLCOcjzFLflCVJTgXYxDh5RAnAjxWw8qFrT5Uw0+n8dk03q7hQoCdEIsIsxib31kqSTCOMYywHuJMgOdqeHgad53e6tQRfhjBV2O4Po1LNewF2A5x/jtLfZWZi3A2xGqAUzUcncb9Y7h75OtbNo6DYXwyjrcu4UINOwG2GpjPfZGKMU3+PUn8l0w0h40G1gOcqeH5S3h0HCvDeHD862vfwMEhfHkc18dw+SL2qljWsZjFPMRsDpsRpvHOSSKM5zAKMZzFoI7VKk5exNExPHAcK4ew3vj7PDSB74fw6TDeOYs3JrE7g2UVizrmAWYNbH5elIbbJ2lg3MAowLCOQRVrM3hxEs+exSPDuGcIz0z808R4Et/uxY0juDaK189jdwrLGSwuY17F5hVMd0ByBaMqhpcxmMHaFF46j2OjOHwE9+7FEye/NVOfwM09+OgArh7FxVHsnsNyAotJzKY+x5sdEE9hOInBBNbO4fQojh/F4wdwaA+ePLGd1HEGn1dwo/I5dezHxcPYPYbtEcxPYTq6faJTODuCtWM4ffhz6tiPwxU8VMGJMzvJZXVcPYj93XhvF96sYG8IW/sw/Wn7NPZhdQgvVPD0LhzZjeMHsVH/533/BBlkVpJvhbVfAAAAAElFTkSuQmCC" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="tm"/><feDisplacementMap in="SourceGraphic" in2="tm" scale="11" xChannelSelector="R" yChannelSelector="G"/></filter>
 </svg>
 <div id="presets-backdrop" class="settings-backdrop" hidden></div>
 <button id="presets-close" class="icon btn-dim presets-close" aria-label="Close presets">✕</button>

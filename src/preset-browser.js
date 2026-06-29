@@ -5,7 +5,7 @@
 let viewCat = null;   // category id currently shown in the patch column
 let search = '';      // current search term
 
-export function renderPresetBrowser(container, categories, onSelect, activeName) {
+export function renderPresetBrowser(container, categories, onSelect, activeName, onCollapse) {
   // Default the viewed category to the active patch's category (so loading a
   // patch reveals its list), else the first category.
   if (viewCat == null || !categories.some((c) => c.id === viewCat)) {
@@ -19,6 +19,14 @@ export function renderPresetBrowser(container, categories, onSelect, activeName)
   const input = document.createElement('input');
   input.type = 'search'; input.placeholder = 'Search Sounds'; input.value = search;
   searchWrap.appendChild(input);
+  if (onCollapse) {
+    const collapse = document.createElement('button');
+    collapse.type = 'button'; collapse.className = 'pb-collapse';
+    collapse.title = 'Hide patches'; collapse.setAttribute('aria-label', 'Hide patches');
+    collapse.textContent = '⟨';
+    collapse.addEventListener('click', onCollapse);
+    searchWrap.appendChild(collapse);
+  }
 
   const split = document.createElement('div'); split.className = 'pb-split';
   const catsCol = document.createElement('div'); catsCol.className = 'pb-cats';
