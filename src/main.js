@@ -73,6 +73,7 @@ function rebuildGraph() {
       onAdd: addEffect,
       onRemove: removeEffect,
       onMove: moveEffect,
+      onToggleBypass: toggleBypass,
     });
   } catch (e) {
     $('error').textContent = 'render: ' + e.message;
@@ -108,6 +109,11 @@ function addEffect(type, beforeId) {
 
 function removeEffect(instanceId) {
   currentChain = chainState.remove(currentChain, instanceId);
+  rebuildGraph();
+}
+
+function toggleBypass(instanceId) {
+  currentChain = chainState.toggleBypass(currentChain, instanceId);
   rebuildGraph();
 }
 

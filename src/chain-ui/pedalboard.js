@@ -231,10 +231,24 @@ function buildPedal(unit, handlers) {
     knobs.appendChild(el);
   });
 
-  const led = document.createElement('div');
+  if (unit.bypassed) pedal.classList.add('bypassed');
+  // Footswitch hit area: a generous button around the small LED so a press near
+  // the indicator toggles power instead of starting a drag.
+  const power = document.createElement('button');
+  power.type = 'button';
+  power.className = 'pedal-power';
+  power.setAttribute('role', 'switch');
+  power.setAttribute('aria-checked', unit.bypassed ? 'false' : 'true');
+  power.setAttribute('aria-label', `${unit.schema.label} power`);
+  power.title = unit.bypassed ? 'Off — click to power on' : 'On — click to bypass';
+  const led = document.createElement('span');
   led.className = 'pedal-led';
+  power.appendChild(led);
+  // Stop the drag-grip from reacting to a press in this zone.
+  power.addEventListener('pointerdown', (e) => e.stopPropagation());
+  power.addEventListener('click', (e) => { e.stopPropagation(); handlers.onToggleBypass?.(unit.instanceId); });
 
-  pedal.append(art, grip, knobs, led);
+  pedal.append(art, grip, knobs, power);
   return { pedal, plate: grip };
 }
 

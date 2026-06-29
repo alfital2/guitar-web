@@ -1,7 +1,7 @@
 // tests/chain-state.test.js
 import { describe, it, expect } from 'vitest';
 import {
-  fromPreset, ampBounds, move, add, remove, setParam, toEngineChain, signature,
+  fromPreset, ampBounds, move, add, remove, setParam, toEngineChain, signature, toggleBypass,
 } from '../src/chain-state.js';
 
 const PRESET = [
@@ -89,6 +89,24 @@ describe('remove', () => {
   });
 });
 
+describe('toggleBypass', () => {
+  it('flips a pedal\'s bypass immutably', () => {
+    const { chain } = build();
+    const next = toggleBypass(chain, 1);
+    expect(next[0].bypassed).toBe(true);
+    expect(chain[0].bypassed).toBe(false);
+    expect(toggleBypass(next, 1)[0].bypassed).toBe(false);
+  });
+  it('refuses to bypass a locked amp module', () => {
+    const { chain } = build();
+    expect(toggleBypass(chain, 2)[1].bypassed).toBe(false); // drive is locked
+  });
+  it('signature marks bypassed effects so loudness re-measures', () => {
+    const { chain } = build();
+    expect(signature(toggleBypass(chain, 1))).toBe('!compressor>drive>eq>cabinet>delay');
+  });
+});
+
 describe('setParam / toEngineChain / signature', () => {
   it('updates a param immutably', () => {
     const { chain } = build();
@@ -99,11 +117,11 @@ describe('setParam / toEngineChain / signature', () => {
   it('toEngineChain yields {type, params} in order', () => {
     const { chain } = build();
     expect(toEngineChain(chain)).toEqual([
-      { type: 'compressor', params: { threshold: -28 } },
-      { type: 'drive', params: { amount: 1.5 } },
-      { type: 'eq', params: { bass: 6 } },
-      { type: 'cabinet', params: { mix: 1 } },
-      { type: 'delay', params: { mix: 0.2 } },
+      { type: 'compressor', params: { threshold: -28 }, bypassed: false },
+      { type: 'drive', params: { amount: 1.5 }, bypassed: false },
+      { type: 'eq', params: { bass: 6 }, bypassed: false },
+      { type: 'cabinet', params: { mix: 1 }, bypassed: false },
+      { type: 'delay', params: { mix: 0.2 }, bypassed: false },
     ]);
   });
   it('signature is order-sensitive', () => {

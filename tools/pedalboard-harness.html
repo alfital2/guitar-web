@@ -8,7 +8,7 @@
   body{margin:0;background:#0d0d10;color:#e8e8ea;font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;padding:28px}
   /* --- copied pedal CSS under test --- */
   .pedalboard{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;padding:16px;
-    background:repeating-linear-gradient(45deg,rgba(0,0,0,.15) 0 2px,transparent 2px 6px),#0d0d10;border-radius:10px;border:1px solid rgba(255,255,255,.04)}
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='felt'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.32 0 0 0 0 0.32 0 0 0 0 0.34 0 0 0 1 -0.45'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23felt)'/%3E%3C/svg%3E"),#18181a;background-size:150px 150px,auto;border-radius:10px;border:1px solid rgba(255,255,255,.04);box-shadow:inset 0 2px 14px rgba(0,0,0,.75)}
   .connector{display:flex;align-items:center;align-self:center;color:#252528;font-size:18px;flex-shrink:0}
   .pedal{position:relative;border-radius:14px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,.6),inset 0 0 0 1px rgba(0,0,0,.4)}
   .pedal-art{display:block;width:100%;height:auto}
@@ -20,7 +20,12 @@
   #knob-tip.knob-tip{position:fixed;transform:translate(-50%,-100%);margin-top:-7px;padding:4px 8px;border-radius:6px;white-space:nowrap;z-index:200;pointer-events:none;font:700 9px/1 -apple-system,sans-serif;letter-spacing:.07em;text-transform:uppercase;color:#fff;background:rgba(12,12,15,.97);border:1px solid rgba(255,255,255,.14);box-shadow:0 6px 16px rgba(0,0,0,.6);opacity:0;transition:opacity .12s}
   #knob-tip.knob-tip::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:rgba(12,12,15,.97)}
   #knob-tip.knob-tip.on{opacity:1}
-  .pedal-led{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;z-index:2;background:var(--pedal-color);box-shadow:0 0 7px var(--pedal-color),0 0 2px #fff}
+  .pedal-power{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:46px;height:26px;z-index:3;cursor:pointer;pointer-events:auto;display:flex;align-items:center;justify-content:center;background:none;border:none;padding:0}
+  .pedal-led{width:7px;height:7px;border-radius:50%;background:var(--pedal-color);box-shadow:0 0 9px var(--pedal-color),0 0 3px var(--pedal-color),inset 0 0 2px rgba(255,255,255,.5)}
+  .pedal-power:hover .pedal-led{filter:brightness(1.25)}
+  .pedal.bypassed .pedal-led{background:#2a2a2e;box-shadow:inset 0 1px 2px rgba(0,0,0,.8),0 0 0 1px rgba(0,0,0,.5)}
+  .pedal.bypassed .pedal-art{opacity:.4;filter:saturate(.45) brightness(.8)}
+  .pedal.bypassed .pedal-knobs{opacity:.6}
   .amp-anchor{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:56px;align-self:stretch;padding:8px 10px;border-radius:11px;background:rgba(255,159,10,.1);border:1px dashed rgba(255,159,10,.4);color:#ff9f0a}
   .amp-anchor-icon{font-size:14px}.amp-anchor-label{font-size:8px;font-weight:800;letter-spacing:.16em}
   .pedal-add-wrap{align-self:stretch;display:flex}.pedal-add{min-width:44px;align-self:stretch;border-radius:11px;font-size:20px;color:#666;background:rgba(255,255,255,.02);border:1px dashed rgba(255,255,255,.12);cursor:pointer}
@@ -42,6 +47,7 @@
     u(8,'tape-echo','Tape Echo',[P('space','Space',0,10,.1,3),P('time','Time',0,1000,1,420,'ms'),P('fdbk','Fdbk',0,1,.01,.4),P('tone','Tone',0,10,.1,5),P('mix','Mix',0,1,.01,.35)],{space:3,time:420,fdbk:.4,tone:5,mix:.35}),
     u(9,'octave','Octave Fuzz',[P('octave','Octave',0,10,.1,5),P('fuzz','Fuzz',0,10,.1,6),P('tone','Tone',0,10,.1,5),P('vol','Vol',0,10,.1,7)],{octave:5,fuzz:6,tone:5,vol:7}),
   ];
-  renderPedalboard(document.getElementById('chain'), units, {onParamChange(){},onAdd(){},onRemove(){},onMove(){}});
+  units[5].bypassed = true; // reverb shown powered-off
+  renderPedalboard(document.getElementById('chain'), units, {onParamChange(){},onAdd(){},onRemove(){},onMove(){},onToggleBypass(){}});
 </script>
 </body></html>

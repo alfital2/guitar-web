@@ -10,8 +10,13 @@ export function buildChain(ctx, chain, registry) {
     if (!def) throw new Error(`Unknown effect type: ${node.type}`);
     const params = { ...node.params };
     const built = def.create(ctx, params);
-    prev.connect(built.input);
-    prev = built.output;
+    // Bypassed effects are still built (so live param edits apply when re-enabled)
+    // but left out of the signal path — the signal flows straight to the next
+    // effect, so the rest of the chain keeps working.
+    if (!node.bypassed) {
+      prev.connect(built.input);
+      prev = built.output;
+    }
     modules.push({ type: node.type, schema: def.schema, params, apply: built.apply, input: built.input, output: built.output });
   }
   prev.connect(output);

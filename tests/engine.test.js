@@ -44,4 +44,20 @@ describe('buildChain', () => {
     const g = buildChain(ctx, [], registry);
     expect(ctx.connections.some(c => c.from === g.input.id && c.to === g.output.id)).toBe(true);
   });
+  it('skips a bypassed module in the signal path but keeps the chain flowing', () => {
+    const ctx = new FakeAudioContext();
+    const c3 = [
+      { type: 'compressor', params: { threshold: -18, ratio: 2.5, attack: 0.005, release: 0.25, makeup: 3 } },
+      { type: 'reverb', params: { decay: 4, mix: 0.3 }, bypassed: true },
+      { type: 'eq', params: { bass: 5, mid: 6, midFreq: 750, treble: 5 } },
+    ];
+    const g = buildChain(ctx, c3, registry);
+    expect(g.modules).toHaveLength(3); // bypassed module still built (indices aligned)
+    // compressor output goes straight to eq input, hopping over the bypassed reverb
+    expect(ctx.connections.some(c => c.from === g.modules[0].output.id && c.to === g.modules[2].input.id)).toBe(true);
+    // nothing feeds the bypassed reverb's input
+    expect(ctx.connections.some(c => c.to === g.modules[1].input.id)).toBe(false);
+    // eq still reaches the output
+    expect(ctx.connections.some(c => c.from === g.modules[2].output.id && c.to === g.output.id)).toBe(true);
+  });
 });

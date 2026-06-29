@@ -20,8 +20,8 @@ describe('chain-store', () => {
       { instanceId: 2, type: 'delay', params: { mix: 0.2 }, locked: false },
     ]);
     expect(load()).toEqual([
-      { type: 'drive', params: { amount: 3 } },
-      { type: 'delay', params: { mix: 0.2 } },
+      { type: 'drive', params: { amount: 3 }, bypassed: false },
+      { type: 'delay', params: { mix: 0.2 }, bypassed: false },
     ]);
   });
   it('returns null when empty', () => {

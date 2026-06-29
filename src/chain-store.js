@@ -5,7 +5,7 @@ const KEY = 'gs-chain';
 
 export function save(chain) {
   try {
-    const data = chain.map((u) => ({ type: u.type, params: u.params }));
+    const data = chain.map((u) => ({ type: u.type, params: u.params, bypassed: !!u.bypassed }));
     localStorage.setItem(KEY, JSON.stringify(data));
   } catch {}
 }

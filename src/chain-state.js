@@ -9,6 +9,7 @@ export function fromPreset(presetChain, startId) {
     type: e.type,
     params: { ...e.params },
     locked: AMP_TYPES.has(e.type),
+    bypassed: !!e.bypassed,
   }));
   return { chain, nextId };
 }
@@ -33,8 +34,13 @@ export function move(chain, instanceId, targetIndex) {
 }
 
 export function add(chain, type, defaultParams, startId) {
-  const unit = { instanceId: startId, type, params: { ...defaultParams }, locked: false };
+  const unit = { instanceId: startId, type, params: { ...defaultParams }, locked: false, bypassed: false };
   return { chain: [...chain, unit], nextId: startId + 1 };
+}
+
+// Toggle an effect's bypass (power). Amp modules can't be bypassed here.
+export function toggleBypass(chain, instanceId) {
+  return chain.map((u) => (u.instanceId === instanceId && !u.locked ? { ...u, bypassed: !u.bypassed } : u));
 }
 
 export function remove(chain, instanceId) {
@@ -48,9 +54,10 @@ export function setParam(chain, instanceId, key, value) {
 }
 
 export function toEngineChain(chain) {
-  return chain.map((u) => ({ type: u.type, params: u.params }));
+  return chain.map((u) => ({ type: u.type, params: u.params, bypassed: !!u.bypassed }));
 }
 
 export function signature(chain) {
-  return chain.map((u) => u.type).join('>');
+  // Include bypass so loudness re-measures when an effect is powered on/off.
+  return chain.map((u) => (u.bypassed ? `!${u.type}` : u.type)).join('>');
 }
