@@ -18,6 +18,7 @@ import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
 import { spectrumBars } from './spectrum.js';
 import { measureLoudnessGain } from './normalize.js';
+import { mountTransport } from './transport-ui.js';
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
@@ -512,3 +513,7 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
   else loadPreset(PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0]);
   renderBrowser();
 })();
+
+// Toolbar transport cluster: inert transport (ground for recording) + working
+// metronome and tuner. The tuner taps the live engine analyser when running.
+mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });

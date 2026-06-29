@@ -77,6 +77,48 @@
   }
   .toolbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
+  /* ── Transport cluster (center of toolbar) ──────────── */
+  .transport-cluster {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .transport { display: flex; align-items: center; gap: 4px; }
+  .tp-btn {
+    width: 30px; height: 28px; padding: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: rgba(255,255,255,0.5);
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px;
+  }
+  .tp-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .tp-record { color: var(--red); }
+  .tp-record:disabled { opacity: 0.7; }
+
+  .metro { display: flex; align-items: center; gap: 8px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.08); }
+  .metro-toggle { width: 30px; height: 28px; padding: 0; font-size: 14px; border-radius: 6px; }
+  .metro-toggle.on { color: var(--accent); border-color: rgba(var(--accent-rgb),0.5); background: rgba(var(--accent-rgb),0.12); }
+  .metro-toggle.beat { box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.4); }
+  .metro-toggle.beat-accent { box-shadow: 0 0 0 2px var(--accent); }
+  .metro-bpm { display: inline-flex; align-items: baseline; gap: 4px; cursor: ns-resize; user-select: none; touch-action: none; padding: 4px 6px; border-radius: 6px; }
+  .metro-bpm:hover { background: rgba(255,255,255,0.05); }
+  .metro-bpm-val { font: 600 13px var(--mono); color: var(--text); min-width: 26px; text-align: right; }
+  .metro-bpm-lbl { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; color: var(--muted); }
+  .metro-bpm-input { width: 44px; font: 600 13px var(--mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-hi); border-radius: 6px; padding: 3px 5px; }
+
+  .tuner { display: flex; align-items: center; gap: 10px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.08); }
+  .tuner-toggle { height: 28px; padding: 0 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; border-radius: 6px; }
+  .tuner-toggle.on { color: var(--accent); border-color: rgba(var(--accent-rgb),0.5); background: rgba(var(--accent-rgb),0.12); }
+  .tuner-strip { display: flex; align-items: center; gap: 10px; }
+  .tuner-note { font: 800 16px var(--mono); color: var(--green); min-width: 34px; text-align: center; }
+  .tuner-meter { position: relative; width: 140px; height: 16px; background: rgba(255,255,255,0.04); border-radius: 8px; overflow: hidden; }
+  .tuner-ticks { position: absolute; inset: 0; background:
+      linear-gradient(90deg, transparent 49.5%, rgba(255,255,255,0.35) 49.5% 50.5%, transparent 50.5%); }
+  .tuner-needle { position: absolute; top: 1px; bottom: 1px; left: 50%; width: 2px; margin-left: -1px; background: var(--accent); border-radius: 1px; transition: left .06s linear; }
+  .tuner-strip.in-tune .tuner-needle { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .tuner-readout { display: flex; flex-direction: column; line-height: 1.1; }
+  .tuner-cents { font: 600 11px var(--mono); color: var(--text-secondary); }
+  .tuner-hz { font: 9px var(--mono); color: var(--muted); }
+  @media (max-width: 760px) { .tuner-strip { display: none; } }
+  @media (max-width: 980px) { .transport-cluster { position: static; transform: none; } }
+
   /* Toolbar preset select */
   #presets select {
     appearance: none; -webkit-appearance: none; min-width: 188px; font: 12px var(--font); font-weight: 500;
@@ -509,7 +551,7 @@
   <div class="window-main">
   <div class="toolbar">
     <button id="presets-toggle" class="icon btn-dim presets-toggle" title="Presets" aria-label="Open presets">☰ Presets</button>
-    <div class="title">Guitar Studio</div>
+    <div id="transport-cluster"></div>
     <div class="toolbar-actions">
       <div id="presets"></div>
       <button id="start" class="btn-start">▶ START</button>
