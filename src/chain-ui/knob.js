@@ -124,6 +124,16 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
   labelEl.style.cssText = `font-size:${small ? 8 : 9}px;color:#48484e;text-transform:uppercase;letter-spacing:.06em;text-align:center;`;
   el.append(svg, valEl, labelEl);
 
+  // Tooltip showing the knob's name, surfaced only while the user is tuning it
+  // (drag / wheel / keyboard) or focusing it — no permanent on-pedal clutter.
+  const tip = document.createElement('div');
+  tip.className = 'knob-tip'; tip.textContent = label; tip.setAttribute('aria-hidden', 'true');
+  el.appendChild(tip);
+  let hideT = null;
+  const showTip = () => { if (hideT) { clearTimeout(hideT); hideT = null; } el.classList.add('tip-on'); };
+  const hideTip = () => { if (hideT) { clearTimeout(hideT); hideT = null; } el.classList.remove('tip-on'); };
+  const tipFade = (ms = 750) => { if (hideT) clearTimeout(hideT); hideT = setTimeout(() => el.classList.remove('tip-on'), ms); };
+
   function paint() {
     const ang = valueToAngle(current, min, max);
     const t = max === min ? 0 : (current - min) / (max - min);
@@ -152,13 +162,15 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
     else if (e.key === 'Home') change(min);
     else if (e.key === 'End') change(max);
     else handled = false;
-    if (handled) e.preventDefault();
+    if (handled) { e.preventDefault(); showTip(); tipFade(); }
   });
-  el.addEventListener('wheel', (e) => { e.preventDefault(); change(current + (e.deltaY < 0 ? step : -step)); }, { passive: false });
-  el.addEventListener('dblclick', () => change(param.default));
+  el.addEventListener('wheel', (e) => { e.preventDefault(); change(current + (e.deltaY < 0 ? step : -step)); showTip(); tipFade(900); }, { passive: false });
+  el.addEventListener('dblclick', () => { change(param.default); showTip(); tipFade(); });
+  el.addEventListener('focus', showTip);
+  el.addEventListener('blur', hideTip);
   let dragStartY = 0, dragStartVal = 0;
   el.addEventListener('pointerdown', (e) => {
-    dragStartY = e.clientY; dragStartVal = current; el.classList.add('dragging');
+    dragStartY = e.clientY; dragStartVal = current; el.classList.add('dragging'); showTip();
     try { el.setPointerCapture(e.pointerId); } catch {}
     e.preventDefault();
   });
@@ -166,7 +178,7 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
     if (!el.classList.contains('dragging')) return;
     change(dragStartVal + ((dragStartY - e.clientY) / 140) * (max - min));
   });
-  const endDrag = () => el.classList.remove('dragging');
+  const endDrag = () => { el.classList.remove('dragging'); tipFade(500); };
   el.addEventListener('pointerup', endDrag);
   el.addEventListener('pointercancel', endDrag);
 
