@@ -12,27 +12,43 @@ export function playbackDuration(takes) {
 
 export function createPlayer() {
   let ctx = null, sources = [], playing = false, raf = null;
+  let nodes = new Map(); // trackId -> { gain, pan }
 
-  function play(takes, fromSec = 0, onTick, onEnd) {
+  // groups: [{ id, takes, gain, pan }] — one mixer strip per track.
+  function play(groups, fromSec = 0, onTick, onEnd) {
     if (playing || !AC) return;
-    const dur = playbackDuration(takes);
+    const flat = groups.flatMap((g) => g.takes || []);
+    const dur = playbackDuration(flat);
     if (dur <= 0 || fromSec >= dur) return;
     if (!ctx) ctx = new AC();
     if (ctx.state === 'suspended') ctx.resume();
     const t0 = ctx.currentTime + 0.06;
-    sources = [];
-    for (const tk of takes) {
-      if (!tk.samples || !tk.samples.length) continue;
-      const start = (tk.x || 0) / PX_PER_SEC;
-      const end = start + (tk.duration || 0);
-      if (end <= fromSec) continue; // already finished before the playhead
-      const buf = ctx.createBuffer(1, tk.samples.length, tk.sampleRate);
-      if (buf.copyToChannel) buf.copyToChannel(tk.samples, 0); else buf.getChannelData(0).set(tk.samples);
-      const s = ctx.createBufferSource();
-      s.buffer = buf; s.connect(ctx.destination);
-      const rel = start - fromSec;
-      if (rel >= 0) s.start(t0 + rel); else s.start(t0, -rel); // start partway into the buffer
-      sources.push(s);
+    sources = []; nodes = new Map();
+    for (const g of groups) {
+      const gain = ctx.createGain();
+      gain.gain.value = g.gain == null ? 1 : g.gain;
+      if (ctx.createStereoPanner) {
+        const pan = ctx.createStereoPanner();
+        pan.pan.value = g.pan || 0;
+        gain.connect(pan); pan.connect(ctx.destination);
+        nodes.set(g.id, { gain, pan });
+      } else {
+        gain.connect(ctx.destination);
+        nodes.set(g.id, { gain });
+      }
+      for (const tk of (g.takes || [])) {
+        if (!tk.samples || !tk.samples.length) continue;
+        const start = (tk.x || 0) / PX_PER_SEC;
+        const end = start + (tk.duration || 0);
+        if (end <= fromSec) continue;
+        const buf = ctx.createBuffer(1, tk.samples.length, tk.sampleRate);
+        if (buf.copyToChannel) buf.copyToChannel(tk.samples, 0); else buf.getChannelData(0).set(tk.samples);
+        const s = ctx.createBufferSource();
+        s.buffer = buf; s.connect(gain);
+        const rel = start - fromSec;
+        if (rel >= 0) s.start(t0 + rel); else s.start(t0, -rel);
+        sources.push(s);
+      }
     }
     playing = true;
     const tick = () => {
@@ -44,13 +60,16 @@ export function createPlayer() {
     tick();
   }
 
+  function setTrackGain(id, g) { const n = nodes.get(id); if (n) n.gain.gain.setTargetAtTime(g, ctx.currentTime, 0.01); }
+  function setTrackPan(id, p) { const n = nodes.get(id); if (n && n.pan) n.pan.pan.setTargetAtTime(p, ctx.currentTime, 0.01); }
+
   function stop() {
     playing = false;
     if (raf) { cancelAnimationFrame(raf); raf = null; }
     for (const s of sources) { try { s.stop(); } catch {} }
-    sources = [];
+    sources = []; nodes = new Map();
   }
 
   function isPlaying() { return playing; }
-  return { play, stop, isPlaying };
+  return { play, stop, isPlaying, setTrackGain, setTrackPan };
 }

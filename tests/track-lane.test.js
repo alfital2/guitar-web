@@ -62,6 +62,27 @@ describe('renderTrackLane (multi-track)', () => {
     s.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(t).toBe(1);
   });
+  it('mute/solo toggles reflect state and fire handlers', () => {
+    const el = document.createElement('div');
+    const muted = [], soloed = [];
+    const tk = [{ id: 1, name: 'A', armed: true, takes: [], mute: true, solo: false, volume: 0.8, pan: 0 }];
+    renderTrackLane(el, { tracks: tk, armedId: 1, onMute: (id) => muted.push(id), onSolo: (id) => soloed.push(id) });
+    const h = el.querySelector('.track-header');
+    expect(h.querySelector('.track-mute').classList.contains('on')).toBe(true);
+    expect(h.querySelector('.track-solo').classList.contains('on')).toBe(false);
+    h.querySelector('.track-mute').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    h.querySelector('.track-solo').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(muted).toEqual([1]); expect(soloed).toEqual([1]);
+  });
+  it('volume input fires onVolume(id, value)', () => {
+    const el = document.createElement('div');
+    const vols = [];
+    renderTrackLane(el, { tracks: [{ id: 3, name: 'A', armed: true, takes: [], volume: 0.5, pan: 0 }], armedId: 3, onVolume: (id, v) => vols.push([id, v]) });
+    const vol = el.querySelector('.track-vol');
+    expect(vol.value).toBe('0.5');
+    vol.value = '0.2'; vol.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(vols).toEqual([[3, 0.2]]);
+  });
   it('clip carries track + take ids and a canvas', () => {
     const el = document.createElement('div');
     renderTrackLane(el, { tracks: tracks(), armedId: 1 });

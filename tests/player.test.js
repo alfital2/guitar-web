@@ -18,7 +18,7 @@ describe('playbackDuration', () => {
 describe('createPlayer (no audio)', () => {
   it('play is a no-op without AudioContext', () => {
     const p = createPlayer();
-    p.play([{ x: 0, duration: 2, samples: new Float32Array(8), sampleRate: 8 }], 0, () => {}, () => {});
+    p.play([{ id: 1, gain: 1, pan: 0, takes: [{ x: 0, duration: 2, samples: new Float32Array(8), sampleRate: 8 }] }], 0, () => {}, () => {});
     expect(p.isPlaying()).toBe(false);
   });
 });

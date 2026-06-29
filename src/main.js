@@ -46,6 +46,19 @@ const player = createPlayer();
 
 const armedTrack = () => tracks.find((t) => t.id === armedId) || null;
 const allTakes = () => tracks.flatMap((t) => t.takes);
+const newTrack = (name) => ({ id: nextTrackId++, name: name || 'Track', armed: false, takes: [], volume: 0.8, pan: 0, mute: false, solo: false });
+// Effective playback gain for a track given the global solo state.
+function trackGain(t, anySolo) { return anySolo ? (t.solo ? t.volume : 0) : (t.mute ? 0 : t.volume); }
+function buildGroups() {
+  const anySolo = tracks.some((t) => t.solo);
+  return tracks.map((t) => ({ id: t.id, takes: t.takes, gain: trackGain(t, anySolo), pan: t.pan }));
+}
+// Push current mixer state to the player while it's playing.
+function syncMix() {
+  if (!player.isPlaying()) return;
+  const anySolo = tracks.some((t) => t.solo);
+  for (const t of tracks) { player.setTrackGain(t.id, trackGain(t, anySolo)); player.setTrackPan(t.id, t.pan); }
+}
 // x offset (px) where the next clip starts in a track: end of its last take.
 function nextClipX(track) {
   return (track ? track.takes : []).reduce((acc, k) => acc + Math.max(8, Math.round((k.duration || 0) * PX_PER_SEC)), 0);
@@ -196,11 +209,15 @@ function renderTrack() {
     snap: snapOn,
     onToggleSnap: () => { snapOn = !snapOn; renderTrack(); },
     onAddTrack: () => {
-      const t = { id: nextTrackId++, name: activePresetName || 'Track', armed: true, takes: [] };
+      const t = newTrack(activePresetName);
       tracks.forEach((k) => { k.armed = false; });
       t.armed = true; armedId = t.id; tracks.push(t);
       renderTrack();
     },
+    onMute: (id) => { const t = tracks.find((k) => k.id === id); if (t) { t.mute = !t.mute; syncMix(); renderTrack(); } },
+    onSolo: (id) => { const t = tracks.find((k) => k.id === id); if (t) { t.solo = !t.solo; syncMix(); renderTrack(); } },
+    onVolume: (id, v) => { const t = tracks.find((k) => k.id === id); if (t) { t.volume = v; if (player.isPlaying()) { const anySolo = tracks.some((k) => k.solo); player.setTrackGain(id, trackGain(t, anySolo)); } } },
+    onPan: (id, p) => { const t = tracks.find((k) => k.id === id); if (t) { t.pan = p; if (player.isPlaying()) player.setTrackPan(id, p); } },
     onRemoveTrack: (id) => {
       tracks = tracks.filter((t) => t.id !== id);
       if (armedId === id) armedId = tracks.length ? tracks[tracks.length - 1].id : null;
@@ -594,8 +611,8 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
   else loadPreset(PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0]);
   renderBrowser();
   // Start with one armed track named after the active preset.
-  tracks = [{ id: nextTrackId++, name: activePresetName || 'Track', armed: true, takes: [] }];
-  armedId = tracks[0].id;
+  const t0 = newTrack(activePresetName); t0.armed = true;
+  tracks = [t0]; armedId = t0.id;
   renderTrack();
 })();
 
@@ -656,10 +673,9 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
   const playBtn = $('tp-play');
   if (playBtn) playBtn.addEventListener('click', () => {
     if (player.isPlaying()) { player.stop(); playBtn.classList.remove('on'); return; }
-    const flat = allTakes();
-    if (!flat.length) return;
+    if (!allTakes().length) return;
     playBtn.classList.add('on');
-    player.play(flat, playheadSec, setPlayhead, () => { playBtn.classList.remove('on'); setPlayhead(0); });
+    player.play(buildGroups(), playheadSec, setPlayhead, () => { playBtn.classList.remove('on'); setPlayhead(0); });
   });
 
   // Skip to start: stop playback and park the playhead at bar 1.

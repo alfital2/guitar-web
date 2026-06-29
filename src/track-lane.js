@@ -50,18 +50,33 @@ function trackHeader(track, armedId, h) {
   top.append(el('span', 'track-icon', '▤'), (() => { const n = el('span', 'track-name'); n.textContent = track.name || '—'; return n; })());
 
   const ctrls = el('div', 'track-ctrls');
-  const mute = el('button', 'track-ctrl track-mute'); mute.type = 'button'; mute.disabled = true; mute.textContent = 'M'; mute.title = 'Mute — coming soon'; mute.setAttribute('aria-label', 'Mute');
+  const mute = el('button', 'track-ctrl track-mute' + (track.mute ? ' on' : '')); mute.type = 'button'; mute.textContent = 'M'; mute.title = 'Mute'; mute.setAttribute('aria-label', 'Mute');
+  if (h.onMute) mute.addEventListener('click', () => h.onMute(track.id));
+  const solo = el('button', 'track-ctrl track-solo' + (track.solo ? ' on' : '')); solo.type = 'button'; solo.textContent = 'S'; solo.title = 'Solo'; solo.setAttribute('aria-label', 'Solo');
+  if (h.onSolo) solo.addEventListener('click', () => h.onSolo(track.id));
   const mon = el('button', 'track-ctrl track-monitor'); mon.type = 'button'; mon.disabled = true; mon.textContent = '\u{1F3A7}'; mon.title = 'Monitor — coming soon'; mon.setAttribute('aria-label', 'Monitor');
   const arm = el('button', 'track-ctrl track-rec' + (track.id === armedId ? ' on' : '')); arm.type = 'button'; arm.textContent = '●'; arm.title = 'Record-enable'; arm.setAttribute('aria-label', 'Record-enable');
   if (h.onArm) arm.addEventListener('click', () => h.onArm(track.id));
-  ctrls.append(mute, mon, arm);
+  ctrls.append(mute, solo, mon, arm);
 
   const rm = el('button', 'track-remove'); rm.type = 'button'; rm.textContent = '✕'; rm.title = 'Remove track'; rm.setAttribute('aria-label', 'Remove track');
   if (h.onRemoveTrack) rm.addEventListener('click', () => h.onRemoveTrack(track.id));
 
   const mix = el('div', 'track-mix');
-  const vol = el('input', 'track-vol'); vol.type = 'range'; vol.min = '0'; vol.max = '1'; vol.step = '0.01'; vol.value = '0.8'; vol.disabled = true; vol.setAttribute('aria-label', 'Track volume');
-  const pan = el('span', 'track-pan'); pan.title = 'Pan';
+  const vol = el('input', 'track-vol'); vol.type = 'range'; vol.min = '0'; vol.max = '1'; vol.step = '0.01';
+  vol.value = String(track.volume == null ? 0.8 : track.volume); vol.setAttribute('aria-label', 'Track volume');
+  if (h.onVolume) vol.addEventListener('input', () => h.onVolume(track.id, parseFloat(vol.value)));
+  const pan = el('span', 'track-pan'); pan.title = 'Pan (drag) · double-click to center';
+  const panDot = el('span', 'track-pan-dot'); pan.appendChild(panDot);
+  const panVal = track.pan || 0;
+  panDot.style.transform = `rotate(${panVal * 135}deg)`;
+  if (h.onPan) {
+    let pd = null;
+    pan.addEventListener('pointerdown', (e) => { pd = { x: e.clientX, v: panVal }; try { pan.setPointerCapture(e.pointerId); } catch {} e.preventDefault(); });
+    pan.addEventListener('pointermove', (e) => { if (!pd) return; const p = Math.max(-1, Math.min(1, pd.v + (e.clientX - pd.x) / 80)); panDot.style.transform = `rotate(${p * 135}deg)`; h.onPan(track.id, p); });
+    pan.addEventListener('pointerup', () => { pd = null; });
+    pan.addEventListener('dblclick', () => { panDot.style.transform = 'rotate(0deg)'; h.onPan(track.id, 0); });
+  }
   mix.append(vol, pan);
 
   const ctrlRow = el('div', 'track-ctrl-row');
@@ -74,10 +89,11 @@ function trackHeader(track, armedId, h) {
 export function renderTrackLane(container, {
   tracks = [], bars = 16, armedId, snap = true,
   onAddTrack, onRemoveTrack, onArm, onToggleSnap, onMoveClip, onDeleteClip,
+  onMute, onSolo, onVolume, onPan,
 } = {}) {
   container.innerHTML = '';
   const row = el('div', 'track-lane-row');
-  const handlers = { onArm, onRemoveTrack, onMoveClip, onDeleteClip, rowH: ROW_H };
+  const handlers = { onArm, onRemoveTrack, onMoveClip, onDeleteClip, onMute, onSolo, onVolume, onPan, rowH: ROW_H };
 
   // ── Headers column ──
   const headers = el('div', 'track-headers');
