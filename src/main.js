@@ -21,6 +21,7 @@ import { measureLoudnessGain } from './normalize.js';
 import { mountTransport } from './transport-ui.js';
 import { renderTrackLane, PX_PER_SEC } from './track-lane.js';
 import { createRecorder } from './recorder.js';
+import { createPlayer } from './player.js';
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
@@ -36,10 +37,23 @@ let takes = [];          // recorded clips on the track lane
 let takeSeq = 0;         // running take number for clip labels
 let liveRAF = null, liveClip = null; // in-progress (growing) recording clip
 const recorder = createRecorder({ getSource: () => engine && engine.output, getContext: () => ctx });
+const player = createPlayer();
 
 // x offset (px) where the next clip starts: end of the last take.
 function nextClipX() {
   return takes.reduce((acc, k) => acc + Math.max(8, Math.round((k.duration || 0) * PX_PER_SEC)), 0);
+}
+// Move the playhead to a time position (seconds) on the track lane.
+function setPlayhead(sec) {
+  const ph = $('track-lane') && $('track-lane').querySelector('.track-playhead');
+  if (ph) ph.style.left = `${(sec || 0) * PX_PER_SEC}px`;
+}
+// Enable play/skip once there is something to play.
+function updateTransport() {
+  const has = takes.length > 0;
+  const play = $('tp-play'), skip = $('tp-start');
+  if (play) { play.disabled = !has; play.title = has ? 'Play' : 'Play — record something first'; }
+  if (skip) { skip.disabled = !has; skip.title = has ? 'Skip to start' : 'Skip to start'; }
 }
 // Remove the growing in-progress clip (on stop or teardown).
 function clearLiveClip() {
@@ -464,6 +478,7 @@ async function start() {
 function stop() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   if (recorder.isRecording()) recorder.stop();
+  if (player.isPlaying()) { player.stop(); const pb = $('tp-play'); if (pb) pb.classList.remove('on'); }
   clearLiveClip();
   { const r = $('tp-record'); if (r) { r.disabled = true; r.classList.remove('recording'); r.title = 'Record — available with recording'; } }
   stopCalibration();
@@ -557,8 +572,10 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
       if (t && t.samples.length) {
         takes.push({ ...t, n: ++takeSeq, name: activePresetName, x: nextClipX() });
         renderTrack();
+        updateTransport();
       }
     } else {
+      if (player.isPlaying()) { player.stop(); $('tp-play').classList.remove('on'); }
       recorder.start();
       recBtn.classList.add('recording');
       // Grow a purple clip in real time as the recording proceeds.
@@ -574,4 +591,21 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
       }
     }
   });
+
+  // Play / Stop playback of recorded takes; the playhead sweeps the timeline.
+  const playBtn = $('tp-play');
+  if (playBtn) playBtn.addEventListener('click', () => {
+    if (player.isPlaying()) { player.stop(); playBtn.classList.remove('on'); return; }
+    if (!takes.length) return;
+    playBtn.classList.add('on');
+    player.play(takes, setPlayhead, () => { playBtn.classList.remove('on'); setPlayhead(0); });
+  });
+
+  // Skip to start: stop playback and park the playhead at bar 1.
+  const skipBtn = $('tp-start');
+  if (skipBtn) skipBtn.addEventListener('click', () => {
+    player.stop(); if (playBtn) playBtn.classList.remove('on'); setPlayhead(0);
+  });
+
+  updateTransport();
 }
