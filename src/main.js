@@ -688,11 +688,19 @@ async function listDevices() {
   }
 }
 
+// Paint the accent "fill" left of the glass thumb (native range can't do this).
+function paintGain() {
+  const el = $('gain'); if (!el) return;
+  const pct = ((parseFloat(el.value) - el.min) / (el.max - el.min)) * 100;
+  el.style.background = `linear-gradient(90deg, rgba(var(--accent-rgb),0.85) ${pct}%, rgba(255,255,255,0.16) ${pct}%)`;
+}
 $('gain').addEventListener('input', e => {
   const v = parseFloat(e.target.value);
   if (gainOut) gainOut.gain.value = v;
   const gl = $('gain-label'); if (gl) gl.textContent = v.toFixed(1) + '×';
+  paintGain();
 });
+paintGain();
 $('start').addEventListener('click', start);
 $('stop').addEventListener('click', stop);
 $('calib-save').addEventListener('click', saveCalibration);

@@ -184,13 +184,15 @@
   @media (prefers-reduced-motion: no-preference) { .meter-fill { transition: width .05s linear; } }
   .vol-wrap { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .vol-wrap .vol-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #2e2e36; }
-  #gain { -webkit-appearance: none; appearance: none; width: 90px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.16); cursor: pointer; }
-  #gain::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
-    background: radial-gradient(circle at 36% 26%, rgba(255,255,255,0.95) 0%, rgba(255,206,128,0.85) 32%, rgba(var(--accent-rgb),0.92) 72%);
-    border: 1px solid rgba(255,255,255,0.5);
-    box-shadow: inset 0 1px 1.5px rgba(255,255,255,0.95), inset 0 -2px 3px rgba(120,55,0,0.5), 0 0 0 0.5px rgba(0,0,0,0.35), 0 2px 5px rgba(0,0,0,0.45), 0 0 9px rgba(var(--accent-rgb),0.4); cursor: pointer; }
-  #gain::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.5);
-    background: radial-gradient(circle at 36% 26%, rgba(255,255,255,0.95), rgba(var(--accent-rgb),0.92) 72%); box-shadow: inset 0 1px 1.5px rgba(255,255,255,0.9), 0 2px 5px rgba(0,0,0,0.45); cursor: pointer; }
+  /* VOL: accent fill (painted in JS) under a translucent glass-bead thumb */
+  #gain { -webkit-appearance: none; appearance: none; width: 92px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.16); cursor: pointer; }
+  #gain::-webkit-slider-thumb { -webkit-appearance: none; width: 17px; height: 17px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 26%, rgba(255,255,255,0.62) 0%, rgba(255,236,200,0.26) 42%, rgba(255,255,255,0.08) 100%);
+    border: 1px solid rgba(255,255,255,0.8);
+    box-shadow: inset 0 1.5px 2px rgba(255,255,255,0.95), inset 0 -2.5px 4px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.55); cursor: pointer; }
+  #gain::-moz-range-thumb { width: 17px; height: 17px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.8);
+    background: radial-gradient(circle at 38% 26%, rgba(255,255,255,0.62), rgba(255,255,255,0.08) 100%);
+    box-shadow: inset 0 1.5px 2px rgba(255,255,255,0.95), 0 1px 3px rgba(0,0,0,0.55); cursor: pointer; }
   #gain-label { font: 10px var(--mono); color: #3a3a44; width: 28px; }
   .dot { display: none; }
 
@@ -317,14 +319,14 @@
   .track-mix { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 8px; margin-top: auto; }
   .mix-label { font-size: 8px; font-weight: 800; letter-spacing: 0.1em; color: var(--very-muted); }
   .track-vol { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.12); }
-  /* Liquid-glass thumbs — a glassy accent orb with a bright specular cap + rim */
-  .track-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; border-radius: 50%;
-    background: radial-gradient(circle at 36% 26%, rgba(255,255,255,0.95) 0%, rgba(255,206,128,0.85) 32%, rgba(var(--accent-rgb),0.92) 72%);
-    border: 1px solid rgba(255,255,255,0.5);
-    box-shadow: inset 0 1px 1.5px rgba(255,255,255,0.95), inset 0 -2px 3px rgba(120,55,0,0.5), 0 0 0 0.5px rgba(0,0,0,0.35), 0 2px 5px rgba(0,0,0,0.45), 0 0 9px rgba(var(--accent-rgb),0.4); cursor: pointer; }
-  .track-vol::-moz-range-thumb { width: 15px; height: 15px; border-radius: 50%;
-    background: radial-gradient(circle at 36% 26%, rgba(255,255,255,0.95), rgba(var(--accent-rgb),0.92) 72%);
-    border: 1px solid rgba(255,255,255,0.5); box-shadow: inset 0 1px 1.5px rgba(255,255,255,0.9), 0 2px 5px rgba(0,0,0,0.45); cursor: pointer; }
+  /* Liquid-glass thumb — a translucent glass bead with a bright specular cap + rim */
+  .track-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 26%, rgba(255,255,255,0.62) 0%, rgba(255,236,200,0.26) 42%, rgba(255,255,255,0.08) 100%);
+    border: 1px solid rgba(255,255,255,0.8);
+    box-shadow: inset 0 1.5px 2px rgba(255,255,255,0.95), inset 0 -2.5px 4px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.55); cursor: pointer; }
+  .track-vol::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 26%, rgba(255,255,255,0.62), rgba(255,255,255,0.08) 100%);
+    border: 1px solid rgba(255,255,255,0.8); box-shadow: inset 0 1.5px 2px rgba(255,255,255,0.95), 0 1px 3px rgba(0,0,0,0.55); cursor: pointer; }
   .track-pan { position: relative; width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%;
     background: radial-gradient(circle at 35% 26%, rgba(255,255,255,0.22), rgba(54,54,62,0.5) 58%, rgba(20,20,26,0.62));
     border: 1px solid rgba(255,255,255,0.26);
