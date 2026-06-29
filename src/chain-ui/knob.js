@@ -168,6 +168,8 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
   el.addEventListener('dblclick', () => { change(param.default); showTip(); tipFade(); });
   el.addEventListener('focus', showTip);
   el.addEventListener('blur', hideTip);
+  el.addEventListener('pointerenter', showTip);
+  el.addEventListener('pointerleave', () => { if (!el.classList.contains('dragging')) hideTip(); });
   let dragStartY = 0, dragStartVal = 0;
   el.addEventListener('pointerdown', (e) => {
     dragStartY = e.clientY; dragStartVal = current; el.classList.add('dragging'); showTip();
