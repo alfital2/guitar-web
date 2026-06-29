@@ -22,13 +22,14 @@ export function create(ctx, params) {
   const delay = ctx.createDelay(2.0);
   const damp = ctx.createBiquadFilter(); damp.type = 'lowpass';
   const sat = ctx.createWaveShaper(); sat.oversample = '2x'; // soft saturation in the loop
-  // The soft-clip curve has small-signal gain ~k (k = 1 + drive*3). Inside a
-  // feedback loop that multiplies the loop gain by k, so quiet repeats would
-  // GROW instead of decay (endless echo). Compensate to unity small-signal gain
-  // so the saturator only softens loud repeats and feedback stays < 1.
+  // makeSoftClipCurve(d) realises tanh(k*x) with k = 1 + d*3, so its small-signal
+  // gain is k (≈5.5 here). Raw in a feedback loop that makes loop gain = feedback*k,
+  // so repeats GROW (endless echo). Pre-scaling the saturator input by 1/k turns
+  // the effective curve into tanh(x): unity small-signal gain (loop gain ≈ feedback,
+  // so repeats decay at the knob value) plus gentle peak compression for tape warmth.
   const SAT_DRIVE = 1.5;
   const SAT_K = 1 + SAT_DRIVE * 3;
-  const satComp = ctx.createGain(); satComp.gain.value = 1 / SAT_K;
+  const satIn = ctx.createGain(); satIn.gain.value = 1 / SAT_K;
   const fb = ctx.createGain();
   const wet = ctx.createGain();
   // Wow/flutter LFO on the delay time.
@@ -37,7 +38,7 @@ export function create(ctx, params) {
 
   input.connect(dry); dry.connect(output);
   input.connect(delay);
-  delay.connect(damp); damp.connect(sat); sat.connect(satComp); satComp.connect(fb); fb.connect(delay); // unity-gain saturating loop
+  delay.connect(damp); damp.connect(satIn); satIn.connect(sat); sat.connect(fb); fb.connect(delay); // unity-gain saturating loop
   delay.connect(wet); wet.connect(output);
   osc.connect(flutterGain); flutterGain.connect(delay.delayTime);
   osc.start();

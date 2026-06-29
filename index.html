@@ -647,36 +647,43 @@
      Translucent, refractive frosted surfaces on the floating chrome: toolbar,
      the Settings + Presets drawers, the Add-Effect window and its tiles. Safari
      keeps the existing solid surfaces (these rules simply don't apply there). */
+  /* Specular highlight stack (the Apple "lit glass edge" look): bright top inner
+     line, soft inner glow, a thin light rim, and a deep drop. Lighter blur lets
+     the lens refraction (#liquid-glass) read through. */
   html.liquid .toolbar {
-    background: rgba(28,28,32,0.55);
-    -webkit-backdrop-filter: blur(20px) saturate(1.8);
-    backdrop-filter: url(#liquid-glass) blur(20px) saturate(1.8);
-    border-bottom: 1px solid rgba(255,255,255,0.12);
+    background: rgba(34,34,40,0.5);
+    -webkit-backdrop-filter: blur(8px) saturate(1.7);
+    backdrop-filter: url(#liquid-glass) blur(6px) saturate(1.7);
+    border-bottom: 1px solid rgba(255,255,255,0.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -10px 22px rgba(255,255,255,0.04), 0 6px 22px rgba(0,0,0,0.4);
   }
   html.liquid .settings-panel,
   html.liquid .preset-browser {
-    background: rgba(26,26,30,0.6);
-    -webkit-backdrop-filter: blur(22px) saturate(1.7);
-    backdrop-filter: url(#liquid-glass) blur(22px) saturate(1.7);
-    box-shadow: inset 1px 0 0 rgba(255,255,255,0.14), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 60px rgba(0,0,0,0.55);
+    background: rgba(30,30,36,0.52);
+    -webkit-backdrop-filter: blur(9px) saturate(1.6);
+    backdrop-filter: url(#liquid-glass) blur(7px) saturate(1.6);
+    border-left: 1px solid rgba(255,255,255,0.18);
+    box-shadow: inset 1px 0 0 rgba(255,255,255,0.4), inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -40px 80px rgba(255,255,255,0.03), 0 0 60px rgba(0,0,0,0.55);
   }
-  html.liquid .settings-head { background: rgba(255,255,255,0.04); border-bottom-color: rgba(255,255,255,0.1); }
+  html.liquid .preset-browser { border-left: none; border-right: 1px solid rgba(255,255,255,0.16); box-shadow: inset -1px 0 0 rgba(255,255,255,0.3), inset 0 1px 0 rgba(255,255,255,0.16), 0 0 60px rgba(0,0,0,0.55); }
+  html.liquid .settings-head { background: rgba(255,255,255,0.05); border-bottom-color: rgba(255,255,255,0.12); }
   html.liquid .fx-modal {
-    background: rgba(30,30,34,0.62);
-    -webkit-backdrop-filter: blur(26px) saturate(1.8);
-    backdrop-filter: url(#liquid-glass) blur(26px) saturate(1.8);
-    border: 1px solid rgba(255,255,255,0.16);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 30px 80px rgba(0,0,0,0.7);
+    background: rgba(34,34,40,0.5);
+    -webkit-backdrop-filter: blur(10px) saturate(1.7);
+    backdrop-filter: url(#liquid-glass) blur(8px) saturate(1.7);
+    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -30px 60px rgba(255,255,255,0.04), 0 30px 80px rgba(0,0,0,0.7);
   }
   html.liquid .fx-tile {
     background: rgba(255,255,255,0.05);
     -webkit-backdrop-filter: blur(7px);
     backdrop-filter: blur(7px) saturate(1.4);
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
   }
-  html.liquid .fx-tile:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+  html.liquid .fx-tile:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.22); }
   /* glassy tint on the dim backdrops */
-  html.liquid .settings-backdrop { background: rgba(10,10,12,0.45); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+  html.liquid .settings-backdrop { background: rgba(10,10,12,0.4); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
 </style>
 </head>
 <body>
@@ -737,11 +744,8 @@
 
 <!-- Liquid-glass refraction filter (used via backdrop-filter on Chrome only) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <filter id="liquid-glass" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-    <feTurbulence type="fractalNoise" baseFrequency="0.008 0.012" numOctaves="2" seed="11" result="n"/>
-    <feGaussianBlur in="n" stdDeviation="2.5" result="nb"/>
-    <feDisplacementMap in="SourceGraphic" in2="nb" scale="16" xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
+  <filter id="liquid-glass" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB"><feImage href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22100%22%20height=%22100%22%3E%3Cdefs%3E%3ClinearGradient%20id=%22r%22%20x1=%220%22%20y1=%220%22%20x2=%221%22%20y2=%220%22%3E%3Cstop%20offset=%220%22%20stop-color=%22rgb(0,0,128)%22/%3E%3Cstop%20offset=%22.32%22%20stop-color=%22rgb(128,0,128)%22/%3E%3Cstop%20offset=%22.68%22%20stop-color=%22rgb(128,0,128)%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22rgb(255,0,128)%22/%3E%3C/linearGradient%3E%3ClinearGradient%20id=%22g%22%20x1=%220%22%20y1=%220%22%20x2=%220%22%20y2=%221%22%3E%3Cstop%20offset=%220%22%20stop-color=%22rgb(0,0,0)%22/%3E%3Cstop%20offset=%22.32%22%20stop-color=%22rgb(0,128,0)%22/%3E%3Cstop%20offset=%22.68%22%20stop-color=%22rgb(0,128,0)%22/%3E%3Cstop%20offset=%221%22%20stop-color=%22rgb(0,255,0)%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width=%22100%22%20height=%22100%22%20fill=%22url(%23r)%22/%3E%3Crect%20width=%22100%22%20height=%22100%22%20fill=%22url(%23g)%22%20style=%22mix-blend-mode:screen%22/%3E%3C/svg%3E
+" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="m"/><feDisplacementMap in="SourceGraphic" in2="m" scale="26" xChannelSelector="R" yChannelSelector="G"/></filter>
 </svg>
 <div id="presets-backdrop" class="settings-backdrop" hidden></div>
 <button id="presets-close" class="icon btn-dim presets-close" aria-label="Close presets">✕</button>
