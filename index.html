@@ -268,6 +268,43 @@
   .amp-power span { font: 800 8px var(--font); letter-spacing: 0.12em; color: #23252a; text-shadow: 0 1px 0 rgba(255,255,255,0.4); }
 
   /* ── Pedalboard ─────────────────────────────────────── */
+  /* ── Track lane (recording) ─────────────────────────── */
+  .track-lane { padding: 14px 20px; background: rgba(0,0,0,0.18); border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .track-lane-row {
+    display: flex; align-items: stretch; height: 124px; border-radius: 10px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.06); box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .track-header {
+    flex: 0 0 190px; width: 190px; background: var(--surface); border-right: 1px solid rgba(0,0,0,0.4);
+    display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+  }
+  .track-head-top { display: flex; align-items: center; gap: 8px; }
+  .track-icon { width: 22px; height: 22px; flex: 0 0 22px; display: flex; align-items: center; justify-content: center;
+    background: rgba(var(--accent-rgb),0.16); color: var(--accent); border-radius: 5px; font-size: 12px; }
+  .track-name { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track-ctrls { display: flex; gap: 5px; }
+  .track-ctrl { width: 24px; height: 22px; padding: 0; font-size: 10px; font-weight: 700; border-radius: 5px;
+    color: var(--text-secondary); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+  .track-ctrl:disabled { opacity: 0.5; cursor: not-allowed; }
+  .track-rec { color: var(--red); }
+  .track-mix { display: flex; align-items: center; gap: 10px; margin-top: auto; }
+  .track-vol { flex: 1; height: 3px; accent-color: var(--accent); }
+  .track-pan { width: 18px; height: 18px; flex: 0 0 18px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #4a4a50, #1a1a1e); border: 1px solid rgba(0,0,0,0.5); }
+
+  .track-timeline { flex: 1; min-width: 0; background: var(--recessed); overflow-x: auto; overflow-y: hidden; }
+  .track-scroll { position: relative; min-width: 100%; width: max-content; height: 100%; }
+  .track-ruler {
+    display: flex; height: 22px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+  }
+  .track-bar {
+    width: 64px; flex: 0 0 64px; font: 10px var(--mono); color: var(--muted);
+    display: flex; align-items: center; padding-left: 5px; border-right: 1px solid rgba(255,255,255,0.05);
+  }
+  .track-area { height: calc(100% - 22px); }
+  .track-playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb),0.6); }
+
   .pedalboard-strip { padding: 0 20px 28px; background: rgba(0,0,0,0.1); }
   .strip-head { display: flex; align-items: center; gap: 0; margin-bottom: 12px; padding-top: 2px; }
   .strip-head h2 { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.15em; color: #2e2e36; margin: 0; }
@@ -587,6 +624,8 @@
       </div>
     </div>
   </section>
+
+  <section id="track-lane" class="track-lane"></section>
 
   <section class="amp-strip">
     <div id="amp" class="amp-host"></div>

@@ -19,6 +19,7 @@ import { renderProfileCard } from './profile-card/ui.js';
 import { spectrumBars } from './spectrum.js';
 import { measureLoudnessGain } from './normalize.js';
 import { mountTransport } from './transport-ui.js';
+import { renderTrackLane } from './track-lane.js';
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
@@ -135,12 +136,18 @@ function loadPreset(preset) {
   activePresetName = preset.name;
   rebuildGraph();
   renderBrowser();
+  renderTrack();
   setPresets(false); // close the drawer after picking (narrow screens)
 }
 
 function renderBrowser() {
   const el = $('preset-browser');
   if (el) renderPresetBrowser(el, GB_CATEGORIES, loadPreset, activePresetName);
+}
+
+function renderTrack() {
+  const el = $('track-lane');
+  if (el) renderTrackLane(el, { presetName: activePresetName });
 }
 
 // Restore a persisted chain (array of {type, params}) into the model.
@@ -512,6 +519,7 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
   if (stored && Array.isArray(stored) && stored.length) loadStoredChain(stored);
   else loadPreset(PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0]);
   renderBrowser();
+  renderTrack();
 })();
 
 // Toolbar transport cluster: inert transport (ground for recording) + working
