@@ -26,7 +26,7 @@ export function renderAmp(container, modules, onParamChange) {
     const row = el('div', 'amp-group-knobs');
     for (const p of m.schema.params) {
       const slot = el('div', 'amp-knob');
-      const { el: kEl } = createKnob(p, m.params[p.key] ?? p.default, (v) => onParamChange(m.instanceId, p.key, v), 48, AMP_KNOB_STYLE);
+      const { el: kEl } = createKnob(p, m.params[p.key] ?? p.default, (v) => onParamChange(m.instanceId, p.key, v), 44, AMP_KNOB_STYLE);
       const lbl = el('div', 'amp-knob-label');
       lbl.textContent = p.label;
       slot.append(kEl, lbl);
