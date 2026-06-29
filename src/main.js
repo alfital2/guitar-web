@@ -37,7 +37,9 @@ let accentRGB = '255,159,10'; // current theme accent for canvas drawing
 let takes = [];          // recorded clips on the track lane
 let takeSeq = 0;         // running take number for clip labels
 let liveRAF = null, liveClip = null; // in-progress (growing) recording clip
-const recorder = createRecorder({ getSource: () => engine && engine.output, getContext: () => ctx });
+// Tap normGain (post loudness-normalization, pre Vol) so the take matches what
+// you hear and is independent of the master Vol slider.
+const recorder = createRecorder({ getSource: () => normGain, getContext: () => ctx });
 const player = createPlayer();
 
 // x offset (px) where the next clip starts: end of the last take.
