@@ -6,6 +6,8 @@
 // nonlinear drive/waveshaper stages, not just linear gain.
 import { buildChain } from './engine.js';
 import { registry } from './effects/index.js';
+import { loadWorklets } from './effects/worklets/index.js';
+import * as reverbFx from './effects/reverb.js';
 
 // Deterministic pink-ish noise (Paul Kellet's economy filter) so loudness
 // measurements are reproducible across renders. Pink (≈ -3 dB/oct) is a far
@@ -42,18 +44,29 @@ const OfflineCtx = typeof OfflineAudioContext !== 'undefined' ? OfflineAudioCont
 // Returns a linear gain factor to apply after the chain so its output loudness
 // matches the reference input loudness. Clamped to avoid wild extremes.
 export async function measureLoudnessGain(chain, {
-  sampleRate = 48000, seconds = 0.7, settle = 0.2, target = null, min = 0.1, max = 4,
+  sampleRate = 48000, seconds = 0.7, settle = 0.2, target = null, min = 0.1, max = 4, reverb = null,
 } = {}) {
   if (!OfflineCtx) return 1;
   const length = Math.floor(sampleRate * seconds);
   const offline = new OfflineCtx(1, length, sampleRate);
+  // The chain may include AudioWorklet effects; their modules must be present in
+  // this offline context too, or buildChain would throw constructing the node.
+  try { await loadWorklets(offline); } catch { return 1; }
   const noise = makeReferenceNoise(offline, length);
   const src = offline.createBufferSource();
   src.buffer = noise;
 
   const engine = buildChain(offline, chain, registry);
   src.connect(engine.input);
-  engine.output.connect(offline.destination);
+  // Include the amp reverb stage (post-pedalboard) so its wet mix is reflected
+  // in the measured loudness, matching the live signal path.
+  if (reverb && (reverb.mix || 0) > 0) {
+    const rv = reverbFx.create(offline, reverb);
+    engine.output.connect(rv.input);
+    rv.output.connect(offline.destination);
+  } else {
+    engine.output.connect(offline.destination);
+  }
   src.start();
 
   const rendered = await offline.startRendering();

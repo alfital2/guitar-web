@@ -81,6 +81,7 @@ const expr = `(async () => {
   const { buildChain } = await import(base + '/src/engine.js');
   const { loadWorklets } = await import(base + '/src/effects/worklets/index.js');
   const { measureLoudnessGain, makeReferenceNoise } = await import(base + '/src/normalize.js');
+  const reverbFx = await import(base + '/src/effects/reverb.js');
   const { riff } = await import(base + '/tools/audio-qa/signal.js');
   const { analyze, rms } = await import(base + '/tools/audio-qa/metrics.js');
   const SR = 44100;
@@ -98,8 +99,12 @@ const expr = `(async () => {
   const out = [];
   for (const preset of sel) {
     try {
-      const chain = preset.chain.map(c => ({ type: c.type, params: c.params }));
-      const g = await measureLoudnessGain(chain, { sampleRate: SR });
+      // Reverb is now an amp stage, not a pedal: pull it out of the chain and
+      // render it after the pedalboard, exactly like the live app.
+      const rev = preset.chain.filter(c => c.type === 'reverb');
+      const reverb = rev.length ? { size: 0.4, mix: 0.12, ...rev[rev.length - 1].params } : null;
+      const chain = preset.chain.filter(c => c.type !== 'reverb').map(c => ({ type: c.type, params: c.params }));
+      const g = await measureLoudnessGain(chain, { sampleRate: SR, reverb });
       const ctx = new OfflineAudioContext(1, Math.round(SR * (sig.inputEndSec + 6)), SR);
       await loadWorklets(ctx);
       const eng = buildChain(ctx, chain, registry);
@@ -109,7 +114,9 @@ const expr = `(async () => {
       buf.copyToChannel(scaled, 0);
       const src = ctx.createBufferSource(); src.buffer = buf;
       const norm = ctx.createGain(); norm.gain.value = g; // the live normGain stage
-      src.connect(eng.input); eng.output.connect(norm); norm.connect(ctx.destination); src.start();
+      let tail = eng.output;
+      if (reverb && reverb.mix > 0) { const rv = reverbFx.create(ctx, reverb); eng.output.connect(rv.input); tail = rv.output; }
+      src.connect(eng.input); tail.connect(norm); norm.connect(ctx.destination); src.start();
       const rendered = await ctx.startRendering();
       // High-crest plucked transients legitimately exceed 1.0 after loudness
       // normalization (even a bypassed clean chain peaks ~1.4), so only flag

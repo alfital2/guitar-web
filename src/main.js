@@ -27,9 +27,14 @@ import { cloneTake, splitTakeAt, resolveNoOverlap } from './clip-ops.js';
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
+import * as reverbFx from './effects/reverb.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
+// Reverb lives in the amp now (post-pedalboard, always on), not as a pedal.
+const REVERB_ID = '__amp_reverb__';
+let ampReverb = { size: 0.4, mix: 0 }; // amp reverb params (size, wet mix)
+let reverbStage = null;                // audio node: engine.output -> reverbStage -> normGain
 let calibrationEq, calibRAF, calibState, calibCountdown;
 let pitchBuf, lastNoteMs = 0;
 let prevBars = null;
@@ -188,11 +193,16 @@ function rebuildGraph() {
     }
     engine = buildChain(ctx, chainState.toEngineChain(currentChain), registry);
     if (calibrationEq) calibrationEq.output.connect(engine.input);
-    if (normGain) engine.output.connect(normGain);
+    // Pedalboard feeds the amp reverb stage, which feeds normGain.
+    if (reverbStage) { reverbStage.apply(ampReverb); engine.output.connect(reverbStage.input); }
+    else if (normGain) engine.output.connect(normGain);
   }
 
+  // The amp head also hosts the always-on reverb (rendered as a synthetic module
+  // so it reuses the amp-knob UI), placed after the drive/eq/cabinet groups.
+  const ampModules = [...locked, { instanceId: REVERB_ID, schema: reverbFx.schema, params: ampReverb }];
   try {
-    renderAmp($('amp'), locked, setParamLive);
+    renderAmp($('amp'), ampModules, onAmpParam);
     renderPedalboard($('chain'), view, {
       onParamChange: setParamLive,
       onAdd: addEffect,
@@ -216,6 +226,29 @@ function setParamLive(instanceId, key, value) {
     if (idx >= 0) engine.setParam(idx, key, value);
   }
   chainStore.save(currentChain);
+}
+
+// Amp knob changes. The reverb group routes to the amp reverb stage; all other
+// amp groups (drive/eq/cabinet) are normal locked chain modules.
+function onAmpParam(instanceId, key, value) {
+  if (instanceId === REVERB_ID) {
+    ampReverb = { ...ampReverb, [key]: value };
+    if (reverbStage) reverbStage.apply(ampReverb);
+    chainStore.saveReverb(ampReverb);
+    scheduleNormalize(); // wet mix changes output loudness
+    return;
+  }
+  setParamLive(instanceId, key, value);
+}
+
+// Reverb is no longer a pedal: pull any reverb entries out of a preset/saved
+// chain and fold them into the amp reverb (last one wins; none → reverb off).
+function extractReverb(chainData) {
+  const rev = chainData.filter((e) => e.type === 'reverb');
+  return {
+    rest: chainData.filter((e) => e.type !== 'reverb'),
+    reverb: rev.length ? { size: 0.4, mix: 0.12, ...rev[rev.length - 1].params } : null,
+  };
 }
 
 function addEffect(type, beforeId) {
@@ -254,7 +287,10 @@ let activePresetName = null;
 function loadPreset(preset) {
   const errors = validatePreset(preset, registry);
   if (errors.length) { $('error').textContent = errors.join('; '); return; }
-  const r = chainState.fromPreset(preset.chain, nextId);
+  const { rest, reverb } = extractReverb(preset.chain);
+  ampReverb = reverb || { size: 0.4, mix: 0 };
+  chainStore.saveReverb(ampReverb);
+  const r = chainState.fromPreset(rest, nextId);
   currentChain = r.chain; nextId = r.nextId;
   activePresetName = preset.name;
   rebuildGraph();
@@ -315,7 +351,9 @@ function renderTrack() {
 
 // Restore a persisted chain (array of {type, params}) into the model.
 function loadStoredChain(data) {
-  const valid = data.filter((e) => registry[e.type]); // drop unknown types defensively
+  const { rest, reverb } = extractReverb(data);
+  ampReverb = chainStore.loadReverb() || reverb || { size: 0.4, mix: 0 };
+  const valid = rest.filter((e) => registry[e.type]); // drop unknown types defensively
   const r = chainState.fromPreset(valid, nextId);
   currentChain = r.chain; nextId = r.nextId;
   rebuildGraph();
@@ -325,13 +363,14 @@ function loadStoredChain(data) {
 // (debounced). Param-only edits keep the signature, so they don't re-measure.
 function scheduleNormalize() {
   if (!normGain) return;
-  const sig = chainState.signature(currentChain);
+  // Reverb wet mix affects output loudness, so fold it into the signature.
+  const sig = chainState.signature(currentChain) + `|rv${ampReverb.size},${ampReverb.mix}`;
   if (sig === normSig) return;
   normSig = sig;
   clearTimeout(normTimer);
   normTimer = setTimeout(async () => {
     try {
-      const g = await measureLoudnessGain(chainState.toEngineChain(currentChain), { sampleRate: ctx ? ctx.sampleRate : 48000 });
+      const g = await measureLoudnessGain(chainState.toEngineChain(currentChain), { sampleRate: ctx ? ctx.sampleRate : 48000, reverb: ampReverb });
       if (normGain && chainState.signature(currentChain) === sig) normGain.gain.value = g;
     } catch (e) { console.warn('loudness normalize failed:', e); }
   }, 150);
@@ -580,6 +619,11 @@ async function start() {
     normGain.gain.value = 1;
     normGain.connect(gainOut);
 
+    // Amp reverb stage sits at the end of the effect path (post-pedalboard):
+    // engine.output -> reverbStage -> normGain. Created once; params live-update.
+    reverbStage = reverbFx.create(ctx, ampReverb);
+    reverbStage.output.connect(normGain);
+
     // Calibration EQ sits between source and the artist chain.
     calibrationEq = createCalibrationEq(ctx);
     source.connect(calibrationEq.input);
@@ -620,7 +664,7 @@ function stop() {
   { const c = $('note-circle'); if (c) { c.textContent = '—'; c.classList.remove('active'); } }
   if (stream) stream.getTracks().forEach(t => t.stop());
   if (ctx) ctx.close();
-  ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = null;
+  ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = reverbStage = null;
   $('start').disabled = false; $('stop').disabled = true;
   prevBars = null;
   { const fl = $('freq-label'); if (fl) { fl.textContent = '— Hz'; fl.style.color = ''; } }

@@ -1,7 +1,7 @@
 { "name": "Woolly Octave", "artist": "GarageBand", "song": "Octave-fuzz lead", "chain": [
-  { "type": "octave",  "params": { "octave": 0.7, "fuzz": 6, "tone": 5, "level": 4 } },
-  { "type": "drive",   "params": { "amount": 3, "tone": 5, "level": 5, "blend": 0.7, "midBump": 2 } },
-  { "type": "eq",      "params": { "bass": 6, "mid": 6, "midFreq": 700, "treble": 4 } },
+  { "type": "octave",  "params": { "octave": 0.7, "fuzz": 6, "tone": 5, "level": 3 } },
+  { "type": "drive",   "params": { "amount": 3, "tone": 5, "level": 4, "blend": 0.7, "midBump": 1 } },
+  { "type": "eq",      "params": { "bass": 5, "mid": 5, "midFreq": 700, "treble": 4 } },
   { "type": "cabinet", "params": { "brightness": 4, "body": 7, "mix": 1 } },
   { "type": "reverb",  "params": { "size": 0.3, "mix": 0.1 } }
 ] }

@@ -32,8 +32,9 @@ const COLORS = {
 };
 
 // Pedal (addable) types and their display labels. Amp types (drive/eq/cabinet)
-// are excluded — they live in the amp head. Keep this in sync with the effects
-// registry: only list types that have a registered effect.
+// are excluded — they live in the amp head. Reverb is also excluded: it's now a
+// built-in amp stage, not a pedal. Keep this in sync with the effects registry:
+// only list types that have a registered effect.
 const PEDAL_TYPES = [
   ['compressor', 'Compressor'], ['boost', 'Boost'], ['gate', 'Noise Gate'],
   ['fuzz', 'Fuzz'], ['octave', 'Octave Fuzz'],
@@ -42,7 +43,7 @@ const PEDAL_TYPES = [
   ['tremolo', 'Tremolo'], ['vibrato', 'Vibrato'], ['autopan', 'Auto-Pan'],
   ['rotary', 'Rotary'], ['ringmod', 'Ring Mod'],
   ['delay', 'Delay'], ['tape-echo', 'Tape Echo'], ['pingpong', 'Ping-Pong'],
-  ['reverb', 'Reverb'], ['widener', 'Widener'], ['limiter', 'Limiter'],
+  ['widener', 'Widener'], ['limiter', 'Limiter'],
   ['pitchshift', 'Pitch Shift'], ['looper', 'Looper'],
 ];
 

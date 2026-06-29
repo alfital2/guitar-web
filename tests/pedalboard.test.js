@@ -48,21 +48,23 @@ describe('renderPedalboard', () => {
     const modal = document.querySelector('.fx-modal');
     expect(modal).toBeTruthy();
     const opts = [...document.querySelectorAll('.fx-tile')].map(b => b.dataset.type);
-    for (const t of ['compressor', 'delay', 'reverb', 'chorus']) expect(opts).toContain(t);
+    for (const t of ['compressor', 'delay', 'pingpong', 'chorus']) expect(opts).toContain(t);
     // amp types never appear in the effects window
     expect(opts).not.toContain('drive');
     expect(opts).not.toContain('eq');
     expect(opts).not.toContain('cabinet');
+    // reverb is a built-in amp stage now, not an addable pedal
+    expect(opts).not.toContain('reverb');
   });
   it('clicking an effects-window tile calls onAdd(type) and closes', () => {
     const el = document.createElement('div');
     const onAdd = vi.fn();
     renderPedalboard(el, units, { ...noop, onAdd });
     el.querySelector('.pedal-add').dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    const tile = document.querySelector('.fx-tile[data-type="reverb"]');
+    const tile = document.querySelector('.fx-tile[data-type="pingpong"]');
     tile.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 0, clientY: 0 }));
     tile.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, button: 0, clientX: 0, clientY: 0 }));
-    expect(onAdd).toHaveBeenCalledWith('reverb');
+    expect(onAdd).toHaveBeenCalledWith('pingpong');
     expect(document.querySelector('.fx-modal')).toBeNull();
   });
   it('a knob change calls onParamChange(instanceId, key, value)', () => {
@@ -92,8 +94,8 @@ describe('renderPedalboard', () => {
     const el = document.createElement('div');
     renderPedalboard(el, units, noop);
     el.querySelector('.pedal-add').dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    const tile = document.querySelector('.fx-tile[data-type="reverb"]');
-    expect(tile.querySelector('.fx-art use').getAttribute('href')).toBe('#fx-art-reverb');
+    const tile = document.querySelector('.fx-tile[data-type="pingpong"]');
+    expect(tile.querySelector('.fx-art use').getAttribute('href')).toBe('#fx-art-pingpong');
   });
 });
 

@@ -2,6 +2,7 @@
 // Persistence behind a single interface. localStorage now; a DB backend can
 // replace the internals later without changing callers.
 const KEY = 'gs-chain';
+const REVERB_KEY = 'gs-amp-reverb';
 
 export function save(chain) {
   try {
@@ -17,6 +18,22 @@ export function load() {
     const data = JSON.parse(raw);
     if (!Array.isArray(data)) return null;
     return data;
+  } catch {
+    return null;
+  }
+}
+
+// Amp reverb (separate from the pedal chain). { size, mix } or null.
+export function saveReverb(reverb) {
+  try { localStorage.setItem(REVERB_KEY, JSON.stringify(reverb)); } catch {}
+}
+
+export function loadReverb() {
+  try {
+    const raw = localStorage.getItem(REVERB_KEY);
+    if (!raw) return null;
+    const r = JSON.parse(raw);
+    return (r && typeof r.mix === 'number') ? r : null;
   } catch {
     return null;
   }
