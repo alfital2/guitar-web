@@ -6,7 +6,7 @@
 <title>Guitar Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Bungee&family=Bungee+Inline&family=Audiowide&family=Orbitron:wght@600;800&family=Special+Elite&family=Major+Mono+Display&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Bungee&family=Bungee+Inline&family=Audiowide&family=Orbitron:wght@600;800&family=Special+Elite&family=Major+Mono+Display&family=Pacifico&display=swap" rel="stylesheet">
 <style>
   :root {
     /* Theme-able palette (Studio = default). Overridden per [data-theme] below. */
@@ -146,40 +146,80 @@
   /* ── Amp head host ──────────────────────────────────── */
   .amp-strip { padding: 16px 20px 14px; background: rgba(0,0,0,0.12); }
 
-  /* Amp head (rendered by amp.js) */
-  .amp-wood {
-    height: 14px; border-radius: 10px 10px 0 0; border: 1px solid #160a00; border-bottom: none;
-    background: repeating-linear-gradient(90deg,
-      #3c2510 0 3px, #4a3018 3px 5px, #38240e 5px 9px, #2c1e0b 9px 13px,
-      #3c2510 13px 16px, #503818 16px 18px, #3c2510 18px);
-  }
-  .amp {
-    border-radius: 0 0 10px 10px; border: 1px solid rgba(0,0,0,0.8); border-top: none; overflow: hidden;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.08);
-  }
-  .amp-grille {
-    display: flex; align-items: center; justify-content: space-between; padding: 0 18px; height: 26px;
-    background: linear-gradient(180deg, #222226, #181819); border-bottom: 1px solid rgba(0,0,0,0.7);
-  }
-  .amp-badge { font-size: 9px; font-weight: 800; letter-spacing: 0.28em; color: #b89848; text-shadow: 0 1px 2px rgba(0,0,0,0.95); }
-  .amp-power { display: flex; align-items: center; gap: 7px; }
-  .amp-led { width: 6px; height: 6px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffe070, #ff9f0a); animation: led-amber 3s ease-in-out infinite; }
-  .amp-power span { font-size: 7px; font-weight: 800; letter-spacing: 0.12em; color: #3a3a3e; }
-  .amp-panel {
-    display: flex; align-items: stretch; padding: 16px 24px 20px;
+  /* Amp head (rendered by amp.js) — GarageBand-style head:
+     black tolex enclosure, leather handle, metal corners, brushed-metal control
+     panel with engraved groups + numbered knobs, silver grille cloth + script. */
+  .amp-head {
+    position: relative; border-radius: 16px; padding: 34px 20px 20px;
     background:
-      repeating-linear-gradient(90deg, rgba(255,255,255,0.016) 0 1px, transparent 1px 4px),
-      linear-gradient(180deg, #3a3a3f 0%, #2a2a2e 50%, #222226 100%);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.13), inset 0 -4px 10px rgba(0,0,0,0.5);
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='tx'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55 0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23tx)'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, #1b1b1d, #0e0e10);
+    background-size: 90px 90px, auto;
+    border: 1px solid #000;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 0 0 2px rgba(0,0,0,0.55);
   }
-  .amp-section { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 0 16px; }
-  .amp-section + .amp-section { border-left: 1px solid rgba(0,0,0,0.6); box-shadow: -1px 0 0 rgba(255,255,255,0.06); }
-  .amp-section-label {
-    width: 100%; text-align: center; font-size: 8px; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase;
-    color: rgba(255,255,255,0.55); text-shadow: 0 1px 2px rgba(0,0,0,0.9);
-    padding-bottom: 7px; border-bottom: 1px solid rgba(255,255,255,0.1);
+  .amp-head::before {
+    content: ""; position: absolute; inset: 6px; border-radius: 11px; border: 2px solid rgba(0,0,0,0.55);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); pointer-events: none;
   }
-  .amp-knobs { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .amp-handle {
+    position: absolute; top: -13px; left: 50%; transform: translateX(-50%); width: 230px; height: 28px;
+    display: flex; align-items: center; justify-content: space-between; z-index: 2;
+  }
+  .amp-handle-strap {
+    flex: 1; height: 15px; margin: 0 -8px; border-radius: 10px;
+    background: linear-gradient(180deg, #2c2c2e, #0d0d0f); border: 1px solid #000;
+    box-shadow: inset 0 2px 3px rgba(255,255,255,0.08), inset 0 -3px 6px rgba(0,0,0,0.7), 0 4px 7px rgba(0,0,0,0.6);
+  }
+  .amp-handle-mount {
+    width: 40px; height: 24px; border-radius: 6px; background: linear-gradient(180deg, #4c4c50, #202024); border: 1px solid #000;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.22), 0 2px 4px rgba(0,0,0,0.6);
+  }
+  .amp-corner {
+    position: absolute; width: 34px; height: 34px; background: linear-gradient(135deg, #62626a, #26262b); border: 1px solid #000;
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.28), 0 2px 4px rgba(0,0,0,0.6); z-index: 1;
+  }
+  .amp-corner::after { content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #9a9aa0, #1a1a1e); }
+  .amp-corner-tl { top: 7px; left: 7px; border-radius: 11px 0 9px 0; } .amp-corner-tl::after { right: 6px; bottom: 6px; }
+  .amp-corner-tr { top: 7px; right: 7px; border-radius: 0 11px 0 9px; } .amp-corner-tr::after { left: 6px; bottom: 6px; }
+  .amp-corner-bl { bottom: 7px; left: 7px; border-radius: 0 9px 0 11px; } .amp-corner-bl::after { right: 6px; top: 6px; }
+  .amp-corner-br { bottom: 7px; right: 7px; border-radius: 9px 0 11px 0; } .amp-corner-br::after { left: 6px; top: 6px; }
+  .amp-panel {
+    position: relative; display: flex; align-items: stretch; margin: 10px 16px 14px; padding: 8px 12px; border-radius: 8px;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, rgba(0,0,0,0.045) 1px 2px),
+      linear-gradient(180deg, #dadce0 0%, #b8bbc1 46%, #9c9fa5 54%, #c4c7cd 100%);
+    border: 1px solid #5a5c61; box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), inset 0 -2px 6px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .amp-group { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 15px 10px 9px; position: relative; }
+  .amp-group::before {
+    content: ""; position: absolute; inset: 7px 5px; border: 1.5px solid rgba(255,255,255,0.9); border-radius: 8px;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.25), inset 0 1px 1px rgba(0,0,0,0.12); pointer-events: none;
+  }
+  .amp-group-head {
+    position: relative; z-index: 1; font: 800 9px/1 var(--font); letter-spacing: 0.2em; text-transform: uppercase;
+    color: #2c2e33; text-shadow: 0 1px 0 rgba(255,255,255,0.6); margin-bottom: 10px; padding: 0 7px;
+    background: linear-gradient(180deg, #cfd2d7, #bcbfc5);
+  }
+  .amp-group-knobs { display: flex; gap: 13px; align-items: flex-start; }
+  .amp-knob { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .amp-knob .knob .val, .amp-knob .knob .label { display: none; }
+  .amp-knob-label { font: 800 8px/1 var(--font); letter-spacing: 0.1em; text-transform: uppercase; color: #2c2e33; text-shadow: 0 1px 0 rgba(255,255,255,0.65); }
+  .amp-grille {
+    position: relative; margin: 0 16px; height: 130px; border-radius: 8px; overflow: hidden; display: flex; align-items: center; padding: 0 26px;
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='3' height='3' fill='%23ffffff' fill-opacity='0.16'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23ffffff' fill-opacity='0.16'/%3E%3Crect x='3' width='3' height='3' fill='%23000' fill-opacity='0.28'/%3E%3Crect y='3' width='3' height='3' fill='%23000' fill-opacity='0.28'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, #9da0a5, #7c7f84);
+    background-size: 6px 6px, auto; border: 1px solid #3a3c40; box-shadow: inset 0 0 0 3px rgba(0,0,0,0.4), inset 0 2px 10px rgba(0,0,0,0.45);
+  }
+  .amp-logo {
+    font-family: 'Pacifico', cursive; font-size: 38px; line-height: 1;
+    background: linear-gradient(180deg, #fff, #9a9da2 58%, #54565b); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.55));
+  }
+  .amp-power { margin-left: auto; display: flex; align-items: center; gap: 7px; }
+  .amp-led { width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffe070, var(--accent)); animation: led-amber 3s ease-in-out infinite; }
+  .amp-power span { font: 800 8px var(--font); letter-spacing: 0.12em; color: #23252a; text-shadow: 0 1px 0 rgba(255,255,255,0.4); }
 
   /* ── Pedalboard ─────────────────────────────────────── */
   .pedalboard-strip { padding: 0 20px 28px; background: rgba(0,0,0,0.1); }
@@ -309,9 +349,8 @@
   .pb-empty { padding: 12px; font-size: 12px; color: rgba(255,255,255,0.4); font-style: italic; }
   /* Tighten amp spacing on smaller widths so the knob rows stay together longer. */
   @media (max-width: 1320px) {
-    .amp-section { padding: 0 9px; }
-    .amp-knobs { gap: 8px 8px; }
-    .amp-panel { padding: 16px 16px 20px; }
+    .amp-group { padding: 13px 6px 9px; }
+    .amp-group-knobs { gap: 9px; }
   }
   /* Stack the library above the workspace on narrow screens. */
   @media (max-width: 1040px) {

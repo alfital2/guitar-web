@@ -100,6 +100,22 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
   const arc = svgEl('path', { class: 'knob-arc', fill: 'none', 'stroke-width': '3.5', 'stroke-linecap': 'round', filter: `url(#${uid}-g)` });
   if (style.accent) arc.setAttribute('stroke', accent);
 
+  // Optional engraved number ring (0..10) around the dial — amp-panel knobs.
+  const nums = svgEl('g', { class: 'knob-nums' });
+  if (style.numbered) {
+    for (let i = 0; i <= 10; i++) {
+      const ang = -135 + i * 27;
+      const pt = polar(C, C, RTO + (numeric ? 3.5 : 6), ang);
+      const t = svgEl('text', {
+        x: pt.x.toFixed(1), y: (pt.y + (numeric ? 1.7 : 2.3)).toFixed(1), 'text-anchor': 'middle',
+        'font-size': String(numeric ? 5 : 6.5), 'font-weight': '700', fill: 'rgba(255,255,255,0.8)',
+      });
+      t.style.fontFamily = "'Inter', sans-serif";
+      t.textContent = String(i);
+      nums.appendChild(t);
+    }
+  }
+
   // Cap. 'round' = circular cap + a pointer line; 'chicken' = a rotating
   // chicken-head cap whose beak is the indicator (vintage vibe).
   let capg = null, ptr = null;
@@ -110,12 +126,12 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
       svgEl('path', { d: `M ${C} ${(C - RC - 4).toFixed(2)} L ${(C - 3.6).toFixed(2)} ${(C - RC + 2).toFixed(2)} L ${(C + 3.6).toFixed(2)} ${(C - RC + 2).toFixed(2)} Z`, fill: pointerCol, stroke: 'rgba(0,0,0,0.4)', 'stroke-width': '0.5' }),
       svgEl('circle', { class: 'knob-spec', cx: (C - RC * 0.18).toFixed(2), cy: (C - RC * 0.24).toFixed(2), r: (RC * 0.5).toFixed(2), fill: `url(#${uid}-h)` }),
     );
-    svg.append(defs, ticks, track, arc, capg);
+    svg.append(defs, ticks, nums, track, arc, capg);
   } else {
     const cap = svgEl('circle', { class: 'knob-cap', cx: String(C), cy: String(C), r: String(RC), fill: `url(#${uid}-c)`, stroke: 'rgba(0,0,0,0.6)', 'stroke-width': '0.75' });
     const spec = svgEl('circle', { class: 'knob-spec', cx: (C - RC * 0.15).toFixed(2), cy: (C - RC * 0.22).toFixed(2), r: (RC * 0.52).toFixed(2), fill: `url(#${uid}-h)` });
     ptr = svgEl('line', { class: 'knob-pointer', stroke: pointerCol, 'stroke-width': '2', 'stroke-linecap': 'round' });
-    svg.append(defs, ticks, track, arc, cap, spec, ptr);
+    svg.append(defs, ticks, nums, track, arc, cap, spec, ptr);
   }
 
   const valEl = document.createElement('span'); valEl.className = 'val';
