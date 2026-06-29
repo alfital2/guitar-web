@@ -49,5 +49,7 @@ export function createRecorder({ getSource, getContext }) {
   }
 
   function isRecording() { return recording; }
-  return { start, stop, isRecording };
+  // Snapshot of everything captured so far (for live waveform drawing).
+  function samplesSoFar() { return concatChunks(chunks); }
+  return { start, stop, isRecording, samplesSoFar };
 }

@@ -22,6 +22,7 @@ import { mountTransport } from './transport-ui.js';
 import { renderTrackLane, PX_PER_SEC } from './track-lane.js';
 import { createRecorder } from './recorder.js';
 import { createPlayer } from './player.js';
+import { drawWaveform } from './waveform.js';
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
@@ -585,8 +586,23 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
         liveClip = document.createElement('div');
         liveClip.className = 'track-clip recording-clip';
         liveClip.style.cssText = `left:${x}px;top:6px;height:80px;width:0px`;
+        const lbl = document.createElement('div'); lbl.className = 'clip-label'; lbl.textContent = `${activePresetName || 'Take'} #${takeSeq + 1}`;
+        const canvas = document.createElement('canvas'); canvas.className = 'clip-wave'; canvas.height = 80;
+        liveClip.append(lbl, canvas);
         area.appendChild(liveClip);
-        const grow = () => { if (!liveClip) return; liveClip.style.width = `${Math.max(0, (ctx.currentTime - startT) * PX_PER_SEC)}px`; liveRAF = requestAnimationFrame(grow); };
+        let lastDraw = 0;
+        const grow = () => {
+          if (!liveClip) return;
+          const w = Math.max(0, (ctx.currentTime - startT) * PX_PER_SEC);
+          liveClip.style.width = `${w}px`;
+          const now = performance.now();
+          if (now - lastDraw > 50) { // redraw the live waveform ~20fps
+            lastDraw = now;
+            canvas.width = Math.max(1, Math.floor(w));
+            drawWaveform(canvas, recorder.samplesSoFar(), { color: '#d8daf8' });
+          }
+          liveRAF = requestAnimationFrame(grow);
+        };
         grow();
       }
     }
