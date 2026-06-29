@@ -13,12 +13,12 @@ const modules = [
 ];
 
 describe('renderAmp', () => {
-  it('renders a section per module and a knob per param', () => {
+  it('renders a group per module and a knob per param', () => {
     const el = document.createElement('div');
     renderAmp(el, modules, () => {});
-    expect(el.querySelectorAll('.amp-section')).toHaveLength(2);
+    expect(el.querySelectorAll('.amp-group')).toHaveLength(2);
     expect(el.querySelectorAll('[role=slider]')).toHaveLength(3);
-    expect(el.querySelector('.amp-section .amp-section-label').textContent).toBe('Drive');
+    expect(el.querySelector('.amp-group .amp-group-head').textContent).toBe('Drive');
     expect(el.querySelector('.amp-grille')).toBeTruthy();
     expect(el.querySelector('.amp-panel')).toBeTruthy();
   });
@@ -26,7 +26,7 @@ describe('renderAmp', () => {
     const el = document.createElement('div');
     const cb = vi.fn();
     renderAmp(el, modules, cb);
-    const firstKnob = el.querySelectorAll('.amp-section')[0].querySelector('[role=slider]');
+    const firstKnob = el.querySelectorAll('.amp-group')[0].querySelector('[role=slider]');
     firstKnob.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
     expect(cb).toHaveBeenCalledWith(10, 'amount', 2.6);
   });
@@ -34,6 +34,6 @@ describe('renderAmp', () => {
     const el = document.createElement('div');
     renderAmp(el, modules, () => {});
     renderAmp(el, modules, () => {});
-    expect(el.querySelectorAll('.amp')).toHaveLength(1);
+    expect(el.querySelectorAll('.amp-head')).toHaveLength(1);
   });
 });
