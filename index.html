@@ -271,13 +271,22 @@
   /* ── Track lane (recording) ─────────────────────────── */
   .track-lane { padding: 14px 20px; background: rgba(0,0,0,0.18); border-bottom: 1px solid rgba(255,255,255,0.04); }
   .track-lane-row {
-    display: flex; align-items: stretch; height: 124px; border-radius: 10px; overflow: hidden;
+    display: flex; align-items: stretch; border-radius: 10px; overflow: hidden;
     border: 1px solid rgba(255,255,255,0.06); box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
   }
+  .track-headers { flex: 0 0 190px; width: 190px; background: var(--surface); border-right: 1px solid rgba(0,0,0,0.4); display: flex; flex-direction: column; }
+  .track-add-row { display: flex; align-items: center; gap: 6px; padding: 0 8px; border-bottom: 1px solid rgba(0,0,0,0.4); background: rgba(0,0,0,0.15); }
+  .track-add { height: 18px; padding: 0 8px; font-size: 10px; font-weight: 700; border-radius: 5px; color: var(--accent); background: rgba(var(--accent-rgb),0.12); border: 1px solid rgba(var(--accent-rgb),0.4); cursor: pointer; }
+  .track-add:hover { filter: brightness(1.1); }
   .track-header {
-    flex: 0 0 190px; width: 190px; background: var(--surface); border-right: 1px solid rgba(0,0,0,0.4);
-    display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 6px; padding: 8px 12px;
+    border-bottom: 1px solid rgba(0,0,0,0.35);
   }
+  .track-header.armed { box-shadow: inset 3px 0 0 var(--red); }
+  .track-ctrl-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .track-remove { width: 20px; height: 20px; padding: 0; font-size: 10px; border-radius: 5px; color: var(--muted); background: transparent; border: 1px solid rgba(255,255,255,0.08); cursor: pointer; }
+  .track-remove:hover { color: var(--red); border-color: rgba(255,69,58,0.4); }
+  .track-rec.on { color: #fff; background: var(--red); border-color: var(--red); }
   .track-head-top { display: flex; align-items: center; gap: 8px; }
   .track-icon { width: 22px; height: 22px; flex: 0 0 22px; display: flex; align-items: center; justify-content: center;
     background: rgba(var(--accent-rgb),0.16); color: var(--accent); border-radius: 5px; font-size: 12px; }
@@ -293,7 +302,9 @@
     background: radial-gradient(circle at 35% 30%, #4a4a50, #1a1a1e); border: 1px solid rgba(0,0,0,0.5); }
 
   .track-timeline { flex: 1; min-width: 0; background: var(--recessed); overflow-x: auto; overflow-y: hidden; }
-  .track-scroll { position: relative; min-width: 100%; width: max-content; height: 100%; }
+  .track-scroll { position: relative; min-width: 100%; width: max-content; }
+  .track-strip { position: relative; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .track-strip.removing { outline: 1px dashed var(--red); outline-offset: -2px; }
   .track-ruler {
     display: flex; height: 22px; border-bottom: 1px solid rgba(255,255,255,0.06);
     background: rgba(255,255,255,0.02);
@@ -302,7 +313,6 @@
     width: 64px; flex: 0 0 64px; font: 10px var(--mono); color: var(--muted);
     display: flex; align-items: center; padding-left: 5px; border-right: 1px solid rgba(255,255,255,0.05);
   }
-  .track-area { position: relative; height: calc(100% - 22px); }
   .track-playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb),0.6); z-index: 6; }
   .playhead-grip { position: absolute; top: 0; left: -5px; width: 11px; height: 9px; cursor: ew-resize;
     background: var(--accent); clip-path: polygon(0 0, 100% 0, 50% 100%); }
@@ -321,7 +331,6 @@
   .track-clip { cursor: grab; }
   .track-clip.dragging { cursor: grabbing; opacity: 0.85; z-index: 5; }
   .track-clip.will-delete { opacity: 0.4; outline: 2px solid var(--red); }
-  .track-area.removing { outline: 1px dashed var(--red); outline-offset: -2px; }
   /* In-progress clip grows in real time; right edge glows red. */
   .recording-clip { border-right: 2px solid var(--red); box-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 10px rgba(255,69,58,0.35); }
   .track-rec.recording, #tp-record.recording { color: #fff; background: var(--red); border-color: var(--red); animation: rec-pulse 1s ease-in-out infinite; }

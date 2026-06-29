@@ -1,6 +1,6 @@
 // src/track-lane.js
-// GarageBand-style track lane: a track header (preset name + inert controls) and
-// a timeline (numbered bar ruler + playhead) holding recorded clips.
+// GarageBand-style multi-track lane: a column of track headers and a column of
+// timeline strips (one per track), sharing a bar ruler and a single playhead.
 import { drawWaveform } from './waveform.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -8,19 +8,21 @@ const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls)
 export const BAR_W = 64;        // px per bar
 export const PX_PER_SEC = 32;   // 1 bar (2s @ 120 BPM 4/4) = 64px → 32 px/sec
 const CLIP_H = 80;              // clip/canvas height in px
+const ROW_H = 124;              // track row height (header + strip)
+const RULER_H = 22;
 const WAVE_COLOR = '#d8daf8';   // light lavender (retained from GarageBand)
 
 // Pointer-drag a clip horizontally to move it; drag it out of the lane to delete.
-function enableClipDrag(clip, take, handlers, getArea) {
+function enableClipDrag(clip, trackId, take, handlers, getStrip) {
   if (!handlers || (!handlers.onMoveClip && !handlers.onDeleteClip)) return;
   let drag = null;
-  const outside = (e) => { const r = getArea().getBoundingClientRect(); return e.clientY < r.top - 30 || e.clientY > r.bottom + 30; };
+  const outside = (e) => { const r = getStrip().getBoundingClientRect(); return e.clientY < r.top - 30 || e.clientY > r.bottom + 30; };
   clip.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     drag = { startX: e.clientX, origLeft: take.x || 0, left: take.x || 0 };
     clip.classList.add('dragging');
     try { clip.setPointerCapture(e.pointerId); } catch {}
-    e.preventDefault();
+    e.preventDefault(); e.stopPropagation();
   });
   clip.addEventListener('pointermove', (e) => {
     if (!drag) return;
@@ -28,85 +30,101 @@ function enableClipDrag(clip, take, handlers, getArea) {
     clip.style.left = `${drag.left}px`;
     const out = outside(e);
     clip.classList.toggle('will-delete', out);
-    getArea().classList.toggle('removing', out);
+    getStrip().classList.toggle('removing', out);
   });
   clip.addEventListener('pointerup', (e) => {
     if (!drag) return;
     const out = outside(e);
-    getArea().classList.remove('removing');
+    getStrip().classList.remove('removing');
     clip.classList.remove('dragging', 'will-delete');
-    if (out && handlers.onDeleteClip) handlers.onDeleteClip(take.n);
-    else if (handlers.onMoveClip) handlers.onMoveClip(take.n, drag.left);
+    if (out && handlers.onDeleteClip) handlers.onDeleteClip(trackId, take.n);
+    else if (handlers.onMoveClip) handlers.onMoveClip(trackId, take.n, drag.left);
     drag = null;
   });
-  clip.addEventListener('pointercancel', () => { drag = null; clip.classList.remove('dragging', 'will-delete'); const a = getArea(); if (a) a.classList.remove('removing'); });
+  clip.addEventListener('pointercancel', () => { drag = null; clip.classList.remove('dragging', 'will-delete'); const s = getStrip(); if (s) s.classList.remove('removing'); });
 }
 
-export function renderTrackLane(container, { presetName, bars = 16, takes = [], onMoveClip, onDeleteClip, snap = true, onToggleSnap } = {}) {
-  container.innerHTML = '';
-  const row = el('div', 'track-lane-row');
-
-  // ── Header ──
-  const header = el('div', 'track-header');
+function trackHeader(track, armedId, h) {
+  const header = el('div', 'track-header' + (track.id === armedId ? ' armed' : ''));
   const top = el('div', 'track-head-top');
-  const icon = el('span', 'track-icon', '▤');
-  const name = el('span', 'track-name');
-  name.textContent = presetName || '—';
-  top.append(icon, name);
+  top.append(el('span', 'track-icon', '▤'), (() => { const n = el('span', 'track-name'); n.textContent = track.name || '—'; return n; })());
 
   const ctrls = el('div', 'track-ctrls');
-  for (const [cls, glyph, label] of [['mute', 'M', 'Mute'], ['monitor', '\u{1F3A7}', 'Monitor'], ['rec', '●', 'Record-enable']]) {
-    const b = el('button', `track-ctrl track-${cls}`);
-    b.type = 'button'; b.disabled = true; b.title = `${label} — available with recording`;
-    b.setAttribute('aria-label', label); b.textContent = glyph;
-    ctrls.appendChild(b);
-  }
-  // Snap-to-grid toggle (functional).
-  const snapBtn = el('button', `track-ctrl snap-toggle${snap ? ' on' : ''}`);
-  snapBtn.id = 'snap-toggle'; snapBtn.type = 'button'; snapBtn.textContent = '▦';
-  snapBtn.title = 'Snap to grid'; snapBtn.setAttribute('aria-label', 'Snap to grid');
-  if (onToggleSnap) snapBtn.addEventListener('click', onToggleSnap);
-  ctrls.appendChild(snapBtn);
+  const mute = el('button', 'track-ctrl track-mute'); mute.type = 'button'; mute.disabled = true; mute.textContent = 'M'; mute.title = 'Mute — coming soon'; mute.setAttribute('aria-label', 'Mute');
+  const mon = el('button', 'track-ctrl track-monitor'); mon.type = 'button'; mon.disabled = true; mon.textContent = '\u{1F3A7}'; mon.title = 'Monitor — coming soon'; mon.setAttribute('aria-label', 'Monitor');
+  const arm = el('button', 'track-ctrl track-rec' + (track.id === armedId ? ' on' : '')); arm.type = 'button'; arm.textContent = '●'; arm.title = 'Record-enable'; arm.setAttribute('aria-label', 'Record-enable');
+  if (h.onArm) arm.addEventListener('click', () => h.onArm(track.id));
+  ctrls.append(mute, mon, arm);
+
+  const rm = el('button', 'track-remove'); rm.type = 'button'; rm.textContent = '✕'; rm.title = 'Remove track'; rm.setAttribute('aria-label', 'Remove track');
+  if (h.onRemoveTrack) rm.addEventListener('click', () => h.onRemoveTrack(track.id));
 
   const mix = el('div', 'track-mix');
   const vol = el('input', 'track-vol'); vol.type = 'range'; vol.min = '0'; vol.max = '1'; vol.step = '0.01'; vol.value = '0.8'; vol.disabled = true; vol.setAttribute('aria-label', 'Track volume');
   const pan = el('span', 'track-pan'); pan.title = 'Pan';
   mix.append(vol, pan);
-  header.append(top, ctrls, mix);
 
-  // ── Timeline ──
+  const ctrlRow = el('div', 'track-ctrl-row');
+  ctrlRow.append(ctrls, rm);
+  header.append(top, ctrlRow, mix);
+  header.style.height = `${h.rowH}px`;
+  return header;
+}
+
+export function renderTrackLane(container, {
+  tracks = [], bars = 16, armedId, snap = true,
+  onAddTrack, onRemoveTrack, onArm, onToggleSnap, onMoveClip, onDeleteClip,
+} = {}) {
+  container.innerHTML = '';
+  const row = el('div', 'track-lane-row');
+  const handlers = { onArm, onRemoveTrack, onMoveClip, onDeleteClip, rowH: ROW_H };
+
+  // ── Headers column ──
+  const headers = el('div', 'track-headers');
+  const addRow = el('div', 'track-add-row');
+  const add = el('button', 'track-add'); add.type = 'button'; add.textContent = '＋ Track'; add.title = 'Add track'; add.setAttribute('aria-label', 'Add track');
+  if (onAddTrack) add.addEventListener('click', onAddTrack);
+  const snapBtn = el('button', `track-ctrl snap-toggle${snap ? ' on' : ''}`); snapBtn.id = 'snap-toggle'; snapBtn.type = 'button'; snapBtn.textContent = '▦'; snapBtn.title = 'Snap to grid'; snapBtn.setAttribute('aria-label', 'Snap to grid');
+  if (onToggleSnap) snapBtn.addEventListener('click', onToggleSnap);
+  addRow.append(add, snapBtn);
+  addRow.style.height = `${RULER_H}px`;
+  headers.appendChild(addRow);
+  for (const t of tracks) headers.appendChild(trackHeader(t, armedId, handlers));
+
+  // ── Timelines column ──
   const timeline = el('div', 'track-timeline');
+  const scroll = el('div', 'track-scroll');
   const ruler = el('div', 'track-ruler');
-  for (let i = 1; i <= bars; i++) {
-    const cell = el('div', 'track-bar');
-    cell.textContent = String(i);
-    ruler.appendChild(cell);
-  }
-  const area = el('div', 'track-area');
+  ruler.style.height = `${RULER_H}px`;
+  for (let i = 1; i <= bars; i++) { const c = el('div', 'track-bar'); c.textContent = String(i); ruler.appendChild(c); }
+  scroll.appendChild(ruler);
 
-  // Recorded clips (purple, lavender waveform), laid by each take's x offset.
-  for (const take of takes) {
-    const w = Math.max(8, Math.round((take.duration || 0) * PX_PER_SEC));
-    const clip = el('div', 'track-clip');
-    clip.dataset.takeId = String(take.n);
-    clip.style.left = `${take.x || 0}px`;
-    clip.style.width = `${w}px`;
-    const lbl = el('div', 'clip-label');
-    lbl.textContent = `${take.name || 'Take'} #${take.n}`;
-    const canvas = el('canvas', 'clip-wave');
-    canvas.width = w; canvas.height = CLIP_H;
-    clip.append(lbl, canvas);
-    area.appendChild(clip);
-    if (take.samples) drawWaveform(canvas, take.samples, { color: WAVE_COLOR });
-    enableClipDrag(clip, take, { onMoveClip, onDeleteClip }, () => area);
+  for (const t of tracks) {
+    const strip = el('div', 'track-strip');
+    strip.dataset.trackId = String(t.id);
+    strip.style.height = `${ROW_H}px`;
+    for (const take of t.takes) {
+      const w = Math.max(8, Math.round((take.duration || 0) * PX_PER_SEC));
+      const clip = el('div', 'track-clip');
+      clip.dataset.trackId = String(t.id);
+      clip.dataset.takeId = String(take.n);
+      clip.style.left = `${take.x || 0}px`;
+      clip.style.width = `${w}px`;
+      const lbl = el('div', 'clip-label'); lbl.textContent = `${take.name || t.name || 'Take'} #${take.n}`;
+      const canvas = el('canvas', 'clip-wave'); canvas.width = w; canvas.height = CLIP_H;
+      clip.append(lbl, canvas);
+      strip.appendChild(clip);
+      if (take.samples) drawWaveform(canvas, take.samples, { color: WAVE_COLOR });
+      enableClipDrag(clip, t.id, take, handlers, () => strip);
+    }
+    scroll.appendChild(strip);
   }
 
   const playhead = el('div', 'track-playhead');
   playhead.appendChild(el('div', 'playhead-grip'));
-  const scroll = el('div', 'track-scroll');
-  scroll.append(ruler, area, playhead);
-  timeline.appendChild(scroll);
+  scroll.appendChild(playhead);
 
-  row.append(header, timeline);
+  timeline.appendChild(scroll);
+  row.append(headers, timeline);
   container.appendChild(row);
 }

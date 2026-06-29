@@ -34,17 +34,21 @@ let pitchBuf, lastNoteMs = 0;
 let prevBars = null;
 let accentRGB = '255,159,10'; // current theme accent for canvas drawing
 
-let takes = [];          // recorded clips on the track lane
-let takeSeq = 0;         // running take number for clip labels
+let tracks = [];         // [{ id, name, armed, takes: [] }]
+let nextTrackId = 1;     // track id source
+let armedId = null;      // the record-armed track
+let takeSeq = 0;         // running take number for clip labels (global)
 let liveRAF = null, liveClip = null; // in-progress (growing) recording clip
 // Tap normGain (post loudness-normalization, pre Vol) so the take matches what
 // you hear and is independent of the master Vol slider.
 const recorder = createRecorder({ getSource: () => normGain, getContext: () => ctx });
 const player = createPlayer();
 
-// x offset (px) where the next clip starts: end of the last take.
-function nextClipX() {
-  return takes.reduce((acc, k) => acc + Math.max(8, Math.round((k.duration || 0) * PX_PER_SEC)), 0);
+const armedTrack = () => tracks.find((t) => t.id === armedId) || null;
+const allTakes = () => tracks.flatMap((t) => t.takes);
+// x offset (px) where the next clip starts in a track: end of its last take.
+function nextClipX(track) {
+  return (track ? track.takes : []).reduce((acc, k) => acc + Math.max(8, Math.round((k.duration || 0) * PX_PER_SEC)), 0);
 }
 let playheadSec = 0;
 // Move the playhead to a time position (seconds) on the track lane.
@@ -55,7 +59,7 @@ function setPlayhead(sec) {
 }
 // Enable play/skip once there is something to play.
 function updateTransport() {
-  const has = takes.length > 0;
+  const has = allTakes().length > 0;
   const play = $('tp-play'), skip = $('tp-start');
   if (play) { play.disabled = !has; play.title = has ? 'Play' : 'Play — record something first'; }
   if (skip) { skip.disabled = !has; skip.title = has ? 'Skip to start' : 'Skip to start'; }
@@ -185,13 +189,33 @@ function snapPx(x) { return snapOn ? Math.round(x / SNAP_PX) * SNAP_PX : x; }
 
 function renderTrack() {
   const el = $('track-lane');
-  if (el) renderTrackLane(el, {
-    presetName: activePresetName,
-    takes,
+  if (!el) return;
+  renderTrackLane(el, {
+    tracks,
+    armedId,
     snap: snapOn,
     onToggleSnap: () => { snapOn = !snapOn; renderTrack(); },
-    onMoveClip: (n, x) => { const t = takes.find((k) => k.n === n); if (t) { t.x = Math.max(0, Math.round(snapPx(x))); renderTrack(); } },
-    onDeleteClip: (n) => { takes = takes.filter((k) => k.n !== n); renderTrack(); updateTransport(); },
+    onAddTrack: () => {
+      const t = { id: nextTrackId++, name: activePresetName || 'Track', armed: true, takes: [] };
+      tracks.forEach((k) => { k.armed = false; });
+      t.armed = true; armedId = t.id; tracks.push(t);
+      renderTrack();
+    },
+    onRemoveTrack: (id) => {
+      tracks = tracks.filter((t) => t.id !== id);
+      if (armedId === id) armedId = tracks.length ? tracks[tracks.length - 1].id : null;
+      tracks.forEach((t) => { t.armed = t.id === armedId; });
+      renderTrack(); updateTransport();
+    },
+    onArm: (id) => { armedId = id; tracks.forEach((t) => { t.armed = t.id === id; }); renderTrack(); },
+    onMoveClip: (trackId, n, x) => {
+      const t = tracks.find((k) => k.id === trackId); const tk = t && t.takes.find((k) => k.n === n);
+      if (tk) { tk.x = Math.max(0, Math.round(snapPx(x))); renderTrack(); }
+    },
+    onDeleteClip: (trackId, n) => {
+      const t = tracks.find((k) => k.id === trackId);
+      if (t) { t.takes = t.takes.filter((k) => k.n !== n); renderTrack(); updateTransport(); }
+    },
   });
 }
 
@@ -569,6 +593,9 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
   if (stored && Array.isArray(stored) && stored.length) loadStoredChain(stored);
   else loadPreset(PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0]);
   renderBrowser();
+  // Start with one armed track named after the active preset.
+  tracks = [{ id: nextTrackId++, name: activePresetName || 'Track', armed: true, takes: [] }];
+  armedId = tracks[0].id;
   renderTrack();
 })();
 
@@ -581,12 +608,14 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
   const recBtn = $('tp-record');
   if (recBtn) recBtn.addEventListener('click', () => {
     if (!ctx) return; // only while live
+    const track = armedTrack();
+    if (!track) return; // need an armed track to record into
     if (recorder.isRecording()) {
       clearLiveClip();
       const t = recorder.stop();
       recBtn.classList.remove('recording');
       if (t && t.samples.length) {
-        takes.push({ ...t, n: ++takeSeq, name: activePresetName, x: nextClipX() });
+        track.takes.push({ ...t, n: ++takeSeq, name: track.name, x: nextClipX(track) });
         renderTrack();
         updateTransport();
       }
@@ -594,14 +623,14 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
       if (player.isPlaying()) { player.stop(); $('tp-play').classList.remove('on'); }
       recorder.start();
       recBtn.classList.add('recording');
-      // Grow a purple clip in real time as the recording proceeds.
-      const area = $('track-lane') && $('track-lane').querySelector('.track-area');
+      // Grow a purple clip in real time in the armed track's strip.
+      const area = $('track-lane') && $('track-lane').querySelector(`.track-strip[data-track-id="${track.id}"]`);
       if (area) {
-        const startT = ctx.currentTime, x = nextClipX();
+        const startT = ctx.currentTime, x = nextClipX(track);
         liveClip = document.createElement('div');
         liveClip.className = 'track-clip recording-clip';
         liveClip.style.cssText = `left:${x}px;top:6px;height:80px;width:0px`;
-        const lbl = document.createElement('div'); lbl.className = 'clip-label'; lbl.textContent = `${activePresetName || 'Take'} #${takeSeq + 1}`;
+        const lbl = document.createElement('div'); lbl.className = 'clip-label'; lbl.textContent = `${track.name || 'Take'} #${takeSeq + 1}`;
         const canvas = document.createElement('canvas'); canvas.className = 'clip-wave'; canvas.height = 80;
         liveClip.append(lbl, canvas);
         area.appendChild(liveClip);
@@ -627,9 +656,10 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
   const playBtn = $('tp-play');
   if (playBtn) playBtn.addEventListener('click', () => {
     if (player.isPlaying()) { player.stop(); playBtn.classList.remove('on'); return; }
-    if (!takes.length) return;
+    const flat = allTakes();
+    if (!flat.length) return;
     playBtn.classList.add('on');
-    player.play(takes, playheadSec, setPlayhead, () => { playBtn.classList.remove('on'); setPlayhead(0); });
+    player.play(flat, playheadSec, setPlayhead, () => { playBtn.classList.remove('on'); setPlayhead(0); });
   });
 
   // Skip to start: stop playback and park the playhead at bar 1.
