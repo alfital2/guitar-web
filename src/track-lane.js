@@ -42,7 +42,7 @@ function enableClipDrag(clip, take, handlers, getArea) {
   clip.addEventListener('pointercancel', () => { drag = null; clip.classList.remove('dragging', 'will-delete'); const a = getArea(); if (a) a.classList.remove('removing'); });
 }
 
-export function renderTrackLane(container, { presetName, bars = 16, takes = [], onMoveClip, onDeleteClip } = {}) {
+export function renderTrackLane(container, { presetName, bars = 16, takes = [], onMoveClip, onDeleteClip, snap = true, onToggleSnap } = {}) {
   container.innerHTML = '';
   const row = el('div', 'track-lane-row');
 
@@ -61,6 +61,12 @@ export function renderTrackLane(container, { presetName, bars = 16, takes = [], 
     b.setAttribute('aria-label', label); b.textContent = glyph;
     ctrls.appendChild(b);
   }
+  // Snap-to-grid toggle (functional).
+  const snapBtn = el('button', `track-ctrl snap-toggle${snap ? ' on' : ''}`);
+  snapBtn.id = 'snap-toggle'; snapBtn.type = 'button'; snapBtn.textContent = '▦';
+  snapBtn.title = 'Snap to grid'; snapBtn.setAttribute('aria-label', 'Snap to grid');
+  if (onToggleSnap) snapBtn.addEventListener('click', onToggleSnap);
+  ctrls.appendChild(snapBtn);
 
   const mix = el('div', 'track-mix');
   const vol = el('input', 'track-vol'); vol.type = 'range'; vol.min = '0'; vol.max = '1'; vol.step = '0.01'; vol.value = '0.8'; vol.disabled = true; vol.setAttribute('aria-label', 'Track volume');
@@ -96,6 +102,7 @@ export function renderTrackLane(container, { presetName, bars = 16, takes = [], 
   }
 
   const playhead = el('div', 'track-playhead');
+  playhead.appendChild(el('div', 'playhead-grip'));
   const scroll = el('div', 'track-scroll');
   scroll.append(ruler, area, playhead);
   timeline.appendChild(scroll);

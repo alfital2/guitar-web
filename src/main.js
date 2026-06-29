@@ -179,12 +179,18 @@ function renderBrowser() {
   if (el) renderPresetBrowser(el, GB_CATEGORIES, loadPreset, activePresetName);
 }
 
+let snapOn = true;
+const SNAP_PX = 16; // one beat (0.5s @ 120 BPM 4/4) at 32 px/sec
+function snapPx(x) { return snapOn ? Math.round(x / SNAP_PX) * SNAP_PX : x; }
+
 function renderTrack() {
   const el = $('track-lane');
   if (el) renderTrackLane(el, {
     presetName: activePresetName,
     takes,
-    onMoveClip: (n, x) => { const t = takes.find((k) => k.n === n); if (t) { t.x = Math.round(x); renderTrack(); } },
+    snap: snapOn,
+    onToggleSnap: () => { snapOn = !snapOn; renderTrack(); },
+    onMoveClip: (n, x) => { const t = takes.find((k) => k.n === n); if (t) { t.x = Math.max(0, Math.round(snapPx(x))); renderTrack(); } },
     onDeleteClip: (n) => { takes = takes.filter((k) => k.n !== n); renderTrack(); updateTransport(); },
   });
 }
@@ -632,17 +638,35 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
     player.stop(); if (playBtn) playBtn.classList.remove('on'); setPlayhead(0);
   });
 
-  // Click an empty part of the timeline to move the playhead (seek). Clicks on a
-  // clip are ignored (clips handle their own drag).
+  // Seek + scrub: click an empty part of the timeline to move the playhead, or
+  // press-drag the ruler / playhead grip to scrub. Snaps to grid when enabled.
+  // Clicks on a clip are ignored (clips handle their own drag).
   const lane = $('track-lane');
-  if (lane) lane.addEventListener('click', (e) => {
-    if (e.target.closest('.track-clip')) return;
+  function seekToClientX(clientX) {
     const tl = lane.querySelector('.track-timeline');
-    if (!tl || !tl.contains(e.target)) return;
-    const x = e.clientX - tl.getBoundingClientRect().left + tl.scrollLeft;
+    if (!tl) return;
+    const x = e_x(clientX, tl);
     player.stop(); playBtn.classList.remove('on');
-    setPlayhead(Math.max(0, x / PX_PER_SEC));
-  });
+    setPlayhead(snapPx(Math.max(0, x)) / PX_PER_SEC);
+  }
+  function e_x(clientX, tl) { return clientX - tl.getBoundingClientRect().left + tl.scrollLeft; }
+  if (lane) {
+    lane.addEventListener('click', (e) => {
+      if (e.target.closest('.track-clip')) return;
+      const tl = lane.querySelector('.track-timeline');
+      if (!tl || !tl.contains(e.target)) return;
+      seekToClientX(e.clientX);
+    });
+    lane.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.track-clip')) return;
+      if (!e.target.closest('.track-ruler') && !e.target.closest('.playhead-grip')) return;
+      seekToClientX(e.clientX);
+      const move = (ev) => seekToClientX(ev.clientX);
+      const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+      window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+      e.preventDefault();
+    });
+  }
 
   updateTransport();
 }

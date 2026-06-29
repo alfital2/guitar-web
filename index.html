@@ -303,7 +303,12 @@
     display: flex; align-items: center; padding-left: 5px; border-right: 1px solid rgba(255,255,255,0.05);
   }
   .track-area { position: relative; height: calc(100% - 22px); }
-  .track-playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb),0.6); }
+  .track-playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb),0.6); z-index: 6; }
+  .playhead-grip { position: absolute; top: 0; left: -5px; width: 11px; height: 9px; cursor: ew-resize;
+    background: var(--accent); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+  .track-ruler { cursor: pointer; }
+  .snap-toggle.on { color: var(--accent); border-color: rgba(var(--accent-rgb),0.5); background: rgba(var(--accent-rgb),0.14); opacity: 1; }
+  .snap-toggle { cursor: pointer; }
 
   /* Recorded clip — GarageBand indigo + lavender waveform (theme-independent). */
   .track-clip {

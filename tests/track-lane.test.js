@@ -62,6 +62,22 @@ describe('renderTrackLane', () => {
     clip.dispatchEvent(new MouseEvent('pointerup', { clientX: 140, clientY: 0, bubbles: true }));
     expect(moves).toEqual([[1, 50]]); // 10 + (140-100)
   });
+  it('renders a snap toggle reflecting state and a playhead grip', () => {
+    const el = document.createElement('div');
+    let toggled = 0;
+    renderTrackLane(el, { presetName: 'P', snap: true, onToggleSnap: () => { toggled++; } });
+    const snap = el.querySelector('.snap-toggle');
+    expect(snap).toBeTruthy();
+    expect(snap.classList.contains('on')).toBe(true);
+    snap.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(toggled).toBe(1);
+    expect(el.querySelector('.track-playhead .playhead-grip')).toBeTruthy();
+  });
+  it('snap toggle is off when snap=false', () => {
+    const el = document.createElement('div');
+    renderTrackLane(el, { presetName: 'P', snap: false });
+    expect(el.querySelector('.snap-toggle').classList.contains('on')).toBe(false);
+  });
   it('dragging a clip out of the lane calls onDeleteClip(n)', () => {
     const el = document.createElement('div');
     const dels = [];
