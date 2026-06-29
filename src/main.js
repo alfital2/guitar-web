@@ -23,6 +23,7 @@ import { renderTrackLane, PX_PER_SEC } from './track-lane.js';
 import { createRecorder } from './recorder.js';
 import { createPlayer } from './player.js';
 import { drawWaveform } from './waveform.js';
+import { cloneTake, splitTakeAt } from './clip-ops.js';
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
@@ -59,6 +60,53 @@ function syncMix() {
   const anySolo = tracks.some((t) => t.solo);
   for (const t of tracks) { player.setTrackGain(t.id, trackGain(t, anySolo)); player.setTrackPan(t.id, t.pan); }
 }
+
+// ── Clip clipboard + ops (right-click menu) ──
+let clipboard = null;
+function copyClip(trackId, n) {
+  const t = tracks.find((k) => k.id === trackId); const tk = t && t.takes.find((k) => k.n === n);
+  if (tk) clipboard = cloneTake(tk);
+}
+function pasteClip(trackId) {
+  if (!clipboard) return;
+  const t = tracks.find((k) => k.id === trackId) || armedTrack();
+  if (!t) return;
+  const x = Math.max(0, Math.round(snapPx(playheadSec * PX_PER_SEC)));
+  t.takes.push({ ...cloneTake(clipboard), n: ++takeSeq, x });
+  renderTrack(); updateTransport();
+}
+function splitClip(trackId, n) {
+  const t = tracks.find((k) => k.id === trackId); if (!t) return;
+  const i = t.takes.findIndex((k) => k.n === n); if (i < 0) return;
+  const tk = t.takes[i];
+  const res = splitTakeAt(tk, playheadSec - (tk.x || 0) / PX_PER_SEC, ++takeSeq, PX_PER_SEC);
+  if (res) { t.takes.splice(i, 1, ...res); renderTrack(); }
+}
+function deleteClip(trackId, n) {
+  const t = tracks.find((k) => k.id === trackId);
+  if (t) { t.takes = t.takes.filter((k) => k.n !== n); renderTrack(); updateTransport(); }
+}
+
+let ctxMenu = null;
+function closeCtxMenu() { if (ctxMenu) { ctxMenu.remove(); ctxMenu = null; } }
+function ctxItem(label, fn, disabled) {
+  const b = document.createElement('button'); b.className = 'ctx-item'; b.textContent = label;
+  if (disabled) b.disabled = true; else b.addEventListener('click', () => { fn(); closeCtxMenu(); });
+  return b;
+}
+function openCtxMenu(x, y, items) {
+  closeCtxMenu();
+  const m = document.createElement('div'); m.className = 'ctx-menu';
+  m.style.left = `${x}px`; m.style.top = `${y}px`;
+  items.forEach((it) => m.appendChild(it));
+  document.body.appendChild(m);
+  // keep it on-screen horizontally
+  const r = m.getBoundingClientRect();
+  if (r.right > window.innerWidth) m.style.left = `${Math.max(4, window.innerWidth - r.width - 4)}px`;
+  ctxMenu = m;
+}
+document.addEventListener('click', closeCtxMenu);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCtxMenu(); });
 // x offset (px) where the next clip starts in a track: end of its last take.
 function nextClipX(track) {
   return (track ? track.takes : []).reduce((acc, k) => acc + Math.max(8, Math.round((k.duration || 0) * PX_PER_SEC)), 0);
@@ -702,6 +750,26 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
       const tl = lane.querySelector('.track-timeline');
       if (!tl || !tl.contains(e.target)) return;
       seekToClientX(e.clientX);
+    });
+    // Right-click: clip → Copy/Paste/Split/Delete; empty strip → Paste.
+    lane.addEventListener('contextmenu', (e) => {
+      const clip = e.target.closest('.track-clip');
+      if (clip && clip.dataset.takeId) {
+        e.preventDefault();
+        const tid = Number(clip.dataset.trackId), n = Number(clip.dataset.takeId);
+        openCtxMenu(e.clientX, e.clientY, [
+          ctxItem('Copy', () => copyClip(tid, n)),
+          ctxItem('Paste at playhead', () => pasteClip(tid), !clipboard),
+          ctxItem('Split at playhead', () => splitClip(tid, n)),
+          ctxItem('Delete', () => deleteClip(tid, n)),
+        ]);
+        return;
+      }
+      const strip = e.target.closest('.track-strip');
+      if (strip && strip.dataset.trackId) {
+        e.preventDefault();
+        openCtxMenu(e.clientX, e.clientY, [ctxItem('Paste at playhead', () => pasteClip(Number(strip.dataset.trackId)), !clipboard)]);
+      }
     });
     lane.addEventListener('pointerdown', (e) => {
       if (e.target.closest('.track-clip')) return;
