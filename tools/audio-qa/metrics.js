@@ -16,7 +16,12 @@ const mean = (a) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
 
 // Analyze a rendered buffer. `inputEndSec` is when the dry input stops; energy
 // after that is the effect tail.
-export function analyze(samples, sampleRate, { inputEndSec = 2, winSec = 0.25 } = {}) {
+// `clipThresh` is the peak level above which we warn. Default 1.05 (true
+// full-scale). When analyzing a loudness-normalized render driven by a
+// high-crest plucked signal, transient peaks legitimately exceed 1.0 (even a
+// bypassed clean chain hits ~1.4), so callers pass a higher value to flag only
+// gross gain-staging blowups rather than normal transients.
+export function analyze(samples, sampleRate, { inputEndSec = 2, winSec = 0.25, clipThresh = 1.05 } = {}) {
   const nonFinite = hasNonFinite(samples);
   const pk = peak(samples);
   const dc = dcOffset(samples);
@@ -46,7 +51,7 @@ export function analyze(samples, sampleRate, { inputEndSec = 2, winSec = 0.25 } 
   if (nonFinite) fail('non-finite samples (NaN/Inf — numerical blowup)');
   if (silent) fail('silent output (no signal)');
   if (growing) fail('runaway feedback (tail energy growing)');
-  if (pk > 1.05) warn(`clipping (peak ${pk.toFixed(2)})`);
+  if (pk > clipThresh) warn(`clipping (peak ${pk.toFixed(2)})`);
   if (!silent && !growing && decayDb > -18) warn(`long tail / endless echo (tail ${decayDb.toFixed(0)} dB ${(inputEndSec + tail.length * winSec).toFixed(1)}s in)`);
   if (Math.abs(dc) > 0.03) warn(`DC offset ${dc.toFixed(3)}`);
 
