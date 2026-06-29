@@ -28,7 +28,6 @@ import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
-import { attachGlassThumb } from './chain-ui/glass-thumb.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
@@ -695,14 +694,13 @@ function paintGain() {
   const pct = ((parseFloat(el.value) - el.min) / (el.max - el.min)) * 100;
   el.style.background = `linear-gradient(90deg, rgba(var(--accent-rgb),0.85) ${pct}%, rgba(255,255,255,0.16) ${pct}%)`;
 }
-const placeGainThumb = attachGlassThumb($('gain'));
 $('gain').addEventListener('input', e => {
   const v = parseFloat(e.target.value);
   if (gainOut) gainOut.gain.value = v;
   const gl = $('gain-label'); if (gl) gl.textContent = v.toFixed(1) + '×';
   paintGain();
 });
-paintGain(); placeGainThumb();
+paintGain();
 $('start').addEventListener('click', start);
 $('stop').addEventListener('click', stop);
 $('calib-save').addEventListener('click', saveCalibration);

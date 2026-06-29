@@ -2,7 +2,6 @@
 // GarageBand-style multi-track lane: a column of track headers and a column of
 // timeline strips (one per track), sharing a bar ruler and a single playhead.
 import { drawWaveform } from './waveform.js';
-import { attachGlassThumb } from './chain-ui/glass-thumb.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 
@@ -82,7 +81,6 @@ function trackHeader(track, armedId, h) {
     pan.addEventListener('dblclick', () => { panDot.style.transform = 'rotate(0deg)'; h.onPan(track.id, 0); });
   }
   mix.append(vol, pan);
-  attachGlassThumb(vol);
 
   const vlabel = el('span', 'mix-label', 'VOL');
   const plabel = el('span', 'mix-label', 'PAN');

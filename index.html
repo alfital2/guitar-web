@@ -186,39 +186,12 @@
   .vol-wrap .vol-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #2e2e36; }
   /* VOL: accent fill (painted in JS) under a translucent glass-bead thumb */
   #gain { -webkit-appearance: none; appearance: none; width: 92px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.16); cursor: pointer; }
-  /* Sliders with a real refracting liquid-glass thumb (see glass-thumb.js): the
-     native thumb is kept full-size as the invisible drag/hit target; the visible
-     glass lozenge is an overlay <span class=glass-thumb> that refracts the track. */
-  .has-glass::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 40px; height: 30px; border-radius: 15px; margin-top: -12px;
-    background: transparent; border: none; box-shadow: none; cursor: pointer; }
-  .has-glass::-moz-range-thumb {
-    width: 40px; height: 30px; border: none; background: transparent; cursor: pointer; }
-  .slider-wrap { position: relative; display: inline-flex; align-items: center; }
-  /* Clear glass lozenge: nearly transparent so you see the level THROUGH it and
-     the bezel refracts the background (kube.io "convex bezel"). The look comes
-     from refraction + a thin rim + a soft specular sheen, not from a dark tint. */
-  .glass-thumb {
-    position: absolute; top: 50%; left: 0; z-index: 3; pointer-events: none; border-radius: 15px; overflow: hidden;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.32);
-    box-shadow: inset 0 1px 1px rgba(255,255,255,0.5), inset 0 -1px 2px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.32);
-    will-change: transform;
-  }
-  /* Specular sheen — a soft lit corner like Apple's glass. */
-  .glass-thumb::before {
-    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-    background: linear-gradient(145deg, rgba(255,255,255,0.5), rgba(255,255,255,0.07) 28%, transparent 52%);
-  }
-  /* The actual lens — Chrome only (html.liquid). Safari keeps the plain lozenge. */
-  html.liquid .glass-thumb { -webkit-backdrop-filter: blur(0.4px); backdrop-filter: url(#glass-thumb) blur(0.4px); }
-  /* During an active drag, drop the per-frame SVG filter (keeps the GPU cool). */
-  .slider-wrap.dragging .glass-thumb {
-    -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(255,255,255,0.1);
-  }
-  .slider-wrap:focus-within .glass-thumb {
-    box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.9), inset 0 1px 1px rgba(255,255,255,0.5), 0 1px 4px rgba(0,0,0,0.32);
-  }
+  /* Simple slider thumb: a clean round handle on the accent-filled track. */
+  #gain::-webkit-slider-thumb, .track-vol::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; margin-top: -5px;
+    background: #fff; border: none; box-shadow: 0 1px 3px rgba(0,0,0,0.5); cursor: pointer; }
+  #gain::-moz-range-thumb, .track-vol::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%; background: #fff; border: none; box-shadow: 0 1px 3px rgba(0,0,0,0.5); cursor: pointer; }
   #gain-label { font: 10px var(--mono); color: #3a3a44; width: 28px; }
   .dot { display: none; }
 
@@ -714,29 +687,21 @@
   }
   html.liquid .preset-browser { border-left: none; border-right: 1px solid rgba(255,255,255,0.16); box-shadow: inset -1px 0 0 rgba(255,255,255,0.3), inset 0 1px 0 rgba(255,255,255,0.16), 0 0 60px rgba(0,0,0,0.55); }
   html.liquid .settings-head { background: rgba(255,255,255,0.05); border-bottom-color: rgba(255,255,255,0.12); }
-  /* Effects window: a clear liquid-glass panel (kube convex-bezel refraction +
-     specular sheen), far more transparent than a frosted slab. */
   html.liquid .fx-modal {
-    background: rgba(26,26,32,0.42);
-    -webkit-backdrop-filter: blur(13px) saturate(1.6);
-    backdrop-filter: url(#liquid-glass) blur(10px) saturate(1.6);
-    border: 1px solid rgba(255,255,255,0.16);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 30px 80px rgba(0,0,0,0.7);
-    overflow: hidden;
+    background: rgba(34,34,40,0.5);
+    -webkit-backdrop-filter: blur(10px) saturate(1.7);
+    backdrop-filter: url(#liquid-glass) blur(8px) saturate(1.7);
+    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -30px 60px rgba(255,255,255,0.04), 0 30px 80px rgba(0,0,0,0.7);
   }
-  html.liquid .fx-modal::before {
-    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
-    background: linear-gradient(158deg, rgba(255,255,255,0.16), rgba(255,255,255,0.03) 20%, transparent 44%);
-  }
-  html.liquid .fx-modal-head, html.liquid .fx-modal-hint, html.liquid .fx-grid { position: relative; z-index: 1; }
   html.liquid .fx-tile {
-    background: rgba(255,255,255,0.045);
-    -webkit-backdrop-filter: blur(6px) saturate(1.3);
-    backdrop-filter: blur(6px) saturate(1.3);
-    border: 1px solid rgba(255,255,255,0.14);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.32), 0 2px 8px rgba(0,0,0,0.28);
+    background: rgba(255,255,255,0.05);
+    -webkit-backdrop-filter: blur(7px);
+    backdrop-filter: blur(7px) saturate(1.4);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25);
   }
-  html.liquid .fx-tile:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.24); }
+  html.liquid .fx-tile:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.22); }
   /* glassy tint on the dim backdrops */
   html.liquid .settings-backdrop { background: rgba(10,10,12,0.4); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
 </style>
@@ -800,7 +765,6 @@
 <!-- Liquid-glass refraction filter (used via backdrop-filter on Chrome only) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <filter id="liquid-glass" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feImage href="data:image/png;base64,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" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="m"/><feDisplacementMap in="SourceGraphic" in2="m" scale="48" xChannelSelector="R" yChannelSelector="G"/></filter>
-  <filter id="glass-thumb" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feImage href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAeCAYAAABe3VzdAAAFVklEQVR42sWYS2tU2RpA1z/wDzhWZyJOxMdE6IE6UHyAqElImyhizEk6VUk9Tuqcqpx6JFXppGJENLFDEhXBBwo+Bg1OfOBExZk6Exw6aH/Bul3kCl5pvKXYcbBmG/bi49vfYxPH2A7VWfz9Lk6/wMl3WP2A8V/tk/2AQ+9w4AX+dhezs+3dy/870FzGpZd47SNeeI3N5zjxGJOHGP/ZPuFDHH6MwXM8+RoPf8TOlxgsf6dgo4nXn+L997j4DGfv4eQNHL+K5SUsLWD8R/sUFjC/hCNXcegG9t3Drme4+z0eeoqp5jcIzi3io7d46wleuoMzl7Exj7XzWD6LY00sTmM81T7RNI42MX8WM+cxNY/9l/H4Hdz/BHe8xd7FNgSXl/HVG7z5AOeuYPMi1mexOoVJA8cmsDSOxRrG1faJalgYx9EJDBuYncL0LAYXsfcKHniAG99gx/JXBBfn8M0rvH0b5xeweQ7rU1ipY1LDUgWLZSwmGI99O1GCURkLFQxrmKtjegqDc9izgPtu4/pX2DX3D4LNBr59hA9u4sI8zsxgvYGVGiYVLCVYLK0QF7+fqLRCIcGwgrkaphvYP4Pd87jrJq57hEHjC8Gn1/HJLbwyh+ea2KhjtYpJgqWW2KdL4h9AS7SIhRKGCWarmKrj6SYencNtt3Dr9c8El5v4/j7euYQXmzhVx1rlC7n4x/O5ZKaCg3U80cS9l3Dtfexo/lfw5RI+W8TLMzhbx3oFK/+y3JeSuQTTFeyr47EZ3LKIm5aQ2Sp+vIb3ZnG+gVNVrCWYrILc55JhCTMJDlaxp4F7ZnHNNeTu7/j6At6YxPM1bCRYKWGpiMV4lQRjLBQxV8JUgqdqeHASN1xAXkzj8yZeHcezZZwYw3JxRTCOV4+WYL6Iw2N4poxHxnFzKwffTeLjCVwqY3MMx0uYrGL0Po9iWMSREgZj2FnG7RPIhyo+THChhNNFrBVxLP45gqMxZoo4UMTuEu78uyHwV4x/xvhHjFOtsSr+uYLZGAdj/DXGX1p18EMWH4a4UMDpCGvRT45ghAMRdhdwZ9jKwSF8PIxLeWyO4ngBk+gn5WCEIwUMRrEzj9uHW694AJ8HeHUEz+ZxYhTLEZaiVX7FEeYjHB7FM3k8MoKbg1Yd/A1fn8QbQ3g+g40QK4UVwVWtgxHmCpgK8VQGDw7hhpOtTpLFj4fxXh/Op3Aqi7UQkwIWVymKUYRhATMhDmaxJ4V7+nDN4U+9uBOfdeHlfpxNYz2HlRBLqyDZkisUMBdiOod9aTzWj1u6cFPnp2kmwPe78c5xvBjgVBprOUz+ZclPcmGImRwOpvFEgHuP49rd2BF8Pg8ewif78UovnguwkcZq9gvJHyUa/a9cNoupNJ4O8GgvbtuPWw99OVGn8O0OfHAAF3pwph/rKaxkMMlhKcRiYYU4+n6iwgqFEMMc5jKYTmF/P3b34K4DuG4HBql/2kl68c1GvL0P57uxeRrrg1hJY5LBUg6LeSz+XUDj0W8nCjHKYyGHYQZzaUwPYnAae7px3z5cvxG7er+21XXgq/V4cxfOHcXmCaz3YXUQkxSODWNpBIsZjLPtE2WwMIKjwximMDuI6T4MTmDvUTywCzeux46OdvbiLny0Dm9tw0t7ceYYNnqwdgrLZ3AswOIAxoPtEw3gaID5M5g5hake7D+Gx/fi/m24Yx32dn3Lz0KA17fi/bW4uAVn9+DkQRw/guVOLHVj/Gv7FLox34kjR3DoIPbtwa4tuHstHtqKqeB7/2Y6cGkTXluDFzZgczNObMdkJ8a/tE+4E4e3Y7AZT27Aw2uwcxMGHV+//z+KcWakyOVTegAAAABJRU5ErkJggg==" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="tm"/><feDisplacementMap in="SourceGraphic" in2="tm" scale="9" xChannelSelector="R" yChannelSelector="G"/></filter>
 </svg>
 <div id="presets-backdrop" class="settings-backdrop" hidden></div>
 <button id="presets-close" class="icon btn-dim presets-close" aria-label="Close presets">✕</button>
