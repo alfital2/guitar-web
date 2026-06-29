@@ -101,12 +101,12 @@ export const FX_KNOB_LAYOUT = {
   rotary: row(76, 134, 3, 38),
   autopan: row(76, 118, 3, 38),
   delay: row(95, 134, 4, 41),
-  'tape-echo': row(114, 150, 5, 44, 34),
+  'tape-echo': row(114, 132, 5, 44, 34),
   pingpong: row(95, 128, 4, 41),
   reverb: row(64, 130, 2, 46),
   widener: [{ x: 54, y: 120, r: 40 }],
   limiter: row(64, 128, 2, 46),
-  pitchshift: row(64, 128, 2, 46),
+  pitchshift: row(64, 150, 2, 46),
   looper: row(64, 128, 2, 46),
   ringmod: row(64, 128, 2, 46),
 };
@@ -133,7 +133,7 @@ const bevel = (w) => `
 const screws = (w, c = 'rgba(0,0,0,.45)') =>
   `<g fill="${c}"><circle cx="16" cy="16" r="4"/><circle cx="${w - 16}" cy="16" r="4"/><circle cx="16" cy="232" r="4"/><circle cx="${w - 16}" cy="232" r="4"/></g>
    <g fill="#fff" fill-opacity=".25"><circle cx="15" cy="15" r="1.2"/><circle cx="${w - 17}" cy="15" r="1.2"/><circle cx="15" cy="231" r="1.2"/><circle cx="${w - 17}" cy="231" r="1.2"/></g>`;
-const texW = (w, fill, filter, op) => `<rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="16" fill="${fill}" filter="url(#${filter})" opacity="${op}"/>`;
+const texW = (w, fill, filter, op) => `<rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="14" fill="${fill}" filter="url(#${filter})" opacity="${op}"/>`;
 const wm = (cx, font, t, size, dark, light, y, ls = 0) => `
   <text x="${cx}" y="${y + 2}" text-anchor="middle" font-family="${font}" font-size="${size}" fill="${dark}" letter-spacing="${ls}">${t}</text>
   <text x="${cx}" y="${y}" text-anchor="middle" font-family="${font}" font-size="${size}" fill="${light}" letter-spacing="${ls}">${t}</text>`;
@@ -148,7 +148,7 @@ function plate(id, o) {
   const font = (FX_FONTS[id] || {}).family || 'sans-serif';
   return `<symbol id="fx-art-${id}" viewBox="0 0 ${w} ${HEIGHT}" preserveAspectRatio="xMidYMid meet">`
     + `${o.defs || ''}`
-    + `<rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="16" fill="${o.body}"/>`
+    + `<rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="14" fill="${o.body}"/>`
     + `${o.bg ? o.bg(w, cx) : ''}`
     + (o.motif ? `<g transform="translate(${shift},0)">${o.motif}</g>` : '')
     + `${o.fg ? o.fg(w, cx) : ''}`
@@ -216,7 +216,7 @@ const AUTOWAH = plate('autowah', {
 const CHORUS = plate('chorus', {
   defs: `<linearGradient id="ch-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc4f2"/><stop offset=".55" stop-color="#bfe3fb"/><stop offset="1" stop-color="#eaf6ff"/></linearGradient><radialGradient id="ch-sun" cx="74%" cy="20%" r="42%"><stop offset="0" stop-color="#fffdf0" stop-opacity=".95"/><stop offset="1" stop-color="#fffdf0" stop-opacity="0"/></radialGradient>`,
   body: 'url(#ch-sky)', screw: '#5aa6d8',
-  bg: (w) => texW(w, '#fff', 'nz-cloud', .9) + `<rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="16" fill="url(#ch-sun)"/>`,
+  bg: (w) => texW(w, '#fff', 'nz-cloud', .9) + `<rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="14" fill="url(#ch-sun)"/>`,
   motif: `<g fill="none" stroke-linecap="round"><path d="M30 116 q 16 -14 32 0 t 32 0 t 32 0" stroke="#5aa6d8" stroke-width="4" opacity=".5"/><path d="M30 124 q 16 -14 32 0 t 32 0 t 32 0" stroke="#3f86c4" stroke-width="5"/></g>`,
   word: (cx, f) => wm(cx, f, 'CHORUS', 24, '#1f4e7a', '#dff0ff', 198) + tag(cx, 'RATE · DEPTH · MIX', '#2b6196', 216),
 });
@@ -315,7 +315,7 @@ const REVERB = plate('reverb', {
 const WIDENER = plate('widener', {
   defs: `<linearGradient id="wi-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b1f26"/><stop offset="1" stop-color="#0a0c10"/></linearGradient><radialGradient id="wi-g" cx="50%" cy="42%" r="60%"><stop offset="0" stop-color="#39d3ff" stop-opacity=".4"/><stop offset="1" stop-color="#39d3ff" stop-opacity="0"/></radialGradient>`,
   body: 'url(#wi-b)', grain: .15, screw: '#04222b',
-  bg: (w) => `<rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="16" fill="url(#wi-g)"/>`,
+  bg: (w) => `<rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="14" fill="url(#wi-g)"/>`,
   motif: `<line x1="88" y1="46" x2="88" y2="150" stroke="#39d3ff" stroke-width="4" stroke-linecap="round"/>
     <g fill="none" stroke="#39d3ff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M70 82 L54 100 L70 118"/><path d="M52 82 L36 100 L52 118" opacity=".55"/><path d="M106 82 L122 100 L106 118"/><path d="M124 82 L140 100 L124 118" opacity=".55"/></g>`,
   word: (cx, f) => wm(cx, f, 'WIDENER', 18, '#04222b', '#c8f5ff', 200, .5) + tag(cx, 'WIDTH · MIX', '#39d3ff', 218),
@@ -333,10 +333,10 @@ const LIMITER = plate('limiter', {
 const PITCHSHIFT = plate('pitchshift', {
   defs: `<linearGradient id="ps-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f5f5a"/><stop offset="1" stop-color="#062f2c"/></linearGradient><radialGradient id="ps-g" cx="50%" cy="40%" r="60%"><stop offset="0" stop-color="#33e0c8" stop-opacity=".35"/><stop offset="1" stop-color="#33e0c8" stop-opacity="0"/></radialGradient>`,
   body: 'url(#ps-b)', grain: .1, screw: '#04201d',
-  bg: (w) => `<rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="16" fill="url(#ps-g)"/>`,
-  motif: `<g fill="#9af6e6">${[0, 1, 2, 3].map((i) => `<rect x="${42 + i * 24}" y="${130 - i * 22}" width="22" height="11" rx="2"/>`).join('')}</g>
-    <path d="M136 64 L136 44 M128 52 L136 40 L144 52" fill="none" stroke="#33e0c8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M52 140 L52 160 M44 152 L52 164 L60 152" fill="none" stroke="#33e0c8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`,
+  bg: (w) => `<rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="14" fill="url(#ps-g)"/>`,
+  motif: `<g fill="#9af6e6">${[0, 1, 2, 3].map((i) => `<rect x="${44 + i * 22}" y="${112 - i * 20}" width="20" height="10" rx="2"/>`).join('')}</g>
+    <path d="M132 60 L132 40 M124 48 L132 36 L140 48" fill="none" stroke="#33e0c8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M44 40 L44 60 M36 48 L44 64 L52 48" fill="none" stroke="#33e0c8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`,
   word: (cx, f) => wm(cx, f, 'PITCH', 24, '#04201d', '#c7fff5', 200, 1) + tag(cx, 'SHIFT · MIX', '#33e0c8', 218),
 });
 

@@ -125,14 +125,29 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
   el.append(svg, valEl, labelEl);
 
   // Tooltip showing the knob's name, surfaced only while the user is tuning it
-  // (drag / wheel / keyboard) or focusing it — no permanent on-pedal clutter.
-  const tip = document.createElement('div');
-  tip.className = 'knob-tip'; tip.textContent = label; tip.setAttribute('aria-hidden', 'true');
-  el.appendChild(tip);
+  // (drag / wheel / keyboard / hover). A single body-level element is used so it
+  // is never clipped by the pedal's rounded overflow, even at the board edges.
   let hideT = null;
-  const showTip = () => { if (hideT) { clearTimeout(hideT); hideT = null; } el.classList.add('tip-on'); };
-  const hideTip = () => { if (hideT) { clearTimeout(hideT); hideT = null; } el.classList.remove('tip-on'); };
-  const tipFade = (ms = 750) => { if (hideT) clearTimeout(hideT); hideT = setTimeout(() => el.classList.remove('tip-on'), ms); };
+  const sharedTip = () => {
+    let t = document.getElementById('knob-tip');
+    if (!t) { t = document.createElement('div'); t.id = 'knob-tip'; t.className = 'knob-tip'; document.body.appendChild(t); }
+    return t;
+  };
+  const showTip = () => {
+    if (hideT) { clearTimeout(hideT); hideT = null; }
+    const t = sharedTip();
+    t.textContent = label; t._owner = el;
+    const r = el.getBoundingClientRect();
+    t.style.left = `${r.left + r.width / 2}px`;
+    t.style.top = `${r.top}px`;
+    t.classList.add('on');
+  };
+  const hideTip = () => {
+    if (hideT) { clearTimeout(hideT); hideT = null; }
+    const t = document.getElementById('knob-tip');
+    if (t && t._owner === el) t.classList.remove('on');
+  };
+  const tipFade = (ms = 750) => { if (hideT) clearTimeout(hideT); hideT = setTimeout(hideTip, ms); };
 
   function paint() {
     const ang = valueToAngle(current, min, max);
