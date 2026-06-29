@@ -1,38 +1,67 @@
 // src/preset-browser.js
-// Right-hand patch browser: GarageBand presets grouped by category. Clicking a
-// row loads that patch's chain via onSelect.
+// GarageBand-style patch library: a category column (Clean / Crunch) on the
+// left, the selected category's patch names on the right, plus a search box.
+// Clicking a patch loads it via onSelect.
+let viewCat = null;   // category id currently shown in the patch column
+let search = '';      // current search term
+
 export function renderPresetBrowser(container, categories, onSelect, activeName) {
+  // Default the viewed category to the active patch's category (so loading a
+  // patch reveals its list), else the first category.
+  if (viewCat == null || !categories.some((c) => c.id === viewCat)) {
+    const activeCat = categories.find((c) => c.presets.some((p) => p.name === activeName));
+    viewCat = activeCat ? activeCat.id : categories[0].id;
+  }
   container.innerHTML = '';
-  const head = document.createElement('div');
-  head.className = 'pb-head';
-  head.textContent = 'Patches';
-  container.appendChild(head);
 
+  const searchWrap = document.createElement('div');
+  searchWrap.className = 'pb-search';
+  const input = document.createElement('input');
+  input.type = 'search'; input.placeholder = 'Search Sounds'; input.value = search;
+  searchWrap.appendChild(input);
+
+  const split = document.createElement('div'); split.className = 'pb-split';
+  const catsCol = document.createElement('div'); catsCol.className = 'pb-cats';
+  const patchesCol = document.createElement('div'); patchesCol.className = 'pb-patches';
+
+  const catRows = new Map();
   for (const cat of categories) {
-    const group = document.createElement('div');
-    group.className = 'pb-group';
-    const label = document.createElement('div');
-    label.className = 'pb-group-label';
-    label.textContent = cat.label;
-    const list = document.createElement('div');
-    list.className = 'pb-list';
+    const row = document.createElement('button');
+    row.type = 'button'; row.className = 'pb-cat';
+    const label = document.createElement('span'); label.className = 'pb-cat-label'; label.textContent = cat.label;
+    const chev = document.createElement('span'); chev.className = 'pb-chev'; chev.textContent = '›';
+    row.append(label, chev);
+    row.addEventListener('click', () => { viewCat = cat.id; paintCats(); paintPatches(); });
+    catRows.set(cat.id, row);
+    catsCol.appendChild(row);
+  }
 
-    for (const preset of cat.presets) {
+  function paintCats() {
+    for (const [id, row] of catRows) row.classList.toggle('active', id === viewCat);
+  }
+  function paintPatches() {
+    patchesCol.innerHTML = '';
+    const cat = categories.find((c) => c.id === viewCat);
+    const term = search.trim().toLowerCase();
+    const items = cat.presets.filter((p) => !term
+      || p.name.toLowerCase().includes(term) || (p.song || '').toLowerCase().includes(term));
+    if (!items.length) {
+      const empty = document.createElement('div'); empty.className = 'pb-empty'; empty.textContent = 'No matches';
+      patchesCol.appendChild(empty); return;
+    }
+    for (const preset of items) {
       const row = document.createElement('button');
       row.type = 'button';
-      row.className = 'pb-row' + (preset.name === activeName ? ' active' : '');
-      row.dataset.preset = preset.name;
-      const name = document.createElement('span');
-      name.className = 'pb-name';
-      name.textContent = preset.name;
-      const desc = document.createElement('span');
-      desc.className = 'pb-desc';
-      desc.textContent = preset.song || '';
-      row.append(name, desc);
+      row.className = 'pb-patch' + (preset.name === activeName ? ' active' : '');
+      row.textContent = preset.name; row.title = preset.song || '';
       row.addEventListener('click', () => onSelect(preset));
-      list.appendChild(row);
+      patchesCol.appendChild(row);
     }
-    group.append(label, list);
-    container.appendChild(group);
   }
+  input.addEventListener('input', () => { search = input.value; paintPatches(); });
+
+  split.append(catsCol, patchesCol);
+  container.append(searchWrap, split);
+  paintCats();
+  paintPatches();
 }

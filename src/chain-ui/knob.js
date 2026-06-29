@@ -95,7 +95,10 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
   }
 
   const track = svgEl('path', { class: 'knob-track', d: arcPath(C, C, RTR, -135, 135), fill: 'none', stroke: 'rgba(255,255,255,0.06)', 'stroke-width': '3.5', 'stroke-linecap': 'round' });
-  const arc = svgEl('path', { class: 'knob-arc', fill: 'none', stroke: accent, 'stroke-width': '3.5', 'stroke-linecap': 'round', filter: `url(#${uid}-g)` });
+  // Arc: pedals tint inline via style.accent; amp/theme arcs stay CSS-driven
+  // (main themes .knob-arc by CSS), so only set an inline stroke when given one.
+  const arc = svgEl('path', { class: 'knob-arc', fill: 'none', 'stroke-width': '3.5', 'stroke-linecap': 'round', filter: `url(#${uid}-g)` });
+  if (style.accent) arc.setAttribute('stroke', accent);
 
   // Cap. 'round' = circular cap + a pointer line; 'chicken' = a rotating
   // chicken-head cap whose beak is the indicator (vintage vibe).
