@@ -167,6 +167,10 @@ let normSig = null;      // last-measured chain structure signature
 const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
 const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
 
+// Liquid-glass surfaces use `backdrop-filter: url(#svg-filter)` for refraction,
+// which Safari doesn't support — enable only off Safari (gated by html.liquid).
+if (!isSafari) document.documentElement.classList.add('liquid');
+
 $('safari-warn').style.display = hasSetSinkId ? 'none' : 'block';
 
 // The artist chain is fed by the calibration EQ (source -> calibrationEq -> engine).
