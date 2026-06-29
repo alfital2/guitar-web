@@ -38,7 +38,7 @@ function enableClipDrag(clip, trackId, take, handlers, getStrip) {
     getStrip().classList.remove('removing');
     clip.classList.remove('dragging', 'will-delete');
     if (out && handlers.onDeleteClip) handlers.onDeleteClip(trackId, take.n);
-    else if (handlers.onMoveClip) handlers.onMoveClip(trackId, take.n, drag.left);
+    else if (handlers.onMoveClip) handlers.onMoveClip(trackId, take.n, drag.left, e.ctrlKey);
     drag = null;
   });
   clip.addEventListener('pointercancel', () => { drag = null; clip.classList.remove('dragging', 'will-delete'); const s = getStrip(); if (s) s.classList.remove('removing'); });
@@ -79,9 +79,12 @@ function trackHeader(track, armedId, h) {
   }
   mix.append(vol, pan);
 
-  const ctrlRow = el('div', 'track-ctrl-row');
-  ctrlRow.append(ctrls, rm);
-  header.append(top, ctrlRow, mix);
+  const vlabel = el('span', 'mix-label', 'VOL');
+  const plabel = el('span', 'mix-label', 'PAN');
+  mix.insertBefore(vlabel, mix.firstChild);
+  mix.insertBefore(plabel, pan);
+
+  header.append(rm, top, ctrls, mix);
   header.style.height = `${h.rowH}px`;
   return header;
 }

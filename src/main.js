@@ -23,7 +23,7 @@ import { renderTrackLane, PX_PER_SEC } from './track-lane.js';
 import { createRecorder } from './recorder.js';
 import { createPlayer } from './player.js';
 import { drawWaveform } from './waveform.js';
-import { cloneTake, splitTakeAt } from './clip-ops.js';
+import { cloneTake, splitTakeAt, resolveNoOverlap } from './clip-ops.js';
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
@@ -94,7 +94,8 @@ function pasteClip(trackId) {
   const t = tracks.find((k) => k.id === trackId) || armedTrack();
   if (!t) return;
   pushUndo();
-  const x = Math.max(0, Math.round(snapPx(playheadSec * PX_PER_SEC)));
+  const w = clipWidth(clipboard);
+  const x = Math.max(0, Math.round(resolveNoOverlap(t.takes.map((k) => ({ x: k.x, w: clipWidth(k) })), snapPx(playheadSec * PX_PER_SEC), w)));
   t.takes.push({ ...cloneTake(clipboard), n: ++takeSeq, x });
   renderTrack(); updateTransport();
 }
@@ -269,7 +270,10 @@ function renderBrowser() {
 
 let snapOn = true;
 const SNAP_PX = 16; // one beat (0.5s @ 120 BPM 4/4) at 32 px/sec
-function snapPx(x) { return snapOn ? Math.round(x / SNAP_PX) * SNAP_PX : x; }
+// Hold Ctrl to bypass snapping entirely (free, sub-pixel-precise placement).
+function snapPx(x, free) { return (snapOn && !free) ? Math.round(x / SNAP_PX) * SNAP_PX : x; }
+const clipWidth = (tk) => Math.max(8, Math.round((tk.duration || 0) * PX_PER_SEC));
+const occupiedExcept = (track, n) => track.takes.filter((k) => k.n !== n).map((k) => ({ x: k.x, w: clipWidth(k) }));
 
 function renderTrack() {
   const el = $('track-lane');
@@ -298,9 +302,9 @@ function renderTrack() {
       renderTrack(); updateTransport();
     },
     onArm: (id) => { armedId = id; tracks.forEach((t) => { t.armed = t.id === id; }); renderTrack(); },
-    onMoveClip: (trackId, n, x) => {
+    onMoveClip: (trackId, n, x, free) => {
       const t = tracks.find((k) => k.id === trackId); const tk = t && t.takes.find((k) => k.n === n);
-      if (tk) { pushUndo(); tk.x = Math.max(0, Math.round(snapPx(x))); renderTrack(); }
+      if (tk) { pushUndo(); tk.x = Math.max(0, Math.round(resolveNoOverlap(occupiedExcept(t, n), snapPx(x, free), clipWidth(tk)))); renderTrack(); }
     },
     onDeleteClip: (trackId, n) => {
       const t = tracks.find((k) => k.id === trackId);
@@ -762,12 +766,12 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
   // press-drag the ruler / playhead grip to scrub. Snaps to grid when enabled.
   // Clicks on a clip are ignored (clips handle their own drag).
   const lane = $('track-lane');
-  function seekToClientX(clientX) {
+  function seekToClientX(clientX, free) {
     const tl = lane.querySelector('.track-timeline');
     if (!tl) return;
     const x = e_x(clientX, tl);
     player.stop(); playBtn.classList.remove('on');
-    setPlayhead(snapPx(Math.max(0, x)) / PX_PER_SEC);
+    setPlayhead(snapPx(Math.max(0, x), free) / PX_PER_SEC);
   }
   function e_x(clientX, tl) { return clientX - tl.getBoundingClientRect().left + tl.scrollLeft; }
   if (lane) {
@@ -775,7 +779,7 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
       if (e.target.closest('.track-clip')) return;
       const tl = lane.querySelector('.track-timeline');
       if (!tl || !tl.contains(e.target)) return;
-      seekToClientX(e.clientX);
+      seekToClientX(e.clientX, e.ctrlKey);
     });
     // Right-click: clip → Copy/Paste/Split/Delete; empty strip → Paste.
     lane.addEventListener('contextmenu', (e) => {
@@ -800,8 +804,8 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
     lane.addEventListener('pointerdown', (e) => {
       if (e.target.closest('.track-clip')) return;
       if (!e.target.closest('.track-ruler') && !e.target.closest('.playhead-grip')) return;
-      seekToClientX(e.clientX);
-      const move = (ev) => seekToClientX(ev.clientX);
+      seekToClientX(e.clientX, e.ctrlKey);
+      const move = (ev) => seekToClientX(ev.clientX, ev.ctrlKey);
       const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
       window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
       e.preventDefault();

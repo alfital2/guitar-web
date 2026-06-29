@@ -94,12 +94,12 @@ describe('renderTrackLane (multi-track)', () => {
   it('drag-move calls onMoveClip(trackId, takeId, origLeft+dx)', () => {
     const el = document.createElement('div');
     const moves = [];
-    renderTrackLane(el, { tracks: tracks(), armedId: 1, onMoveClip: (tid, n, x) => moves.push([tid, n, x]) });
+    renderTrackLane(el, { tracks: tracks(), armedId: 1, onMoveClip: (tid, n, x, free) => moves.push([tid, n, x, free]) });
     const clip = el.querySelector('.track-clip');
     clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 100, clientY: 0, bubbles: true }));
     clip.dispatchEvent(new MouseEvent('pointermove', { clientX: 140, clientY: 0, bubbles: true }));
     clip.dispatchEvent(new MouseEvent('pointerup', { clientX: 140, clientY: 0, bubbles: true }));
-    expect(moves).toEqual([[1, 1, 50]]);
+    expect(moves).toEqual([[1, 1, 50, false]]);
   });
   it('drag-out calls onDeleteClip(trackId, takeId)', () => {
     const el = document.createElement('div');

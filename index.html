@@ -279,31 +279,45 @@
   .track-add { height: 18px; padding: 0 8px; font-size: 10px; font-weight: 700; border-radius: 5px; color: var(--accent); background: rgba(var(--accent-rgb),0.12); border: 1px solid rgba(var(--accent-rgb),0.4); cursor: pointer; }
   .track-add:hover { filter: brightness(1.1); }
   .track-header {
-    display: flex; flex-direction: column; gap: 6px; padding: 8px 12px;
-    border-bottom: 1px solid rgba(0,0,0,0.35);
+    position: relative; display: flex; flex-direction: column; gap: 9px; padding: 11px 13px 12px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0) 60%);
+    border-bottom: 1px solid rgba(0,0,0,0.4); box-shadow: inset 3px 0 0 rgba(255,255,255,0.07);
   }
   .track-header.armed { box-shadow: inset 3px 0 0 var(--red); }
-  .track-ctrl-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-  .track-remove { width: 20px; height: 20px; padding: 0; font-size: 10px; border-radius: 5px; color: var(--muted); background: transparent; border: 1px solid rgba(255,255,255,0.08); cursor: pointer; }
-  .track-remove:hover { color: var(--red); border-color: rgba(255,69,58,0.4); }
-  .track-rec.on { color: #fff; background: var(--red); border-color: var(--red); }
-  .track-ctrl:not(:disabled) { cursor: pointer; }
-  .track-mute.on { color: #120900; background: var(--yellow); border-color: var(--yellow); }
-  .track-solo.on { color: #001a0a; background: var(--green); border-color: var(--green); }
-  .track-head-top { display: flex; align-items: center; gap: 8px; }
-  .track-icon { width: 22px; height: 22px; flex: 0 0 22px; display: flex; align-items: center; justify-content: center;
-    background: rgba(var(--accent-rgb),0.16); color: var(--accent); border-radius: 5px; font-size: 12px; }
-  .track-name { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track-head-top { display: flex; align-items: center; gap: 9px; }
+  .track-icon { width: 24px; height: 24px; flex: 0 0 24px; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, rgba(var(--accent-rgb),0.28), rgba(var(--accent-rgb),0.12)); color: var(--accent);
+    border: 1px solid rgba(var(--accent-rgb),0.35); border-radius: 6px; font-size: 12px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.12); }
+  .track-name { font-size: 14px; font-weight: 700; letter-spacing: 0.01em; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track-remove { position: absolute; top: 9px; right: 9px; width: 18px; height: 18px; padding: 0; font-size: 9px; line-height: 1;
+    border-radius: 5px; color: var(--muted); background: transparent; border: none; cursor: pointer; opacity: 0; transition: opacity .12s, color .12s; }
+  .track-header:hover .track-remove { opacity: 1; }
+  .track-remove:hover { color: var(--red); background: rgba(255,69,58,0.12); }
+
+  /* Channel-strip control buttons */
   .track-ctrls { display: flex; gap: 5px; }
-  .track-ctrl { width: 24px; height: 22px; padding: 0; font-size: 10px; font-weight: 700; border-radius: 5px;
-    color: var(--text-secondary); background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
-  .track-ctrl:disabled { opacity: 0.5; cursor: not-allowed; }
-  .track-rec { color: var(--red); }
-  .track-mix { display: flex; align-items: center; gap: 10px; margin-top: auto; }
-  .track-vol { flex: 1; height: 3px; accent-color: var(--accent); }
-  .track-pan { position: relative; width: 18px; height: 18px; flex: 0 0 18px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #4a4a50, #1a1a1e); border: 1px solid rgba(0,0,0,0.5); cursor: ew-resize; touch-action: none; }
-  .track-pan-dot { position: absolute; top: 1px; left: 50%; width: 2px; height: 7px; margin-left: -1px; background: var(--accent); border-radius: 1px; transform-origin: 50% 8px; }
+  .track-ctrl { width: 26px; height: 22px; padding: 0; font-size: 10px; font-weight: 800; letter-spacing: 0.02em; border-radius: 6px;
+    color: var(--text-secondary); background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.09); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); transition: background .12s, color .12s, box-shadow .12s; }
+  .track-ctrl:not(:disabled) { cursor: pointer; }
+  .track-ctrl:not(:disabled):hover { color: var(--text); border-color: rgba(255,255,255,0.16); }
+  .track-ctrl:disabled { opacity: 0.4; cursor: not-allowed; }
+  .track-rec { color: rgba(255,69,58,0.85); }
+  .track-rec.on { color: #fff; background: var(--red); border-color: var(--red); box-shadow: 0 0 8px rgba(255,69,58,0.5); }
+  .track-mute.on { color: #120900; background: var(--yellow); border-color: var(--yellow); box-shadow: 0 0 7px rgba(255,214,10,0.4); }
+  .track-solo.on { color: #001a0a; background: var(--green); border-color: var(--green); box-shadow: 0 0 7px rgba(50,215,75,0.4); }
+
+  /* Fader + pan row */
+  .track-mix { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 8px; margin-top: auto; }
+  .mix-label { font-size: 8px; font-weight: 800; letter-spacing: 0.1em; color: var(--very-muted); }
+  .track-vol { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.12); }
+  .track-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffce80, var(--accent)); border: 1px solid rgba(0,0,0,0.4); box-shadow: 0 1px 3px rgba(0,0,0,0.5); cursor: pointer; }
+  .track-vol::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: var(--accent); border: 1px solid rgba(0,0,0,0.4); cursor: pointer; }
+  .track-pan { position: relative; width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 28%, #56565e, #1a1a1e); border: 1px solid rgba(0,0,0,0.6);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 1px 2px rgba(0,0,0,0.5); cursor: ew-resize; touch-action: none; }
+  .track-pan-dot { position: absolute; top: 2px; left: 50%; width: 2px; height: 8px; margin-left: -1px; background: var(--accent); border-radius: 1px; transform-origin: 50% 9px; box-shadow: 0 0 3px rgba(var(--accent-rgb),0.6); }
 
   .track-timeline { flex: 1; min-width: 0; background: var(--recessed); overflow-x: auto; overflow-y: hidden; }
   .track-scroll { position: relative; min-width: 100%; width: max-content; }
