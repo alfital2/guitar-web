@@ -103,10 +103,12 @@
   .metro-bpm-lbl { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; color: var(--muted); }
   .metro-bpm-input { width: 44px; font: 600 13px var(--mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-hi); border-radius: 6px; padding: 3px 5px; }
 
-  .tuner { display: flex; align-items: center; gap: 10px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.08); }
+  .tuner { position: relative; display: flex; align-items: center; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.08); }
   .tuner-toggle { height: 28px; padding: 0 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; border-radius: 6px; }
   .tuner-toggle.on { color: var(--accent); border-color: rgba(var(--accent-rgb),0.5); background: rgba(var(--accent-rgb),0.12); }
-  .tuner-strip { display: flex; align-items: center; gap: 10px; }
+  /* The strip floats out to the right of the button (absolute, out of flow) so
+     opening the tuner extends rightward instead of resizing the centered row. */
+  .tuner-strip { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 12px; display: flex; align-items: center; gap: 10px; }
   .tuner-strip[hidden] { display: none; }
   .tuner-note { font: 800 16px var(--mono); color: var(--green); flex: 0 0 42px; width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
   .tuner-meter { position: relative; width: 140px; height: 16px; background: rgba(255,255,255,0.04); border-radius: 8px; overflow: hidden; flex: 0 0 140px; }
