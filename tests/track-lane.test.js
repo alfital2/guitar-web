@@ -38,4 +38,17 @@ describe('renderTrackLane', () => {
     expect(el.querySelectorAll('.track-header')).toHaveLength(1);
     expect(el.querySelector('.track-name').textContent).toBe('B');
   });
+  it('renders a clip per take with label and canvas', () => {
+    const el = document.createElement('div');
+    const takes = [
+      { n: 1, name: 'Echo Studio', duration: 4, x: 0, samples: new Float32Array(8) },
+      { n: 2, name: 'Echo Studio', duration: 2, x: 128, samples: new Float32Array(4) },
+    ];
+    renderTrackLane(el, { presetName: 'Echo Studio', takes });
+    const clips = [...el.querySelectorAll('.track-clip')];
+    expect(clips).toHaveLength(2);
+    expect(clips[0].querySelector('.clip-label').textContent).toBe('Echo Studio #1');
+    expect(clips[1].querySelector('.clip-label').textContent).toBe('Echo Studio #2');
+    expect(clips[0].querySelector('canvas.clip-wave')).toBeTruthy();
+  });
 });

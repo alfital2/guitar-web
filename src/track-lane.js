@@ -1,17 +1,23 @@
 // src/track-lane.js
-// Step 1: GarageBand-style track lane scaffold — a track header (preset name +
-// inert controls) and an empty timeline (numbered bar ruler + playhead). No
-// audio yet; later steps add capture, waveform clips, and playback.
+// GarageBand-style track lane: a track header (preset name + inert controls) and
+// a timeline (numbered bar ruler + playhead) holding recorded clips.
+import { drawWaveform } from './waveform.js';
+
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 
-export function renderTrackLane(container, { presetName, bars = 16 } = {}) {
+export const BAR_W = 64;        // px per bar
+export const PX_PER_SEC = 32;   // 1 bar (2s @ 120 BPM 4/4) = 64px → 32 px/sec
+const CLIP_H = 80;              // clip/canvas height in px
+const WAVE_COLOR = '#d8daf8';   // light lavender (retained from GarageBand)
+
+export function renderTrackLane(container, { presetName, bars = 16, takes = [] } = {}) {
   container.innerHTML = '';
   const row = el('div', 'track-lane-row');
 
   // ── Header ──
   const header = el('div', 'track-header');
   const top = el('div', 'track-head-top');
-  const icon = el('span', 'track-icon', '▤'); // small amp-ish glyph
+  const icon = el('span', 'track-icon', '▤');
   const name = el('span', 'track-name');
   name.textContent = presetName || '—';
   top.append(icon, name);
@@ -28,7 +34,6 @@ export function renderTrackLane(container, { presetName, bars = 16 } = {}) {
   const vol = el('input', 'track-vol'); vol.type = 'range'; vol.min = '0'; vol.max = '1'; vol.step = '0.01'; vol.value = '0.8'; vol.disabled = true; vol.setAttribute('aria-label', 'Track volume');
   const pan = el('span', 'track-pan'); pan.title = 'Pan';
   mix.append(vol, pan);
-
   header.append(top, ctrls, mix);
 
   // ── Timeline ──
@@ -40,6 +45,22 @@ export function renderTrackLane(container, { presetName, bars = 16 } = {}) {
     ruler.appendChild(cell);
   }
   const area = el('div', 'track-area');
+
+  // Recorded clips (purple, lavender waveform), laid by each take's x offset.
+  for (const take of takes) {
+    const w = Math.max(8, Math.round((take.duration || 0) * PX_PER_SEC));
+    const clip = el('div', 'track-clip');
+    clip.style.left = `${take.x || 0}px`;
+    clip.style.width = `${w}px`;
+    const lbl = el('div', 'clip-label');
+    lbl.textContent = `${take.name || 'Take'} #${take.n}`;
+    const canvas = el('canvas', 'clip-wave');
+    canvas.width = w; canvas.height = CLIP_H;
+    clip.append(lbl, canvas);
+    area.appendChild(clip);
+    if (take.samples) drawWaveform(canvas, take.samples, { color: WAVE_COLOR });
+  }
+
   const playhead = el('div', 'track-playhead');
   const scroll = el('div', 'track-scroll');
   scroll.append(ruler, area, playhead);

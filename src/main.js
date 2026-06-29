@@ -19,7 +19,8 @@ import { renderProfileCard } from './profile-card/ui.js';
 import { spectrumBars } from './spectrum.js';
 import { measureLoudnessGain } from './normalize.js';
 import { mountTransport } from './transport-ui.js';
-import { renderTrackLane } from './track-lane.js';
+import { renderTrackLane, PX_PER_SEC } from './track-lane.js';
+import { createRecorder } from './recorder.js';
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
@@ -31,6 +32,9 @@ let pitchBuf, lastNoteMs = 0;
 let prevBars = null;
 let accentRGB = '255,159,10'; // current theme accent for canvas drawing
 
+let takes = [];          // recorded clips on the track lane
+let takeSeq = 0;         // running take number for clip labels
+const recorder = createRecorder({ getSource: () => engine && engine.output, getContext: () => ctx });
 let currentChain = [];   // array of units (chain-state model) — source of truth
 let nextId = 1;          // monotonic instanceId source
 let normTimer = null;    // debounce handle for loudness re-measure
@@ -147,7 +151,7 @@ function renderBrowser() {
 
 function renderTrack() {
   const el = $('track-lane');
-  if (el) renderTrackLane(el, { presetName: activePresetName });
+  if (el) renderTrackLane(el, { presetName: activePresetName, takes });
 }
 
 // Restore a persisted chain (array of {type, params}) into the model.
@@ -437,6 +441,7 @@ async function start() {
     setTimeout(showStats, 600);
 
     $('start').disabled = true; $('stop').disabled = false;
+    { const r = $('tp-record'); if (r) { r.disabled = false; r.title = 'Record'; } }
     $('status').textContent = 'Live — play your guitar'; $('status').classList.add('live'); $('status-dot').classList.add('live');
     listDevices();
   } catch (e) {
@@ -447,6 +452,8 @@ async function start() {
 
 function stop() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  if (recorder.isRecording()) recorder.stop();
+  { const r = $('tp-record'); if (r) { r.disabled = true; r.classList.remove('recording'); r.title = 'Record — available with recording'; } }
   stopCalibration();
   $('meter').style.width = '0%';
   { const c = $('note-circle'); if (c) { c.textContent = '—'; c.classList.remove('active'); } }
@@ -525,3 +532,23 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
 // Toolbar transport cluster: inert transport (ground for recording) + working
 // metronome and tuner. The tuner taps the live engine analyser when running.
 mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
+
+// Record: capture the live processed output into a take, append it as a clip.
+{
+  const recBtn = $('tp-record');
+  if (recBtn) recBtn.addEventListener('click', () => {
+    if (!ctx) return; // only while live
+    if (recorder.isRecording()) {
+      const t = recorder.stop();
+      recBtn.classList.remove('recording');
+      if (t && t.samples.length) {
+        const x = takes.reduce((acc, k) => acc + Math.max(8, Math.round((k.duration || 0) * PX_PER_SEC)), 0);
+        takes.push({ ...t, n: ++takeSeq, name: activePresetName, x });
+        renderTrack();
+      }
+    } else {
+      recorder.start();
+      recBtn.classList.add('recording');
+    }
+  });
+}
