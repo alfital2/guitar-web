@@ -13,7 +13,7 @@
 // (no filter) and only pay for the lens while the thumb is at rest. The thumb is
 // moved with transform (compositor-only) and repaints are rAF-coalesced.
 
-export function attachGlassThumb(input, { width = 36, height = 26 } = {}) {
+export function attachGlassThumb(input, { width = 40, height = 30 } = {}) {
   if (!input || input.dataset.glass) return () => {};
   input.dataset.glass = '1';
   input.classList.add('has-glass');
