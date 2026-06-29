@@ -177,7 +177,12 @@ function renderBrowser() {
 
 function renderTrack() {
   const el = $('track-lane');
-  if (el) renderTrackLane(el, { presetName: activePresetName, takes });
+  if (el) renderTrackLane(el, {
+    presetName: activePresetName,
+    takes,
+    onMoveClip: (n, x) => { const t = takes.find((k) => k.n === n); if (t) { t.x = Math.round(x); renderTrack(); } },
+    onDeleteClip: (n) => { takes = takes.filter((k) => k.n !== n); renderTrack(); updateTransport(); },
+  });
 }
 
 // Restore a persisted chain (array of {type, params}) into the model.

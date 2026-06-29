@@ -50,5 +50,26 @@ describe('renderTrackLane', () => {
     expect(clips[0].querySelector('.clip-label').textContent).toBe('Echo Studio #1');
     expect(clips[1].querySelector('.clip-label').textContent).toBe('Echo Studio #2');
     expect(clips[0].querySelector('canvas.clip-wave')).toBeTruthy();
+    expect(clips[0].dataset.takeId).toBe('1');
+  });
+  it('dragging a clip horizontally calls onMoveClip(n, origLeft+dx)', () => {
+    const el = document.createElement('div');
+    const moves = [];
+    renderTrackLane(el, { presetName: 'P', takes: [{ n: 1, name: 'P', duration: 2, x: 10, samples: new Float32Array(4) }], onMoveClip: (n, x) => moves.push([n, x]) });
+    const clip = el.querySelector('.track-clip');
+    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 100, clientY: 0, bubbles: true }));
+    clip.dispatchEvent(new MouseEvent('pointermove', { clientX: 140, clientY: 0, bubbles: true }));
+    clip.dispatchEvent(new MouseEvent('pointerup', { clientX: 140, clientY: 0, bubbles: true }));
+    expect(moves).toEqual([[1, 50]]); // 10 + (140-100)
+  });
+  it('dragging a clip out of the lane calls onDeleteClip(n)', () => {
+    const el = document.createElement('div');
+    const dels = [];
+    renderTrackLane(el, { presetName: 'P', takes: [{ n: 2, name: 'P', duration: 1, x: 0, samples: new Float32Array(2) }], onDeleteClip: (n) => dels.push(n) });
+    const clip = el.querySelector('.track-clip');
+    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 0, clientY: 0, bubbles: true }));
+    clip.dispatchEvent(new MouseEvent('pointermove', { clientX: 0, clientY: -100, bubbles: true }));
+    clip.dispatchEvent(new MouseEvent('pointerup', { clientX: 0, clientY: -100, bubbles: true }));
+    expect(dels).toEqual([2]);
   });
 });

@@ -10,7 +10,39 @@ export const PX_PER_SEC = 32;   // 1 bar (2s @ 120 BPM 4/4) = 64px → 32 px/sec
 const CLIP_H = 80;              // clip/canvas height in px
 const WAVE_COLOR = '#d8daf8';   // light lavender (retained from GarageBand)
 
-export function renderTrackLane(container, { presetName, bars = 16, takes = [] } = {}) {
+// Pointer-drag a clip horizontally to move it; drag it out of the lane to delete.
+function enableClipDrag(clip, take, handlers, getArea) {
+  if (!handlers || (!handlers.onMoveClip && !handlers.onDeleteClip)) return;
+  let drag = null;
+  const outside = (e) => { const r = getArea().getBoundingClientRect(); return e.clientY < r.top - 30 || e.clientY > r.bottom + 30; };
+  clip.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    drag = { startX: e.clientX, origLeft: take.x || 0, left: take.x || 0 };
+    clip.classList.add('dragging');
+    try { clip.setPointerCapture(e.pointerId); } catch {}
+    e.preventDefault();
+  });
+  clip.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    drag.left = Math.max(0, drag.origLeft + (e.clientX - drag.startX));
+    clip.style.left = `${drag.left}px`;
+    const out = outside(e);
+    clip.classList.toggle('will-delete', out);
+    getArea().classList.toggle('removing', out);
+  });
+  clip.addEventListener('pointerup', (e) => {
+    if (!drag) return;
+    const out = outside(e);
+    getArea().classList.remove('removing');
+    clip.classList.remove('dragging', 'will-delete');
+    if (out && handlers.onDeleteClip) handlers.onDeleteClip(take.n);
+    else if (handlers.onMoveClip) handlers.onMoveClip(take.n, drag.left);
+    drag = null;
+  });
+  clip.addEventListener('pointercancel', () => { drag = null; clip.classList.remove('dragging', 'will-delete'); const a = getArea(); if (a) a.classList.remove('removing'); });
+}
+
+export function renderTrackLane(container, { presetName, bars = 16, takes = [], onMoveClip, onDeleteClip } = {}) {
   container.innerHTML = '';
   const row = el('div', 'track-lane-row');
 
@@ -50,6 +82,7 @@ export function renderTrackLane(container, { presetName, bars = 16, takes = [] }
   for (const take of takes) {
     const w = Math.max(8, Math.round((take.duration || 0) * PX_PER_SEC));
     const clip = el('div', 'track-clip');
+    clip.dataset.takeId = String(take.n);
     clip.style.left = `${take.x || 0}px`;
     clip.style.width = `${w}px`;
     const lbl = el('div', 'clip-label');
@@ -59,6 +92,7 @@ export function renderTrackLane(container, { presetName, bars = 16, takes = [] }
     clip.append(lbl, canvas);
     area.appendChild(clip);
     if (take.samples) drawWaveform(canvas, take.samples, { color: WAVE_COLOR });
+    enableClipDrag(clip, take, { onMoveClip, onDeleteClip }, () => area);
   }
 
   const playhead = el('div', 'track-playhead');
