@@ -46,10 +46,12 @@ const player = createPlayer();
 function nextClipX() {
   return takes.reduce((acc, k) => acc + Math.max(8, Math.round((k.duration || 0) * PX_PER_SEC)), 0);
 }
+let playheadSec = 0;
 // Move the playhead to a time position (seconds) on the track lane.
 function setPlayhead(sec) {
+  playheadSec = Math.max(0, sec || 0);
   const ph = $('track-lane') && $('track-lane').querySelector('.track-playhead');
-  if (ph) ph.style.left = `${(sec || 0) * PX_PER_SEC}px`;
+  if (ph) ph.style.left = `${playheadSec * PX_PER_SEC}px`;
 }
 // Enable play/skip once there is something to play.
 function updateTransport() {
@@ -621,13 +623,25 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
     if (player.isPlaying()) { player.stop(); playBtn.classList.remove('on'); return; }
     if (!takes.length) return;
     playBtn.classList.add('on');
-    player.play(takes, setPlayhead, () => { playBtn.classList.remove('on'); setPlayhead(0); });
+    player.play(takes, playheadSec, setPlayhead, () => { playBtn.classList.remove('on'); setPlayhead(0); });
   });
 
   // Skip to start: stop playback and park the playhead at bar 1.
   const skipBtn = $('tp-start');
   if (skipBtn) skipBtn.addEventListener('click', () => {
     player.stop(); if (playBtn) playBtn.classList.remove('on'); setPlayhead(0);
+  });
+
+  // Click an empty part of the timeline to move the playhead (seek). Clicks on a
+  // clip are ignored (clips handle their own drag).
+  const lane = $('track-lane');
+  if (lane) lane.addEventListener('click', (e) => {
+    if (e.target.closest('.track-clip')) return;
+    const tl = lane.querySelector('.track-timeline');
+    if (!tl || !tl.contains(e.target)) return;
+    const x = e.clientX - tl.getBoundingClientRect().left + tl.scrollLeft;
+    player.stop(); playBtn.classList.remove('on');
+    setPlayhead(Math.max(0, x / PX_PER_SEC));
   });
 
   updateTransport();

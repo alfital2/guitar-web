@@ -13,28 +13,32 @@ export function playbackDuration(takes) {
 export function createPlayer() {
   let ctx = null, sources = [], playing = false, raf = null;
 
-  function play(takes, onTick, onEnd) {
+  function play(takes, fromSec = 0, onTick, onEnd) {
     if (playing || !AC) return;
     const dur = playbackDuration(takes);
-    if (dur <= 0) return;
+    if (dur <= 0 || fromSec >= dur) return;
     if (!ctx) ctx = new AC();
     if (ctx.state === 'suspended') ctx.resume();
     const t0 = ctx.currentTime + 0.06;
     sources = [];
     for (const tk of takes) {
       if (!tk.samples || !tk.samples.length) continue;
+      const start = (tk.x || 0) / PX_PER_SEC;
+      const end = start + (tk.duration || 0);
+      if (end <= fromSec) continue; // already finished before the playhead
       const buf = ctx.createBuffer(1, tk.samples.length, tk.sampleRate);
       if (buf.copyToChannel) buf.copyToChannel(tk.samples, 0); else buf.getChannelData(0).set(tk.samples);
       const s = ctx.createBufferSource();
       s.buffer = buf; s.connect(ctx.destination);
-      s.start(t0 + (tk.x || 0) / PX_PER_SEC);
+      const rel = start - fromSec;
+      if (rel >= 0) s.start(t0 + rel); else s.start(t0, -rel); // start partway into the buffer
       sources.push(s);
     }
     playing = true;
     const tick = () => {
-      const elapsed = ctx.currentTime - t0;
-      if (elapsed >= dur) { stop(); if (onEnd) onEnd(); return; }
-      if (onTick) onTick(Math.max(0, elapsed));
+      const pos = fromSec + (ctx.currentTime - t0);
+      if (pos >= dur) { stop(); if (onEnd) onEnd(); return; }
+      if (onTick) onTick(Math.max(0, pos));
       raf = requestAnimationFrame(tick);
     };
     tick();
