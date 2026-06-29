@@ -313,6 +313,8 @@
   }
   .clip-label { font: 10px var(--font); color: rgba(255,255,255,0.92); padding: 2px 6px; background: rgba(0,0,0,0.14); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .clip-wave { display: block; }
+  /* In-progress clip grows in real time; right edge glows red. */
+  .recording-clip { border-right: 2px solid var(--red); box-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 10px rgba(255,69,58,0.35); }
   .track-rec.recording, #tp-record.recording { color: #fff; background: var(--red); border-color: var(--red); animation: rec-pulse 1s ease-in-out infinite; }
   @keyframes rec-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,69,58,0.6); } 50% { box-shadow: 0 0 0 3px rgba(255,69,58,0); } }
 

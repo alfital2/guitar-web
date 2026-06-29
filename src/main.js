@@ -34,7 +34,18 @@ let accentRGB = '255,159,10'; // current theme accent for canvas drawing
 
 let takes = [];          // recorded clips on the track lane
 let takeSeq = 0;         // running take number for clip labels
+let liveRAF = null, liveClip = null; // in-progress (growing) recording clip
 const recorder = createRecorder({ getSource: () => engine && engine.output, getContext: () => ctx });
+
+// x offset (px) where the next clip starts: end of the last take.
+function nextClipX() {
+  return takes.reduce((acc, k) => acc + Math.max(8, Math.round((k.duration || 0) * PX_PER_SEC)), 0);
+}
+// Remove the growing in-progress clip (on stop or teardown).
+function clearLiveClip() {
+  if (liveRAF) { cancelAnimationFrame(liveRAF); liveRAF = null; }
+  if (liveClip) { liveClip.remove(); liveClip = null; }
+}
 let currentChain = [];   // array of units (chain-state model) — source of truth
 let nextId = 1;          // monotonic instanceId source
 let normTimer = null;    // debounce handle for loudness re-measure
@@ -453,6 +464,7 @@ async function start() {
 function stop() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   if (recorder.isRecording()) recorder.stop();
+  clearLiveClip();
   { const r = $('tp-record'); if (r) { r.disabled = true; r.classList.remove('recording'); r.title = 'Record — available with recording'; } }
   stopCalibration();
   $('meter').style.width = '0%';
@@ -539,16 +551,27 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
   if (recBtn) recBtn.addEventListener('click', () => {
     if (!ctx) return; // only while live
     if (recorder.isRecording()) {
+      clearLiveClip();
       const t = recorder.stop();
       recBtn.classList.remove('recording');
       if (t && t.samples.length) {
-        const x = takes.reduce((acc, k) => acc + Math.max(8, Math.round((k.duration || 0) * PX_PER_SEC)), 0);
-        takes.push({ ...t, n: ++takeSeq, name: activePresetName, x });
+        takes.push({ ...t, n: ++takeSeq, name: activePresetName, x: nextClipX() });
         renderTrack();
       }
     } else {
       recorder.start();
       recBtn.classList.add('recording');
+      // Grow a purple clip in real time as the recording proceeds.
+      const area = $('track-lane') && $('track-lane').querySelector('.track-area');
+      if (area) {
+        const startT = ctx.currentTime, x = nextClipX();
+        liveClip = document.createElement('div');
+        liveClip.className = 'track-clip recording-clip';
+        liveClip.style.cssText = `left:${x}px;top:6px;height:80px;width:0px`;
+        area.appendChild(liveClip);
+        const grow = () => { if (!liveClip) return; liveClip.style.width = `${Math.max(0, (ctx.currentTime - startT) * PX_PER_SEC)}px`; liveRAF = requestAnimationFrame(grow); };
+        grow();
+      }
     }
   });
 }
