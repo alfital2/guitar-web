@@ -134,6 +134,7 @@ function loadPreset(preset) {
   activePresetName = preset.name;
   rebuildGraph();
   renderBrowser();
+  setPresets(false); // close the drawer after picking (narrow screens)
 }
 
 function renderBrowser() {
@@ -484,7 +485,18 @@ function setSettings(open) {
 $('settings-toggle').addEventListener('click', () => setSettings(!$('settings-panel').classList.contains('open')));
 $('settings-close').addEventListener('click', () => setSettings(false));
 $('settings-backdrop').addEventListener('click', () => setSettings(false));
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setSettings(false); });
+
+// Presets slide-in drawer (narrow screens) — mirrors the settings drawer.
+function setPresets(open) {
+  document.body.classList.toggle('presets-open', open);
+  const bd = $('presets-backdrop');
+  if (open) { bd.hidden = false; requestAnimationFrame(() => bd.classList.add('open')); }
+  else { bd.classList.remove('open'); setTimeout(() => { bd.hidden = true; }, 220); }
+}
+$('presets-toggle').addEventListener('click', () => setPresets(!document.body.classList.contains('presets-open')));
+$('presets-close').addEventListener('click', () => setPresets(false));
+$('presets-backdrop').addEventListener('click', () => setPresets(false));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { setSettings(false); setPresets(false); } });
 $('diag').textContent = `${isSafari ? 'Safari' : 'Chrome'} · setSinkId: ${hasSetSinkId ? 'yes' : 'no'}`;
 
 // Read the theme accent once for canvas drawing (the spectrum).

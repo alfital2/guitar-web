@@ -354,12 +354,24 @@
     .amp-group { padding: 14px 8px 9px; }
     .amp-group-knobs { gap: 9px; }
   }
-  /* Stack the library above the workspace on narrow screens. */
-  @media (max-width: 1040px) {
-    .window { flex-direction: column; }
-    .preset-browser { width: 100%; flex: 0 0 auto; max-height: 38vh; border-right: none; border-bottom: 1px solid rgba(0,0,0,0.35); }
-    .pb-patches { overflow-y: auto; }
+  /* Preset library: a persistent left sidebar on wide screens; on narrow screens
+     it becomes a slide-in drawer (like Settings), opened from the toolbar. */
+  .presets-toggle { display: none; font-size: 11px; padding: 6px 11px; }
+  .presets-close { position: fixed; top: 11px; left: min(300px, calc(86vw - 40px)); z-index: 60; display: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .preset-browser { transition: transform .3s cubic-bezier(.2,.85,.25,1); }
   }
+  @media (max-width: 1040px) {
+    .presets-toggle { display: inline-flex; }
+    .preset-browser {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 50; width: min(340px, 86vw); flex: none; max-height: none;
+      transform: translateX(-100%); border-right: 1px solid rgba(0,0,0,0.5); box-shadow: 8px 0 40px rgba(0,0,0,0.6);
+    }
+    body.presets-open .preset-browser { transform: translateX(0); }
+    body.presets-open .presets-close { display: inline-flex; }
+  }
+  /* On wide screens the library is a static sidebar — never show drawer chrome. */
+  @media (min-width: 1041px) { #presets-backdrop, .presets-close { display: none !important; } }
   /* Phone: tighten paddings, let the effects chain scroll horizontally. */
   @media (max-width: 680px) {
     .toolbar { padding: 9px 12px; gap: 8px; }
@@ -496,6 +508,7 @@
   <aside id="preset-browser" class="preset-browser" aria-label="Patches"></aside>
   <div class="window-main">
   <div class="toolbar">
+    <button id="presets-toggle" class="icon btn-dim presets-toggle" title="Presets" aria-label="Open presets">☰ Presets</button>
     <div class="title">Guitar Studio</div>
     <div class="toolbar-actions">
       <div id="presets"></div>
@@ -544,6 +557,8 @@
   </div>
 </div>
 
+<div id="presets-backdrop" class="settings-backdrop" hidden></div>
+<button id="presets-close" class="icon btn-dim presets-close" aria-label="Close presets">✕</button>
 <div id="settings-backdrop" class="settings-backdrop" hidden></div>
 <aside id="settings-panel" class="settings-panel" aria-label="Settings">
   <div class="settings-head">
