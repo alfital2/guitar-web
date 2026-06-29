@@ -185,7 +185,8 @@
   .amp-corner-bl { bottom: 7px; left: 7px; border-radius: 0 9px 0 11px; } .amp-corner-bl::after { right: 6px; top: 6px; }
   .amp-corner-br { bottom: 7px; right: 7px; border-radius: 9px 0 11px 0; } .amp-corner-br::after { left: 6px; top: 6px; }
   .amp-panel {
-    position: relative; display: flex; align-items: stretch; justify-content: center; margin: 10px 16px 14px; padding: 8px 12px; border-radius: 8px;
+    position: relative; display: flex; flex-wrap: wrap; align-items: stretch; justify-content: center; gap: 8px 2px;
+    margin: 10px 16px 14px; padding: 8px 12px; border-radius: 8px;
     background:
       repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, rgba(0,0,0,0.045) 1px 2px),
       linear-gradient(180deg, #dadce0 0%, #b8bbc1 46%, #9c9fa5 54%, #c4c7cd 100%);
@@ -347,9 +348,10 @@
   .pb-patch:hover { background: rgba(255,255,255,0.06); }
   .pb-patch.active { background: rgba(255,255,255,0.14); font-weight: 600; color: #fff; }
   .pb-empty { padding: 12px; font-size: 12px; color: rgba(255,255,255,0.4); font-style: italic; }
-  /* Tighten amp spacing on smaller widths so the knob rows stay together longer. */
-  @media (max-width: 1320px) {
-    .amp-group { padding: 13px 6px 9px; }
+  /* Tighten amp spacing on smaller widths so the knob rows stay together longer,
+     then let the groups wrap rather than overflow the enclosure. */
+  @media (max-width: 1180px) {
+    .amp-group { padding: 14px 8px 9px; }
     .amp-group-knobs { gap: 9px; }
   }
   /* Stack the library above the workspace on narrow screens. */
