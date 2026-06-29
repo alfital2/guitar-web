@@ -27,6 +27,8 @@ const COLORS = {
   limiter: '#0a84ff',
   pitchshift: '#ff2d55',
   looper: '#34c759',
+  autopan: '#00c7be',
+  rotary: '#a2845e',
 };
 
 // Pedal (addable) types and their display labels. Amp types (drive/eq/cabinet)
@@ -37,7 +39,8 @@ const PEDAL_TYPES = [
   ['fuzz', 'Fuzz'], ['octave', 'Octave Fuzz'],
   ['wah', 'Wah'], ['autowah', 'Auto-Wah'],
   ['chorus', 'Chorus'], ['flanger', 'Flanger'], ['phaser', 'Phaser'],
-  ['tremolo', 'Tremolo'], ['vibrato', 'Vibrato'], ['ringmod', 'Ring Mod'],
+  ['tremolo', 'Tremolo'], ['vibrato', 'Vibrato'], ['autopan', 'Auto-Pan'],
+  ['rotary', 'Rotary'], ['ringmod', 'Ring Mod'],
   ['delay', 'Delay'], ['tape-echo', 'Tape Echo'], ['pingpong', 'Ping-Pong'],
   ['reverb', 'Reverb'], ['widener', 'Widener'], ['limiter', 'Limiter'],
   ['pitchshift', 'Pitch Shift'], ['looper', 'Looper'],
