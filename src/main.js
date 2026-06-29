@@ -61,6 +61,28 @@ function syncMix() {
   for (const t of tracks) { player.setTrackGain(t.id, trackGain(t, anySolo)); player.setTrackPan(t.id, t.pan); }
 }
 
+// ── Undo / redo (snapshots of the tracks model) ──
+// Sample buffers are immutable (ops create new arrays), so snapshots copy the
+// structure but share the Float32Arrays — cheap and safe.
+let undoStack = [], redoStack = [];
+function snapshot() {
+  return { tracks: tracks.map((t) => ({ ...t, takes: t.takes.map((k) => ({ ...k })) })), armedId, takeSeq, nextTrackId };
+}
+function restore(s) {
+  tracks = s.tracks.map((t) => ({ ...t, takes: t.takes.map((k) => ({ ...k })) }));
+  armedId = s.armedId; takeSeq = s.takeSeq; nextTrackId = s.nextTrackId;
+  renderTrack(); updateTransport();
+}
+function pushUndo() { undoStack.push(snapshot()); if (undoStack.length > 60) undoStack.shift(); redoStack = []; }
+function undo() { if (!undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); }
+function redo() { if (!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); }
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
+  if (/^(INPUT|TEXTAREA)$/.test((e.target.tagName || ''))) return; // don't hijack text fields
+  e.preventDefault();
+  if (e.shiftKey) redo(); else undo();
+});
+
 // ── Clip clipboard + ops (right-click menu) ──
 let clipboard = null;
 function copyClip(trackId, n) {
@@ -71,6 +93,7 @@ function pasteClip(trackId) {
   if (!clipboard) return;
   const t = tracks.find((k) => k.id === trackId) || armedTrack();
   if (!t) return;
+  pushUndo();
   const x = Math.max(0, Math.round(snapPx(playheadSec * PX_PER_SEC)));
   t.takes.push({ ...cloneTake(clipboard), n: ++takeSeq, x });
   renderTrack(); updateTransport();
@@ -79,12 +102,12 @@ function splitClip(trackId, n) {
   const t = tracks.find((k) => k.id === trackId); if (!t) return;
   const i = t.takes.findIndex((k) => k.n === n); if (i < 0) return;
   const tk = t.takes[i];
-  const res = splitTakeAt(tk, playheadSec - (tk.x || 0) / PX_PER_SEC, ++takeSeq, PX_PER_SEC);
-  if (res) { t.takes.splice(i, 1, ...res); renderTrack(); }
+  const res = splitTakeAt(tk, playheadSec - (tk.x || 0) / PX_PER_SEC, takeSeq + 1, PX_PER_SEC);
+  if (res) { pushUndo(); takeSeq++; t.takes.splice(i, 1, ...res); renderTrack(); }
 }
 function deleteClip(trackId, n) {
   const t = tracks.find((k) => k.id === trackId);
-  if (t) { t.takes = t.takes.filter((k) => k.n !== n); renderTrack(); updateTransport(); }
+  if (t) { pushUndo(); t.takes = t.takes.filter((k) => k.n !== n); renderTrack(); updateTransport(); }
 }
 
 let ctxMenu = null;
@@ -257,16 +280,18 @@ function renderTrack() {
     snap: snapOn,
     onToggleSnap: () => { snapOn = !snapOn; renderTrack(); },
     onAddTrack: () => {
+      pushUndo();
       const t = newTrack(activePresetName);
       tracks.forEach((k) => { k.armed = false; });
       t.armed = true; armedId = t.id; tracks.push(t);
       renderTrack();
     },
-    onMute: (id) => { const t = tracks.find((k) => k.id === id); if (t) { t.mute = !t.mute; syncMix(); renderTrack(); } },
-    onSolo: (id) => { const t = tracks.find((k) => k.id === id); if (t) { t.solo = !t.solo; syncMix(); renderTrack(); } },
+    onMute: (id) => { const t = tracks.find((k) => k.id === id); if (t) { pushUndo(); t.mute = !t.mute; syncMix(); renderTrack(); } },
+    onSolo: (id) => { const t = tracks.find((k) => k.id === id); if (t) { pushUndo(); t.solo = !t.solo; syncMix(); renderTrack(); } },
     onVolume: (id, v) => { const t = tracks.find((k) => k.id === id); if (t) { t.volume = v; if (player.isPlaying()) { const anySolo = tracks.some((k) => k.solo); player.setTrackGain(id, trackGain(t, anySolo)); } } },
     onPan: (id, p) => { const t = tracks.find((k) => k.id === id); if (t) { t.pan = p; if (player.isPlaying()) player.setTrackPan(id, p); } },
     onRemoveTrack: (id) => {
+      pushUndo();
       tracks = tracks.filter((t) => t.id !== id);
       if (armedId === id) armedId = tracks.length ? tracks[tracks.length - 1].id : null;
       tracks.forEach((t) => { t.armed = t.id === armedId; });
@@ -275,11 +300,11 @@ function renderTrack() {
     onArm: (id) => { armedId = id; tracks.forEach((t) => { t.armed = t.id === id; }); renderTrack(); },
     onMoveClip: (trackId, n, x) => {
       const t = tracks.find((k) => k.id === trackId); const tk = t && t.takes.find((k) => k.n === n);
-      if (tk) { tk.x = Math.max(0, Math.round(snapPx(x))); renderTrack(); }
+      if (tk) { pushUndo(); tk.x = Math.max(0, Math.round(snapPx(x))); renderTrack(); }
     },
     onDeleteClip: (trackId, n) => {
       const t = tracks.find((k) => k.id === trackId);
-      if (t) { t.takes = t.takes.filter((k) => k.n !== n); renderTrack(); updateTransport(); }
+      if (t) { pushUndo(); t.takes = t.takes.filter((k) => k.n !== n); renderTrack(); updateTransport(); }
     },
   });
 }
@@ -680,6 +705,7 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
       const t = recorder.stop();
       recBtn.classList.remove('recording');
       if (t && t.samples.length) {
+        pushUndo();
         track.takes.push({ ...t, n: ++takeSeq, name: track.name, x: nextClipX(track) });
         renderTrack();
         updateTransport();
