@@ -31,20 +31,31 @@ describe('renderTrackLane (multi-track)', () => {
     el.querySelector('.track-add').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(added).toBe(1);
   });
-  it('armed track header has .armed and its arm button .on', () => {
+  it('armed track header has .armed (bright box, no arm button)', () => {
     const el = document.createElement('div');
     renderTrackLane(el, { tracks: tracks(), armedId: 2 });
     const headers = el.querySelectorAll('.track-header');
     expect(headers[1].classList.contains('armed')).toBe(true);
-    expect(headers[1].querySelector('.track-rec').classList.contains('on')).toBe(true);
     expect(headers[0].classList.contains('armed')).toBe(false);
+    expect(headers[1].querySelector('.track-rec')).toBeNull(); // arm button removed
   });
-  it('clicking another track arm button calls onArm(id)', () => {
+  it('clicking a track header body calls onArm(id)', () => {
     const el = document.createElement('div');
     const armed = [];
     renderTrackLane(el, { tracks: tracks(), armedId: 1, onArm: (id) => armed.push(id) });
-    el.querySelectorAll('.track-header')[1].querySelector('.track-rec').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    el.querySelectorAll('.track-header')[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(armed).toEqual([2]);
+  });
+  it('clicking the track name enters rename, Enter commits onRename', () => {
+    const el = document.createElement('div');
+    const renamed = [];
+    renderTrackLane(el, { tracks: tracks(), armedId: 1, onRename: (id, name) => renamed.push([id, name]) });
+    el.querySelectorAll('.track-header')[1].querySelector('.track-name').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const inp = el.querySelectorAll('.track-header')[1].querySelector('.track-name-input');
+    expect(inp).toBeTruthy();
+    inp.value = 'Lead';
+    inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(renamed).toEqual([[2, 'Lead']]);
   });
   it('remove button calls onRemoveTrack(id)', () => {
     const el = document.createElement('div');

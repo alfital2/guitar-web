@@ -12,7 +12,7 @@ import { bandPowersFromMagnitudes } from './calibration/bands.js';
 import { createAccumulator, accumulate, fingerprint, coverage } from './calibration/analyzer.js';
 import * as profiles from './calibration/profiles.js';
 import { renderCalibrationControls } from './calibration/ui.js';
-import { autoCorrelate } from './pitch/detector.js';
+import { detectPitchMPM } from './pitch/mpm.js';
 import { freqToNote, noteLabel } from './pitch/note.js';
 import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
@@ -148,6 +148,14 @@ function setPlayhead(sec) {
   if (ph) ph.style.left = `${playheadSec * PX_PER_SEC}px`;
 }
 // Enable play/skip once there is something to play.
+// Reflect playback state on the play button: ▶ when stopped, ⏸ while playing.
+function reflectPlay() {
+  const pb = $('tp-play'); if (!pb) return;
+  const p = player.isPlaying();
+  pb.classList.toggle('on', p);
+  pb.textContent = p ? '⏸' : '▶';
+  pb.title = p ? 'Pause' : 'Play';
+}
 function updateTransport() {
   const has = allTakes().length > 0;
   const play = $('tp-play'), skip = $('tp-start');
@@ -342,6 +350,7 @@ function renderTrack() {
       renderTrack(); updateTransport();
     },
     onArm: (id) => { armedId = id; tracks.forEach((t) => { t.armed = t.id === id; }); renderTrack(); },
+    onRename: (id, name) => { const t = tracks.find((k) => k.id === id); if (t) { pushUndo(); t.name = name; renderTrack(); } },
     onMoveClip: (trackId, n, x, free) => {
       const t = tracks.find((k) => k.id === trackId); const tk = t && t.takes.find((k) => k.n === n);
       if (tk) { pushUndo(); tk.x = Math.max(0, Math.round(resolveNoOverlap(occupiedExcept(t, n), snapPx(x, free), clipWidth(tk)))); renderTrack(); }
@@ -475,13 +484,13 @@ function startMeter() {
       if (v > peak) peak = v;
     }
     $('meter').style.width = Math.min(100, peak / 128 * 100 * 1.5) + '%';
-    // note detection (float time-domain)
+    // note detection — same McLeod Pitch Method the tuner uses.
     analyser.getFloatTimeDomainData(pitchBuf);
-    const f = autoCorrelate(pitchBuf, ctx.sampleRate);
+    const res = detectPitchMPM(pitchBuf, ctx.sampleRate);
     const circle = $('note-circle');
-    if (f > 0) {
+    if (res && res.freq > 0 && res.clarity > 0.9) {
       lastNoteMs = performance.now();
-      circle.textContent = noteLabel(freqToNote(f));
+      circle.textContent = noteLabel(freqToNote(res.freq));
       circle.classList.add('active');
     } else if (performance.now() - lastNoteMs > 1200) {
       // Keep the last note name visible; just dim it once the note has stopped ringing.
@@ -649,7 +658,6 @@ async function start() {
 
     $('start').disabled = true; $('stop').disabled = false;
     { const r = $('tp-record'); if (r) { r.disabled = false; r.title = 'Record'; } }
-    $('status').textContent = 'Live — play your guitar'; $('status').classList.add('live'); $('status-dot').classList.add('live');
     listDevices();
   } catch (e) {
     $('error').textContent = 'Could not start: ' + e.message;
@@ -660,7 +668,7 @@ async function start() {
 function stop() {
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   if (recorder.isRecording()) recorder.stop();
-  if (player.isPlaying()) { player.stop(); const pb = $('tp-play'); if (pb) pb.classList.remove('on'); }
+  if (player.isPlaying()) { player.stop(); reflectPlay(); }
   clearLiveClip();
   { const r = $('tp-record'); if (r) { r.disabled = true; r.classList.remove('recording'); r.title = 'Record — available with recording'; } }
   stopCalibration();
@@ -672,7 +680,6 @@ function stop() {
   $('start').disabled = false; $('stop').disabled = true;
   prevBars = null;
   { const fl = $('freq-label'); if (fl) { fl.textContent = '— Hz'; fl.style.color = ''; } }
-  $('status').textContent = 'Stopped'; $('status').classList.remove('live'); $('status-dot').classList.remove('live');
 }
 
 async function listDevices() {
@@ -688,11 +695,6 @@ async function listDevices() {
   }
 }
 
-$('gain').addEventListener('input', e => {
-  const v = parseFloat(e.target.value);
-  if (gainOut) gainOut.gain.value = v;
-  const gl = $('gain-label'); if (gl) gl.textContent = v.toFixed(1) + '×';
-});
 $('start').addEventListener('click', start);
 $('stop').addEventListener('click', stop);
 $('calib-save').addEventListener('click', saveCalibration);
@@ -755,7 +757,10 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
 
 // Toolbar transport cluster: inert transport (ground for recording) + working
 // metronome and tuner. The tuner taps the live engine analyser when running.
-mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
+mountTransport($('transport-cluster'), {
+  getLiveAnalyser: () => analyser,
+  onGain: (v) => { if (gainOut) gainOut.gain.value = v; },
+});
 
 // Record: capture the live processed output into a take, append it as a clip.
 {
@@ -775,7 +780,7 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
         updateTransport();
       }
     } else {
-      if (player.isPlaying()) { player.stop(); $('tp-play').classList.remove('on'); }
+      if (player.isPlaying()) { player.stop(); reflectPlay(); }
       recorder.start();
       recBtn.classList.add('recording');
       // Grow a purple clip in real time in the armed track's strip.
@@ -810,16 +815,16 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
   // Play / Stop playback of recorded takes; the playhead sweeps the timeline.
   const playBtn = $('tp-play');
   if (playBtn) playBtn.addEventListener('click', () => {
-    if (player.isPlaying()) { player.stop(); playBtn.classList.remove('on'); return; }
+    if (player.isPlaying()) { player.stop(); reflectPlay(); return; }
     if (!allTakes().length) return;
-    playBtn.classList.add('on');
-    player.play(buildGroups(), playheadSec, setPlayhead, () => { playBtn.classList.remove('on'); setPlayhead(0); });
+    player.play(buildGroups(), playheadSec, setPlayhead, () => { reflectPlay(); setPlayhead(0); });
+    reflectPlay();
   });
 
   // Skip to start: stop playback and park the playhead at bar 1.
   const skipBtn = $('tp-start');
   if (skipBtn) skipBtn.addEventListener('click', () => {
-    player.stop(); if (playBtn) playBtn.classList.remove('on'); setPlayhead(0);
+    player.stop(); reflectPlay(); setPlayhead(0);
   });
 
   // Seek + scrub: click an empty part of the timeline to move the playhead, or
@@ -830,7 +835,7 @@ mountTransport($('transport-cluster'), { getLiveAnalyser: () => analyser });
     const tl = lane.querySelector('.track-timeline');
     if (!tl) return;
     const x = e_x(clientX, tl);
-    player.stop(); playBtn.classList.remove('on');
+    player.stop(); reflectPlay();
     setPlayhead(snapPx(Math.max(0, x), free) / PX_PER_SEC);
   }
   function e_x(clientX, tl) { return clientX - tl.getBoundingClientRect().left + tl.scrollLeft; }

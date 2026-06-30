@@ -139,6 +139,10 @@
   .btn-start {
     background: var(--accent); border: none; color: #120900; font-weight: 700; padding: 6px 18px;
   }
+  /* Amp-engine power toggle — visually distinct from the play (▶) button. */
+  .btn-power { background: var(--green); border: none; color: #04210d; font-weight: 700; padding: 6px 16px; border-radius: 7px; letter-spacing: 0.02em; }
+  .btn-power-off { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.55); font-weight: 600; padding: 6px 14px; border-radius: 7px; }
+  .btn-power[disabled] { filter: grayscale(0.5) brightness(0.7); }
   .btn-dim {
     background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.35);
   }
@@ -151,7 +155,7 @@
   .hero {
     position: relative; background: var(--recessed); border-bottom: 1px solid rgba(255,255,255,0.055);
   }
-  #spectrum { display: block; width: 100%; height: 180px; }
+  #spectrum { display: block; width: 100%; height: 116px; }
   .hero-badge { position: absolute; top: 12px; left: 14px; display: flex; align-items: center; gap: 6px; }
   .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--very-muted); }
   #guitar-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--very-muted); }
@@ -159,35 +163,27 @@
     position: absolute; top: 12px; right: 14px; font: 700 10px var(--mono); letter-spacing: 0.1em;
     text-transform: uppercase; color: #2a2a30;
   }
-  .hero-strip {
-    position: absolute; bottom: 0; left: 0; right: 0; height: 52px;
-    background: linear-gradient(0deg, rgba(18,18,20,0.96) 0%, rgba(18,18,20,0.7) 70%, transparent 100%);
-    display: flex; align-items: center; gap: 16px; padding: 0 16px;
-  }
-  .note-wrap { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  /* Live note / pitch detector overlay (bottom-left of the spectrum) */
+  .pitch-box { position: absolute; bottom: 10px; left: 14px; display: flex; align-items: center; gap: 8px; }
+  .pitch-cap { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; color: var(--very-muted); }
   .note-circle {
-    width: 36px; height: 36px; border-radius: 8px; background: #050d07;
-    border: 1px solid rgba(48,209,88,0.14); display: flex; align-items: center; justify-content: center;
-    font: 800 15px var(--mono); letter-spacing: -0.03em; color: rgba(48,209,88,0.25);
+    width: 40px; height: 40px; border-radius: 9px; background: #050d07;
+    border: 1px solid rgba(48,209,88,0.16); display: flex; align-items: center; justify-content: center;
+    font: 800 17px var(--mono); letter-spacing: -0.03em; color: rgba(48,209,88,0.3);
   }
-  .note-circle.active { border-color: rgba(48,209,88,0.5); color: rgba(48,209,88,1); }
-  @media (prefers-reduced-motion: no-preference) {
-    .note-circle { transition: color .15s, border-color .15s; }
-  }
-  #status { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--very-muted); }
-  #status.live { color: var(--green); }
-  #latency-display { font: 9px var(--mono); color: #2a2a30; margin-top: 1px; }
-  .meter-wrap { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-  .meter-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #2a2a30; }
-  .meter { height: 4px; background: rgba(255,255,255,0.04); border-radius: 2px; overflow: hidden; }
+  .note-circle.active { border-color: rgba(48,209,88,0.55); color: rgba(48,209,88,1); box-shadow: 0 0 14px rgba(48,209,88,0.35); }
+  @media (prefers-reduced-motion: no-preference) { .note-circle { transition: color .15s, border-color .15s, box-shadow .15s; } }
+  /* Meter bar (toolbar VOL input level + diagnostics) */
+  .meter { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
   .meter-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #30d158 0%, var(--yellow) 72%, var(--red) 100%); border-radius: 2px; }
   @media (prefers-reduced-motion: no-preference) { .meter-fill { transition: width .05s linear; } }
-  .vol-wrap { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-  .vol-wrap .vol-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #2e2e36; }
-  /* VOL: accent fill (painted in JS) under a translucent glass-bead thumb */
-  /* Plain native slider — the browser handles fill + thumb position. */
+  /* Toolbar VOL group: output slider with a live input-level meter under it. */
+  .io-vol { display: flex; align-items: center; gap: 8px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.08); }
+  .io-vol-cap { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); }
+  .io-vol-stack { display: flex; flex-direction: column; gap: 3px; width: 92px; }
+  .io-meter { height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
   #gain { width: 92px; accent-color: var(--accent); cursor: pointer; }
-  #gain-label { font: 10px var(--mono); color: #3a3a44; width: 28px; }
+  #gain-label { font: 10px var(--mono); color: var(--text-secondary); width: 30px; }
   .dot { display: none; }
 
   /* ── Amp head host ──────────────────────────────────── */
@@ -285,7 +281,16 @@
     background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0) 60%);
     border-bottom: 1px solid rgba(0,0,0,0.4); box-shadow: inset 3px 0 0 rgba(255,255,255,0.07);
   }
-  .track-header.armed { box-shadow: inset 3px 0 0 var(--red); }
+  /* Armed/active track: brighten the whole header box (no record-arm button). */
+  .track-header { cursor: pointer; transition: background .12s, box-shadow .12s; }
+  .track-header.armed {
+    background: linear-gradient(180deg, rgba(var(--accent-rgb),0.16), rgba(var(--accent-rgb),0.04) 70%);
+    box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 1px rgba(var(--accent-rgb),0.22);
+  }
+  .track-name-input {
+    font: 700 14px var(--font); color: var(--text); background: var(--surface);
+    border: 1px solid rgba(var(--accent-rgb),0.5); border-radius: 5px; padding: 2px 6px; width: 100%; min-width: 0;
+  }
   .track-head-top { display: flex; align-items: center; gap: 9px; }
   .track-icon { width: 24px; height: 24px; flex: 0 0 24px; display: flex; align-items: center; justify-content: center;
     background: linear-gradient(180deg, rgba(var(--accent-rgb),0.28), rgba(var(--accent-rgb),0.12)); color: var(--accent);
@@ -709,34 +714,20 @@
     <div id="transport-cluster"></div>
     <div class="toolbar-actions">
       <div id="presets"></div>
-      <button id="start" class="btn-start">▶ START</button>
-      <button id="stop" class="btn-dim" disabled>■ STOP</button>
+      <button id="start" class="btn-power" title="Power on the amp engine">⏻ Power</button>
+      <button id="stop" class="btn-power-off" disabled title="Power off">⏻ Off</button>
       <button id="settings-toggle" class="icon btn-dim" aria-label="Settings" title="Settings">⚙</button>
     </div>
   </div>
 
   <section class="hero">
-    <canvas id="spectrum" width="1140" height="180"></canvas>
+    <canvas id="spectrum" width="1140" height="120"></canvas>
     <div class="hero-badge"><span class="dot" style="display:block"></span><div id="guitar-badge">No Guitar</div></div>
     <div id="freq-label">— Hz</div>
-    <div class="hero-strip">
-      <div class="note-wrap">
-        <div id="note-circle" class="note-circle">—</div>
-        <div>
-          <div id="status">Ready</div>
-          <span id="status-dot" class="dot"></span>
-          <div id="latency-display">— ms RT</div>
-        </div>
-      </div>
-      <div class="meter-wrap">
-        <span class="meter-label">Input</span>
-        <div class="meter"><div id="meter" class="meter-fill"></div></div>
-      </div>
-      <div class="vol-wrap">
-        <span class="vol-label">Vol</span>
-        <input id="gain" type="range" min="0" max="2" step="0.01" value="1">
-        <span id="gain-label">1.0×</span>
-      </div>
+    <!-- Live note / pitch detector (uses the tuner's MPM detection) -->
+    <div class="pitch-box" title="Detected note">
+      <div id="note-circle" class="note-circle">—</div>
+      <span class="pitch-cap">NOTE</span>
     </div>
   </section>
 

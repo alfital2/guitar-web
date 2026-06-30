@@ -4,18 +4,27 @@ import { createTuner } from './tuner.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 
-// Inert transport buttons — ground for the coming recording feature.
 const TP = [
-  ['tp-rewind', '⏪', 'Rewind'],
-  ['tp-ffwd', '⏩', 'Fast-forward'],
   ['tp-start', '⏮', 'Skip to start'],
   ['tp-play', '▶', 'Play'],
   ['tp-record', '⏺', 'Record'],
 ];
 
-export function mountTransport(container, { getLiveAnalyser }) {
+export function mountTransport(container, { getLiveAnalyser, onGain }) {
   container.innerHTML = '';
   container.classList.add('transport-cluster');
+
+  // ── Master VOL (output) with a live input-level meter under it ──
+  const volg = el('div', 'io-vol');
+  volg.append(el('span', 'io-vol-cap', 'VOL'));
+  const stack = el('div', 'io-vol-stack');
+  const gain = el('input'); gain.id = 'gain'; gain.type = 'range'; gain.min = '0'; gain.max = '2'; gain.step = '0.01'; gain.value = '1';
+  gain.setAttribute('aria-label', 'Output volume');
+  const meterBox = el('div', 'io-meter'); const meter = el('div', 'meter-fill'); meter.id = 'meter'; meterBox.appendChild(meter);
+  stack.append(gain, meterBox);
+  const gainVal = el('span', 'io-vol-val'); gainVal.id = 'gain-label'; gainVal.textContent = '1.0×';
+  volg.append(stack, gainVal);
+  gain.addEventListener('input', () => { const v = parseFloat(gain.value); gainVal.textContent = v.toFixed(1) + '×'; if (onGain) onGain(v); });
 
   // ── Transport (inert) ──
   const transport = el('div', 'transport');
@@ -94,5 +103,5 @@ export function mountTransport(container, { getLiveAnalyser }) {
   });
   tunerBtn.addEventListener('click', () => { tuner.isOn() ? tuner.stop() : tuner.start(); });
 
-  container.append(transport, metro, tunerWrap);
+  container.append(volg, transport, metro, tunerWrap);
 }

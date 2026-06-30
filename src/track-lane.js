@@ -47,7 +47,16 @@ function enableClipDrag(clip, trackId, take, handlers, getStrip) {
 function trackHeader(track, armedId, h) {
   const header = el('div', 'track-header' + (track.id === armedId ? ' armed' : ''));
   const top = el('div', 'track-head-top');
-  top.append(el('span', 'track-icon', '▤'), (() => { const n = el('span', 'track-name'); n.textContent = track.name || '—'; return n; })());
+  const nameEl = el('span', 'track-name'); nameEl.textContent = track.name || '—'; nameEl.title = 'Click to rename';
+  nameEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const inp = el('input', 'track-name-input'); inp.value = track.name || '';
+    nameEl.replaceWith(inp); inp.focus(); inp.select();
+    const commit = (apply) => { const v = inp.value.trim(); if (apply && v && h.onRename) h.onRename(track.id, v); else inp.replaceWith(nameEl); };
+    inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') commit(true); else if (ev.key === 'Escape') commit(false); });
+    inp.addEventListener('blur', () => commit(true));
+  });
+  top.append(el('span', 'track-icon', '▤'), nameEl);
 
   const ctrls = el('div', 'track-ctrls');
   const mute = el('button', 'track-ctrl track-mute' + (track.mute ? ' on' : '')); mute.type = 'button'; mute.textContent = 'M'; mute.title = 'Mute'; mute.setAttribute('aria-label', 'Mute');
@@ -55,9 +64,7 @@ function trackHeader(track, armedId, h) {
   const solo = el('button', 'track-ctrl track-solo' + (track.solo ? ' on' : '')); solo.type = 'button'; solo.textContent = 'S'; solo.title = 'Solo'; solo.setAttribute('aria-label', 'Solo');
   if (h.onSolo) solo.addEventListener('click', () => h.onSolo(track.id));
   const mon = el('button', 'track-ctrl track-monitor'); mon.type = 'button'; mon.disabled = true; mon.textContent = '\u{1F3A7}'; mon.title = 'Monitor — coming soon'; mon.setAttribute('aria-label', 'Monitor');
-  const arm = el('button', 'track-ctrl track-rec' + (track.id === armedId ? ' on' : '')); arm.type = 'button'; arm.textContent = '●'; arm.title = 'Record-enable'; arm.setAttribute('aria-label', 'Record-enable');
-  if (h.onArm) arm.addEventListener('click', () => h.onArm(track.id));
-  ctrls.append(mute, solo, mon, arm);
+  ctrls.append(mute, solo, mon);
 
   const rm = el('button', 'track-remove'); rm.type = 'button'; rm.textContent = '✕'; rm.title = 'Remove track'; rm.setAttribute('aria-label', 'Remove track');
   if (h.onRemoveTrack) rm.addEventListener('click', () => h.onRemoveTrack(track.id));
@@ -84,6 +91,12 @@ function trackHeader(track, armedId, h) {
   mix.insertBefore(vlabel, mix.firstChild);
   mix.insertBefore(plabel, pan);
 
+  // Click the header body (not a control/name) to arm = make this the active track.
+  header.addEventListener('click', (e) => {
+    if (e.target.closest('button, input, .track-pan, .track-name')) return;
+    if (h.onArm) h.onArm(track.id);
+  });
+
   header.append(rm, top, ctrls, mix);
   header.style.height = `${h.rowH}px`;
   return header;
@@ -91,12 +104,12 @@ function trackHeader(track, armedId, h) {
 
 export function renderTrackLane(container, {
   tracks = [], bars = 16, armedId, snap = true,
-  onAddTrack, onRemoveTrack, onArm, onToggleSnap, onMoveClip, onDeleteClip,
+  onAddTrack, onRemoveTrack, onArm, onRename, onToggleSnap, onMoveClip, onDeleteClip,
   onMute, onSolo, onVolume, onPan,
 } = {}) {
   container.innerHTML = '';
   const row = el('div', 'track-lane-row');
-  const handlers = { onArm, onRemoveTrack, onMoveClip, onDeleteClip, onMute, onSolo, onVolume, onPan, rowH: ROW_H };
+  const handlers = { onArm, onRename, onRemoveTrack, onMoveClip, onDeleteClip, onMute, onSolo, onVolume, onPan, rowH: ROW_H };
 
   // ── Headers column ──
   const headers = el('div', 'track-headers');
