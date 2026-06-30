@@ -252,11 +252,49 @@ export function renderTrackLane(container, {
     scroll.appendChild(strip);
   }
 
-  // Click empty timeline space (no modifier) clears the selection.
+  // Marquee (rubber-band) select: drag on empty timeline to box-select clips,
+  // like the desktop. A plain click (no drag) clears the selection; clicks on a
+  // clip / ruler / playhead are left to their own handlers.
   scroll.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.track-clip')) return;
-    if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-    if (selection.size) { selection.clear(); applySelection(scroll); }
+    if (e.button !== 0) return;
+    if (e.target.closest('.track-clip') || e.target.closest('.track-ruler') || e.target.closest('.playhead-grip')) return;
+    const startX = e.clientX, startY = e.clientY;
+    const additive = e.metaKey || e.ctrlKey || e.shiftKey;
+    const base = new Set(selection);
+    let box = null;
+    const onMove = (ev) => {
+      if (!box && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return; // drag threshold
+      if (!box) { box = el('div', 'marquee'); scroll.appendChild(box); }
+      const r = scroll.getBoundingClientRect();
+      const x1 = Math.min(startX, ev.clientX), x2 = Math.max(startX, ev.clientX);
+      const y1 = Math.min(startY, ev.clientY), y2 = Math.max(startY, ev.clientY);
+      box.style.left = `${x1 - r.left + scroll.scrollLeft}px`;
+      box.style.top = `${y1 - r.top + scroll.scrollTop}px`;
+      box.style.width = `${x2 - x1}px`;
+      box.style.height = `${y2 - y1}px`;
+      const next = additive ? new Set(base) : new Set();
+      scroll.querySelectorAll('.track-clip').forEach((c) => {
+        const cr = c.getBoundingClientRect();
+        if (cr.right >= x1 && cr.left <= x2 && cr.bottom >= y1 && cr.top <= y2) next.add(clipKey(c.dataset.trackId, c.dataset.takeId));
+      });
+      selection.clear(); next.forEach((k) => selection.add(k));
+      applySelection(scroll);
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      if (box) {
+        box.remove();
+        // Swallow the click that follows a drag so it doesn't also seek/clear.
+        const swallow = (ce) => ce.stopPropagation();
+        window.addEventListener('click', swallow, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 0);
+      } else if (!additive && selection.size) {
+        selection.clear(); applySelection(scroll); // plain empty click clears
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   });
 
   const playhead = el('div', 'track-playhead');

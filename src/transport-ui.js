@@ -51,11 +51,41 @@ export function mountTransport(container, { getLiveAnalyser, onGain }) {
   const metronome = createMetronome({
     onBeat: (b) => { metroBtn.classList.add(b % 4 === 0 ? 'beat-accent' : 'beat'); setTimeout(() => metroBtn.classList.remove('beat', 'beat-accent'), 90); },
   });
-  // The metronome no longer free-runs: clicking ARMS it (active colour). It only
-  // clicks while recording (see the record flow in main.js).
+  // Left-click ARMS the metronome (active colour): it clicks while recording.
+  // Right-click opens a small menu to PLAY it for practice (free-run) without
+  // recording — and if you hit record while it's running, the count-in continues
+  // the same grid (1,2,3,4 in tempo) before recording starts.
   let metroArmed = false;
-  metroBtn.title = 'Metronome — clicks while recording';
+  let metroFree = false;
+  metroBtn.title = 'Metronome — click to arm (clicks while recording) · right-click to practice';
   metroBtn.addEventListener('click', () => { metroArmed = !metroArmed; metroBtn.classList.toggle('on', metroArmed); });
+
+  const setFree = (on) => {
+    metroFree = on;
+    metroBtn.classList.toggle('free', on);
+    if (on) metronome.start(); else metronome.stop();
+  };
+
+  // ── Practice popover (right-click the metronome) ──
+  let metroMenu = null;
+  const onDocDown = (e) => { if (metroMenu && !metroMenu.contains(e.target) && e.target !== metroBtn) closeMetroMenu(); };
+  function closeMetroMenu() { if (metroMenu) { metroMenu.remove(); metroMenu = null; document.removeEventListener('pointerdown', onDocDown, true); } }
+  metroBtn.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    if (metroMenu) { closeMetroMenu(); return; }
+    const m = el('div', 'metro-menu');
+    const item = el('button', 'metro-menu-item');
+    item.type = 'button';
+    item.textContent = metroFree ? '■  Stop metronome' : '▶  Play metronome (practice)';
+    item.addEventListener('click', () => { setFree(!metroFree); closeMetroMenu(); });
+    m.appendChild(item);
+    document.body.appendChild(m);
+    const r = metroBtn.getBoundingClientRect();
+    m.style.left = `${Math.round(r.left)}px`;
+    m.style.top = `${Math.round(r.bottom + 6)}px`;
+    metroMenu = m;
+    setTimeout(() => document.addEventListener('pointerdown', onDocDown, true), 0);
+  });
 
   // ── Count-in toggle (4 beats before recording) ──
   let countOn = false;
@@ -136,10 +166,17 @@ export function mountTransport(container, { getLiveAnalyser, onGain }) {
   return {
     isCountIn: () => countOn,
     isMetroArmed: () => metroArmed,
-    needsSession: () => countOn || metroArmed,
-    // Runs count-in (if armed) then calls onDownbeat when recording should start;
-    // the metronome keeps clicking through the take when armed.
-    recordSession: (onDownbeat) => metronome.startSession({ countBeats: countOn ? 4 : 0, recordMetro: metroArmed, onDownbeat }),
-    endSession: () => metronome.stop(),
+    isMetroFree: () => metroFree,
+    // A record needs the metronome grid if counting in, armed, or practising.
+    needsSession: () => countOn || metroArmed || metroFree,
+    // Practice (free-run) → always count 4 in (continuing the running grid) and
+    // keep clicking through the take. Otherwise count-in only if its toggle is on.
+    recordSession: (onDownbeat) => metronome.armRecord({
+      countBeats: (metroFree || countOn) ? 4 : 0,
+      recordMetro: metroFree || metroArmed,
+      onDownbeat,
+    }),
+    // End the take; if we were practising, resume the free-run click afterwards.
+    endSession: () => { metronome.stop(); if (metroFree) metronome.start(); },
   };
 }

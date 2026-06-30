@@ -85,22 +85,28 @@ export function createMetronome({ onBeat } = {}) {
   function getTempo() { return bpm; }
   function isRunning() { return running; }
 
-  // Start a record session on one continuous beat grid: `countBeats` count-in
-  // clicks, then `onDownbeat` fires on the next beat (when recording starts).
-  // If recordMetro is true the clicks continue through the recording; otherwise
-  // the grid stops at the downbeat (count-in only, silent recording). With no
-  // AudioContext (tests) onDownbeat fires synchronously.
-  function startSession({ countBeats = 4, recordMetro = false, onDownbeat } = {}) {
+  // Arm a recording: `countBeats` count-in clicks, then `onDownbeat` fires on the
+  // next beat (when recording starts). If recordMetro is true the clicks continue
+  // through the recording; otherwise the grid stops at the downbeat (count-in
+  // only, silent recording). If the metronome is ALREADY free-running (practice),
+  // the count-in continues that same grid with no restart/seam — so "1,2,3,4"
+  // lands exactly in tempo. With no AudioContext (tests) onDownbeat is synchronous.
+  function armRecord({ countBeats = 4, recordMetro = false, onDownbeat } = {}) {
     if (!AC) { if (onDownbeat) onDownbeat(); return; }
     if (!ctx) ctx = new AC();
     if (ctx.state === 'suspended') ctx.resume();
-    if (timer) { clearInterval(timer); timer = null; }
-    session = { countBeats, recordMetro, onDownbeat, fired: false };
-    running = true;
-    beat = 0;
-    nextTime = ctx.currentTime + 0.12;
-    timer = setInterval(scheduler, LOOKAHEAD_MS);
+    if (running && timer) {
+      // Continue the running grid: count `countBeats` from the next scheduled beat.
+      session = { countBeats: beat + countBeats, recordMetro, onDownbeat, fired: false };
+    } else {
+      if (timer) { clearInterval(timer); timer = null; }
+      session = { countBeats, recordMetro, onDownbeat, fired: false };
+      running = true;
+      beat = 0;
+      nextTime = ctx.currentTime + 0.12;
+      timer = setInterval(scheduler, LOOKAHEAD_MS);
+    }
   }
 
-  return { start, stop, toggle, setTempo, getTempo, isRunning, startSession };
+  return { start, stop, toggle, setTempo, getTempo, isRunning, armRecord };
 }

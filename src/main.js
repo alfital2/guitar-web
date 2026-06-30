@@ -18,6 +18,7 @@ import { renderProfileCard } from './profile-card/ui.js';
 import { measureLoudnessGain } from './normalize.js';
 import { mountTransport } from './transport-ui.js';
 import { renderTrackLane, PX_PER_SEC, getSelectedClips, clearClipSelection } from './track-lane.js';
+import { punchTakes } from './take-ops.js';
 import { createRecorder } from './recorder.js';
 import { createPlayer } from './player.js';
 import { drawWaveform } from './waveform.js';
@@ -37,7 +38,7 @@ let reverbStage = null;                // audio node: engine.output -> reverbSta
 let calibrationEq, calibRAF, calibState, calibCountdown;
 let pitchBuf, lastNoteMs = 0;
 let prevBars = null;
-let accentRGB = '255,159,10'; // current theme accent for canvas drawing
+let accentRGB = '240,180,41'; // current theme accent for canvas drawing
 
 let tracks = [];         // [{ id, name, armed, takes: [] }]
 let nextTrackId = 1;     // track id source
@@ -173,7 +174,8 @@ function updateTransport() {
   const has = allTakes().length > 0;
   const play = $('tp-play'), skip = $('tp-start');
   if (play) { play.disabled = !has; play.title = has ? 'Play' : 'Play — record something first'; }
-  if (skip) { skip.disabled = !has; skip.title = has ? 'Skip to start' : 'Skip to start'; }
+  // Skip-to-start just parks the playhead at bar 1 — available whenever powered.
+  if (skip) { skip.disabled = !ctx; skip.title = ctx ? 'Skip to start' : 'Skip to start — power on first'; }
 }
 // Remove the growing in-progress clip (on stop or teardown).
 function clearLiveClip() {
@@ -364,6 +366,13 @@ function snapPx(x, free) { return (snapOn && !free) ? Math.round(x / SNAP_PX) * 
 // recorded `duration`. `offset` is how far into the samples playback starts.
 const clipLen = (tk) => (tk.len != null ? tk.len : (tk.duration || 0));
 const clipWidth = (tk) => Math.max(8, Math.round(clipLen(tk) * PX_PER_SEC));
+
+// Overwrite the audio under a new take [newStart, newEnd] on its track.
+function punchOver(track, newStart, newEnd) {
+  if (!track) return;
+  const r = punchTakes(track.takes, newStart, newEnd, takeSeq + 1);
+  track.takes = r.takes; takeSeq = r.nextN - 1;
+}
 const occupiedExcept = (track, n) => track.takes.filter((k) => k.n !== n).map((k) => ({ x: k.x, w: clipWidth(k) }));
 
 function renderTrack() {
@@ -674,6 +683,7 @@ async function start() {
 
     setPower(true);
     { const r = $('tp-record'); if (r) { r.disabled = false; r.title = 'Record'; } }
+    updateTransport(); // enable skip-to-start now that we're powered
     listDevices();
   } catch (e) {
     $('error').textContent = 'Could not start: ' + e.message;
@@ -694,6 +704,7 @@ function stop() {
   if (ctx) ctx.close();
   ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = reverbStage = null;
   setPower(false);
+  updateTransport(); // disable skip-to-start when powered off
   prevBars = null;
   { const fl = $('freq-label'); if (fl) { fl.textContent = '— Hz'; fl.style.color = ''; } }
 }
@@ -761,7 +772,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { setSetti
 $('diag').textContent = `${isSafari ? 'Safari' : 'Chrome'} · setSinkId: ${hasSetSinkId ? 'yes' : 'no'}`;
 
 // Read the theme accent once for canvas drawing (the spectrum).
-accentRGB = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim() || '255,159,10';
+accentRGB = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim() || '240,180,41';
 
 navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
 
@@ -802,7 +813,9 @@ const transport = mountTransport($('transport-cluster'), {
       recBtn.classList.remove('recording');
       if (t && t.samples.length) {
         pushUndo();
-        track.takes.push({ ...t, n: ++takeSeq, name: track.name, x: recStartX });
+        const newStart = recStartX / PX_PER_SEC;
+        punchOver(track, newStart, newStart + (t.duration || 0)); // overwrite overlapped audio
+        track.takes.push({ ...t, n: ++takeSeq, name: track.name, x: recStartX, offset: 0, len: t.duration });
         renderTrack();
         updateTransport();
       }
@@ -849,7 +862,8 @@ const transport = mountTransport($('transport-cluster'), {
       // Count-in and/or metronome → one continuous beat grid; recording starts
       // on the downbeat. No count-in and no metronome → begin immediately.
       if (transport.needsSession()) {
-        if (transport.isCountIn()) recBtn.classList.add('counting');
+        // Pulse the record button while counting in (count-in toggle or practice).
+        if (transport.isCountIn() || transport.isMetroFree()) recBtn.classList.add('counting');
         transport.recordSession(begin);
       } else {
         begin();

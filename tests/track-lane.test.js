@@ -139,8 +139,22 @@ describe('renderTrackLane (multi-track)', () => {
     const clip = el.querySelector('.track-clip');
     clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, metaKey: true, bubbles: true }));
     expect(clip.classList.contains('selected')).toBe(true);
-    el.querySelector('.track-scroll').dispatchEvent(new MouseEvent('pointerdown', { button: 0, bubbles: true }));
+    // plain click on empty timeline (down + up, no drag) clears the selection
+    el.querySelector('.track-scroll').dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 5, clientY: 5, bubbles: true }));
+    window.dispatchEvent(new MouseEvent('pointerup', { clientX: 5, clientY: 5, bubbles: true }));
     expect(el.querySelector('.track-clip').classList.contains('selected')).toBe(false);
+  });
+  it('marquee drag box-selects the clips it covers', () => {
+    const el = document.createElement('div');
+    renderTrackLane(el, { tracks: tracks(), armedId: 1 });
+    const scroll = el.querySelector('.track-scroll');
+    scroll.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 0, clientY: 0, bubbles: true }));
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 60, clientY: 60, bubbles: true }));
+    expect(el.querySelector('.marquee')).toBeTruthy();          // box drawn past the threshold
+    expect(getSelectedClips().length).toBeGreaterThan(0);       // covered clip selected
+    window.dispatchEvent(new MouseEvent('pointerup', { clientX: 60, clientY: 60, bubbles: true }));
+    expect(el.querySelector('.marquee')).toBeNull();            // box removed on release
+    clearClipSelection();
   });
   it('dragging one of several selected clips moves them all via onMoveClips', () => {
     const el = document.createElement('div');
@@ -160,7 +174,8 @@ describe('renderTrackLane (multi-track)', () => {
     clips[0].dispatchEvent(new MouseEvent('pointerup', { clientX: 40, clientY: 0, bubbles: true }));
     expect(batches).toEqual([[{ trackId: 1, n: 1, x: 50 }, { trackId: 1, n: 2, x: 140 }]]);
     // tidy module-level selection so later suites start clean
-    el.querySelector('.track-scroll').dispatchEvent(new MouseEvent('pointerdown', { button: 0, bubbles: true }));
+    el.querySelector('.track-scroll').dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 5, clientY: 5, bubbles: true }));
+    window.dispatchEvent(new MouseEvent('pointerup', { clientX: 5, clientY: 5, bubbles: true }));
   });
   it('positions the playhead at playheadSec (preserved across re-renders)', () => {
     const el = document.createElement('div');

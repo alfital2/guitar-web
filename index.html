@@ -10,8 +10,8 @@
 <style>
   :root {
     /* Theme-able palette (Studio = default). Overridden per [data-theme] below. */
-    --accent: #ff9f0a;
-    --accent-rgb: 255,159,10;
+    --accent: #f0b429;
+    --accent-rgb: 240,180,41;
     --bg: #6a6a6e;
     --bg-grad: linear-gradient(180deg, #7c7c7e 0%, #646466 32%, #5a5a5c 100%);
     --window: #1e1e20;
@@ -108,6 +108,12 @@
   .metro-toggle.on { color: var(--accent); border-color: rgba(var(--accent-rgb),0.5); background: rgba(var(--accent-rgb),0.12); }
   .metro-toggle.beat { box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.4); }
   .metro-toggle.beat-accent { box-shadow: 0 0 0 2px var(--accent); }
+  /* Free-run practice (right-click → Play): green, overrides the armed colour. */
+  .metro-toggle.free { color: var(--green); border-color: rgba(48,209,88,0.55); background: rgba(48,209,88,0.14); }
+  /* Practice popover */
+  .metro-menu { position: fixed; z-index: 100; background: var(--toolbar); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 4px; box-shadow: 0 10px 28px rgba(0,0,0,0.55); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+  .metro-menu-item { display: block; width: 100%; text-align: left; padding: 7px 12px; font-size: 12px; color: var(--text); background: transparent; border: none; border-radius: 5px; white-space: nowrap; cursor: pointer; }
+  .metro-menu-item:hover { background: rgba(255,255,255,0.08); }
   .metro-bpm { display: inline-flex; align-items: baseline; gap: 4px; cursor: ns-resize; user-select: none; touch-action: none; padding: 4px 6px; border-radius: 6px; }
   .metro-bpm:hover { background: rgba(255,255,255,0.05); }
   .metro-bpm-val { font: 600 13px var(--mono); color: var(--text); min-width: 26px; text-align: right; }
@@ -400,6 +406,8 @@
     display: flex; align-items: center; padding-left: 5px; border-right: 1px solid rgba(255,255,255,0.05);
   }
   .track-playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb),0.6); z-index: 6; }
+  /* Marquee (rubber-band) selection box. */
+  .marquee { position: absolute; z-index: 7; pointer-events: none; border: 1px solid var(--accent); background: rgba(var(--accent-rgb),0.12); border-radius: 2px; }
   .playhead-grip { position: absolute; top: 0; left: -5px; width: 11px; height: 9px; cursor: ew-resize;
     background: var(--accent); clip-path: polygon(0 0, 100% 0, 50% 100%); }
   .track-ruler { cursor: pointer; }
