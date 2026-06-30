@@ -151,27 +151,15 @@
   button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.4); }
   @media (prefers-reduced-motion: no-preference) { button:active { transform: scale(.97); } }
 
-  /* ── Spectrum hero ──────────────────────────────────── */
-  .hero {
-    position: relative; background: var(--recessed); border-bottom: 1px solid rgba(255,255,255,0.055);
-  }
-  #spectrum { display: block; width: 100%; height: 116px; }
-  .hero-badge { position: absolute; top: 12px; left: 14px; display: flex; align-items: center; gap: 6px; }
-  .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--very-muted); }
-  #guitar-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--very-muted); }
-  #freq-label {
-    position: absolute; top: 12px; right: 14px; font: 700 10px var(--mono); letter-spacing: 0.1em;
-    text-transform: uppercase; color: #2a2a30;
-  }
-  /* Live note / pitch detector overlay (bottom-left of the spectrum) */
-  .pitch-box { position: absolute; bottom: 10px; left: 14px; display: flex; align-items: center; gap: 8px; }
-  .pitch-cap { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; color: var(--very-muted); }
+  /* ── Live note / pitch detector (compact, in the toolbar) ── */
+  .tp-note { display: flex; align-items: center; gap: 7px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.08); }
+  .tp-note-cap { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); }
   .note-circle {
-    width: 40px; height: 40px; border-radius: 9px; background: #050d07;
-    border: 1px solid rgba(48,209,88,0.16); display: flex; align-items: center; justify-content: center;
-    font: 800 17px var(--mono); letter-spacing: -0.03em; color: rgba(48,209,88,0.3);
+    width: 30px; height: 26px; border-radius: 7px; background: #050d07;
+    border: 1px solid rgba(48,209,88,0.18); display: flex; align-items: center; justify-content: center;
+    font: 800 13px var(--mono); letter-spacing: -0.03em; color: rgba(48,209,88,0.35);
   }
-  .note-circle.active { border-color: rgba(48,209,88,0.55); color: rgba(48,209,88,1); box-shadow: 0 0 14px rgba(48,209,88,0.35); }
+  .note-circle.active { border-color: rgba(48,209,88,0.6); color: rgba(48,209,88,1); box-shadow: 0 0 10px rgba(48,209,88,0.4); }
   @media (prefers-reduced-motion: no-preference) { .note-circle { transition: color .15s, border-color .15s, box-shadow .15s; } }
   /* Meter bar (toolbar VOL input level + diagnostics) */
   .meter { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
@@ -719,17 +707,6 @@
       <button id="settings-toggle" class="icon btn-dim" aria-label="Settings" title="Settings">⚙</button>
     </div>
   </div>
-
-  <section class="hero">
-    <canvas id="spectrum" width="1140" height="120"></canvas>
-    <div class="hero-badge"><span class="dot" style="display:block"></span><div id="guitar-badge">No Guitar</div></div>
-    <div id="freq-label">— Hz</div>
-    <!-- Live note / pitch detector (uses the tuner's MPM detection) -->
-    <div class="pitch-box" title="Detected note">
-      <div id="note-circle" class="note-circle">—</div>
-      <span class="pitch-cap">NOTE</span>
-    </div>
-  </section>
 
   <section id="track-lane" class="track-lane"></section>
 

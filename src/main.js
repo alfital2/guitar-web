@@ -16,7 +16,6 @@ import { detectPitchMPM } from './pitch/mpm.js';
 import { freqToNote, noteLabel } from './pitch/note.js';
 import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
-import { spectrumBars } from './spectrum.js';
 import { measureLoudnessGain } from './normalize.js';
 import { mountTransport } from './transport-ui.js';
 import { renderTrackLane, PX_PER_SEC } from './track-lane.js';
@@ -402,92 +401,24 @@ function showStats() {
   $('verdict').textContent = 'Playing — judge the tone by ear';
 }
 
-function drawSpectrum(freqBytes) {
-  const canvas = $('spectrum');
-  if (!canvas) return;
-  const c = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
-  c.clearRect(0, 0, W, H);
-
-  // Subtle scan grid: 3 horizontal + 7 vertical
-  c.strokeStyle = 'rgba(255,255,255,0.022)'; c.lineWidth = 1;
-  for (let i = 1; i < 4; i++) { const y = Math.round(H / 4 * i) + 0.5; c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
-  for (let i = 1; i < 8; i++) { const x = Math.round(W / 8 * i) + 0.5; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
-
-  const N = 80;
-  let bars = spectrumBars(freqBytes, N);
-
-  // Temporal smoothing: 40% new + 60% previous frame
-  if (prevBars) bars = bars.map((v, i) => v * 0.4 + prevBars[i] * 0.6);
-  prevBars = [...bars];
-
-  // Gaussian smooth across adjacent bins (7-tap)
-  const sm = bars.map((_, i) => {
-    const w = [0.06, 0.12, 0.22, 0.28, 0.22, 0.12, 0.06];
-    let s = 0, wt = 0;
-    w.forEach((ww, o) => { const idx = i + o - 3; if (idx >= 0 && idx < N) { s += bars[idx] * ww; wt += ww; } });
-    return s / wt;
-  });
-
-  const pts = sm.map((v, i) => ({ x: (i / (N - 1)) * W, y: H - v * H * 0.92 }));
-
-  // Filled area (cubic Bézier, control points at x midpoints). Colored by the
-  // active theme's accent.
-  const a = accentRGB;
-  const grad = c.createLinearGradient(0, 0, 0, H);
-  grad.addColorStop(0, `rgba(${a},0.75)`);
-  grad.addColorStop(0.25, `rgba(${a},0.5)`);
-  grad.addColorStop(0.65, `rgba(${a},0.18)`);
-  grad.addColorStop(1, `rgba(${a},0)`);
-  c.beginPath(); c.moveTo(0, H);
-  pts.forEach((p, i) => { if (i === 0) c.lineTo(p.x, p.y); else { const px = pts[i - 1]; c.bezierCurveTo((px.x + p.x) / 2, px.y, (px.x + p.x) / 2, p.y, p.x, p.y); } });
-  c.lineTo(W, H); c.closePath(); c.fillStyle = grad; c.fill();
-
-  // Mirror reflection (subtle)
-  const rGrad = c.createLinearGradient(0, H, 0, H - H * 0.2);
-  rGrad.addColorStop(0, `rgba(${a},0.08)`); rGrad.addColorStop(1, `rgba(${a},0)`);
-  c.beginPath(); c.moveTo(0, H);
-  pts.forEach((p, i) => { const ry = H + (H - p.y) * 0.18; if (i === 0) c.lineTo(p.x, ry); else { const px = pts[i - 1]; const pry = H + (H - px.y) * 0.18; c.bezierCurveTo((px.x + p.x) / 2, pry, (px.x + p.x) / 2, ry, p.x, ry); } });
-  c.lineTo(W, H); c.closePath(); c.fillStyle = rGrad; c.fill();
-
-  // Glowing top edge
-  c.save();
-  c.shadowColor = `rgba(${a},0.7)`; c.shadowBlur = 8;
-  c.beginPath();
-  pts.forEach((p, i) => { if (i === 0) c.moveTo(p.x, p.y); else { const px = pts[i - 1]; c.bezierCurveTo((px.x + p.x) / 2, px.y, (px.x + p.x) / 2, p.y, p.x, p.y); } });
-  c.strokeStyle = `rgba(${a},0.7)`; c.lineWidth = 1.5; c.stroke();
-  c.restore();
-
-  // Peak frequency readout
-  let peakBin = 0, peakV = 0;
-  sm.forEach((v, i) => { if (v > peakV) { peakV = v; peakBin = i; } });
-  const fl = $('freq-label');
-  if (fl && peakV > 0.08 && ctx && analyser) {
-    const binHz = ctx.sampleRate / (2 * analyser.frequencyBinCount);
-    const peakHz = Math.round(peakBin / N * analyser.frequencyBinCount * binHz);
-    fl.style.color = `rgba(${a},${Math.min(0.6, peakV * 1.5)})`;
-    fl.textContent = peakHz < 1000 ? `${peakHz} Hz` : `${(peakHz / 1000).toFixed(1)} kHz`;
-  }
-}
-
 function startMeter() {
   const timeBuf = new Uint8Array(analyser.fftSize);
-  const freqBuf = new Uint8Array(analyser.frequencyBinCount);
   pitchBuf = new Float32Array(analyser.fftSize);
   function loop() {
     rafId = requestAnimationFrame(loop);
-    // input meter (time-domain bytes)
+    // input meter (time-domain bytes) — feeds the toolbar VOL meter
     analyser.getByteTimeDomainData(timeBuf);
     let peak = 0;
     for (let i = 0; i < timeBuf.length; i++) {
       const v = Math.abs(timeBuf[i] - 128);
       if (v > peak) peak = v;
     }
-    $('meter').style.width = Math.min(100, peak / 128 * 100 * 1.5) + '%';
+    { const m = $('meter'); if (m) m.style.width = Math.min(100, peak / 128 * 100 * 1.5) + '%'; }
     // note detection — same McLeod Pitch Method the tuner uses.
     analyser.getFloatTimeDomainData(pitchBuf);
     const res = detectPitchMPM(pitchBuf, ctx.sampleRate);
     const circle = $('note-circle');
+    if (!circle) return;
     if (res && res.freq > 0 && res.clarity > 0.9) {
       lastNoteMs = performance.now();
       circle.textContent = noteLabel(freqToNote(res.freq));
@@ -496,9 +427,6 @@ function startMeter() {
       // Keep the last note name visible; just dim it once the note has stopped ringing.
       circle.classList.remove('active');
     }
-    // live spectrum (frequency-domain)
-    analyser.getByteFrequencyData(freqBuf);
-    drawSpectrum(freqBuf);
   }
   loop();
 }

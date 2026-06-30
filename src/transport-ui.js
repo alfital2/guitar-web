@@ -103,5 +103,10 @@ export function mountTransport(container, { getLiveAnalyser, onGain }) {
   });
   tunerBtn.addEventListener('click', () => { tuner.isOn() ? tuner.stop() : tuner.start(); });
 
-  container.append(volg, transport, metro, tunerWrap);
+  // ── Live note / pitch detector (updated by the main meter loop via #note-circle) ──
+  const noteBox = el('div', 'tp-note'); noteBox.title = 'Detected note';
+  const noteCircle = el('span', 'note-circle'); noteCircle.id = 'note-circle'; noteCircle.textContent = '—';
+  noteBox.append(el('span', 'tp-note-cap', 'NOTE'), noteCircle);
+
+  container.append(volg, transport, metro, tunerWrap, noteBox);
 }
