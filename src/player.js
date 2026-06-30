@@ -6,8 +6,10 @@ import { PX_PER_SEC } from './track-lane.js';
 const AC = typeof AudioContext !== 'undefined' ? AudioContext
   : (typeof webkitAudioContext !== 'undefined' ? webkitAudioContext : null);
 
+const takeLen = (t) => (t.len != null ? t.len : (t.duration || 0));
+
 export function playbackDuration(takes) {
-  return takes.reduce((max, t) => Math.max(max, (t.x || 0) / PX_PER_SEC + (t.duration || 0)), 0);
+  return takes.reduce((max, t) => Math.max(max, (t.x || 0) / PX_PER_SEC + takeLen(t)), 0);
 }
 
 export function createPlayer() {
@@ -38,15 +40,19 @@ export function createPlayer() {
       }
       for (const tk of (g.takes || [])) {
         if (!tk.samples || !tk.samples.length) continue;
+        const len = takeLen(tk);
+        const offset = tk.offset || 0; // seconds into the samples where the clip starts
         const start = (tk.x || 0) / PX_PER_SEC;
-        const end = start + (tk.duration || 0);
+        const end = start + len;
         if (end <= fromSec) continue;
         const buf = ctx.createBuffer(1, tk.samples.length, tk.sampleRate);
         if (buf.copyToChannel) buf.copyToChannel(tk.samples, 0); else buf.getChannelData(0).set(tk.samples);
         const s = ctx.createBufferSource();
         s.buffer = buf; s.connect(gain);
         const rel = start - fromSec;
-        if (rel >= 0) s.start(t0 + rel); else s.start(t0, -rel);
+        // Play only the trimmed window [offset, offset+len) of the buffer.
+        if (rel >= 0) s.start(t0 + rel, offset, len);
+        else s.start(t0, offset - rel, len + rel); // started mid-clip → skip further in
         sources.push(s);
       }
     }

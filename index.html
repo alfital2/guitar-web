@@ -78,9 +78,11 @@
   .toolbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
   /* ── Transport cluster (center of toolbar) ──────────── */
+  /* In-flow + centered (not absolute) so it never overlaps the right-side
+     actions (Power) on narrower windows. */
   .transport-cluster {
-    position: absolute; left: 50%; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 14px;
+    flex: 1 1 auto; min-width: 0;
+    display: flex; align-items: center; justify-content: center; gap: 14px;
   }
   .transport { display: flex; align-items: center; gap: 4px; }
   .tp-btn {
@@ -91,6 +93,15 @@
   .tp-btn:disabled { opacity: 0.55; cursor: not-allowed; }
   .tp-record { color: var(--red); }
   .tp-record:disabled { opacity: 0.7; }
+  /* Count-in pre-roll: pulse the record button while the 4 beats play. */
+  #tp-record.counting { color: var(--accent); border-color: rgba(var(--accent-rgb),0.5); animation: count-pulse 0.5s ease-in-out infinite; }
+  @keyframes count-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb),0.5); } 50% { box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0); } }
+
+  /* Count-in toggle (4 beats before recording), grouped by the metronome. */
+  .countin { display: flex; align-items: center; }
+  .count-toggle { height: 28px; padding: 0 9px; display: inline-flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); border-radius: 6px; }
+  .count-toggle svg { display: block; }
+  .count-toggle.on { color: var(--accent); border-color: rgba(var(--accent-rgb),0.5); background: rgba(var(--accent-rgb),0.12); }
 
   .metro { display: flex; align-items: center; gap: 8px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.08); }
   .metro-toggle { width: 30px; height: 28px; padding: 0; font-size: 14px; border-radius: 6px; }
@@ -106,10 +117,16 @@
   .tuner { position: relative; display: flex; align-items: center; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.08); }
   .tuner-toggle { height: 28px; padding: 0 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; border-radius: 6px; }
   .tuner-toggle.on { color: var(--accent); border-color: rgba(var(--accent-rgb),0.5); background: rgba(var(--accent-rgb),0.12); }
-  /* The strip floats out to the right of the button (absolute, out of flow) so
-     opening the tuner extends rightward instead of resizing the centered row. */
-  .tuner-strip { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 12px; display: flex; align-items: center; gap: 10px; }
+  /* The strip drops DOWN as a popover below the button (out of flow) so opening
+     the tuner never collides with the Power button on the right. */
+  .tuner-strip {
+    position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 30;
+    display: flex; align-items: center; gap: 10px; white-space: nowrap;
+    background: var(--toolbar); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 7px 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  }
   .tuner-strip[hidden] { display: none; }
+  .transport-cluster.tuner-open .tp-note { display: none; } /* tuner readout takes this space */
   .tuner-note { font: 800 16px var(--mono); color: var(--green); flex: 0 0 42px; width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
   .tuner-meter { position: relative; width: 140px; height: 16px; background: rgba(255,255,255,0.04); border-radius: 8px; overflow: hidden; flex: 0 0 140px; }
   .tuner-ticks { position: absolute; inset: 0; background:
@@ -194,13 +211,14 @@
   .dot { display: none; }
 
   /* ── Amp head host ──────────────────────────────────── */
-  .amp-strip { padding: 16px 20px 14px; background: rgba(0,0,0,0.12); }
+  /* Scroll the amp horizontally on narrow windows instead of clipping it. */
+  .amp-strip { padding: 16px 20px 14px; background: rgba(0,0,0,0.12); overflow-x: auto; }
 
   /* Amp head (rendered by amp.js) — GarageBand-style head:
      black tolex enclosure, leather handle, metal corners, brushed-metal control
      panel with engraved groups + numbered knobs, silver grille cloth + script. */
   .amp-head {
-    position: relative; max-width: 1060px; margin: 0 auto; border-radius: 16px; padding: 34px 20px 20px;
+    position: relative; width: fit-content; max-width: 1060px; margin: 0 auto; border-radius: 16px; padding: 34px 20px 20px;
     background:
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='tx'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55 0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23tx)'/%3E%3C/svg%3E"),
       linear-gradient(180deg, #1b1b1d, #0e0e10);
@@ -288,8 +306,8 @@
   .amp-wrap.collapsed .amp-head { display: none; }
   .amp-wrap:not(.collapsed) .amp-vstrip { display: none; }
   .amp-vstrip {
-    display: flex; align-items: stretch; max-width: 1180px; margin: 0 auto; cursor: pointer;
-    padding: 9px 6px; border-radius: 13px; border: 1px solid #8d8f95; overflow: hidden;
+    display: flex; align-items: stretch; width: fit-content; max-width: 1180px; margin: 0 auto; cursor: pointer;
+    padding: 9px 6px; border-radius: 13px; border: 1px solid #8d8f95; overflow: visible;
     background: linear-gradient(180deg, #dfe1e4, #b9bbc0 48%, #a7a9af);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -2px 5px rgba(0,0,0,0.28), 0 8px 22px rgba(0,0,0,0.45);
   }
@@ -307,7 +325,9 @@
 
   /* ── Pedalboard ─────────────────────────────────────── */
   /* ── Track lane (recording) ─────────────────────────── */
-  .track-lane { padding: 14px 20px; background: rgba(0,0,0,0.18); border-bottom: 1px solid rgba(255,255,255,0.04); }
+  /* Track lane flex-grows so the amp + pedalboard are pinned to the bottom of
+     the viewport instead of stacking right under the tracks. Overflows scroll. */
+  .track-lane { padding: 14px 20px; background: rgba(0,0,0,0.18); border-bottom: 1px solid rgba(255,255,255,0.04); flex: 1 1 0; min-height: 0; overflow-y: auto; }
   .track-lane-row {
     display: flex; align-items: stretch; border-radius: 10px; overflow: hidden;
     border: 1px solid rgba(255,255,255,0.06); box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
@@ -397,6 +417,13 @@
   .track-clip { cursor: grab; }
   .track-clip.dragging { cursor: grabbing; opacity: 0.85; z-index: 5; }
   .track-clip.will-delete { opacity: 0.4; outline: 2px solid var(--red); }
+  /* Selected clips (Cmd/Ctrl+click to multi-select; drag moves them together). */
+  .track-clip.selected { outline: 2px solid var(--accent); outline-offset: -1px; box-shadow: 0 0 0 1px var(--accent), 0 2px 12px rgba(var(--accent-rgb),0.5); border-color: var(--accent); }
+  /* Trim handles: drag a clip's edge to resize it. */
+  .clip-trim { position: absolute; top: 0; bottom: 0; width: 7px; z-index: 4; cursor: ew-resize; }
+  .clip-trim-l { left: 0; } .clip-trim-r { right: 0; }
+  .clip-trim:hover { background: rgba(255,255,255,0.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5); }
+  .track-clip.trimming { opacity: 0.92; }
   /* In-progress clip grows in real time; right edge glows red. */
   .recording-clip { border-right: 2px solid var(--red); box-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 10px rgba(255,69,58,0.35); }
   .track-rec.recording, #tp-record.recording { color: #fff; background: var(--red); border-color: var(--red); animation: rec-pulse 1s ease-in-out infinite; }

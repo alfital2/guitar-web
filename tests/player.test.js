@@ -13,6 +13,10 @@ describe('playbackDuration', () => {
   it('accounts for each take offset (x/PX_PER_SEC + duration)', () => {
     expect(playbackDuration([{ x: 0, duration: 2 }, { x: 64, duration: 1 }])).toBeCloseTo(3);
   });
+  it('uses the trimmed len when present (not the full duration)', () => {
+    expect(playbackDuration([{ x: 0, duration: 4, len: 1.5 }])).toBeCloseTo(1.5);
+    expect(playbackDuration([{ x: 64, duration: 4, len: 1 }])).toBeCloseTo(3); // 64px=2s + len 1
+  });
 });
 
 describe('createPlayer (no audio)', () => {

@@ -17,7 +17,7 @@ import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
 import { measureLoudnessGain } from './normalize.js';
 import { mountTransport } from './transport-ui.js';
-import { renderTrackLane, PX_PER_SEC } from './track-lane.js';
+import { renderTrackLane, PX_PER_SEC, getSelectedClips, clearClipSelection } from './track-lane.js';
 import { createRecorder } from './recorder.js';
 import { createPlayer } from './player.js';
 import { drawWaveform } from './waveform.js';
@@ -44,6 +44,7 @@ let nextTrackId = 1;     // track id source
 let armedId = null;      // the record-armed track
 let takeSeq = 0;         // running take number for clip labels (global)
 let liveRAF = null, liveClip = null; // in-progress (growing) recording clip
+let recStartX = 0;                   // px x-position where the current take began
 // Tap normGain (post loudness-normalization, pre Vol) so the take matches what
 // you hear and is independent of the master Vol slider.
 const recorder = createRecorder({ getSource: () => normGain, getContext: () => ctx });
@@ -51,7 +52,7 @@ const player = createPlayer();
 
 const armedTrack = () => tracks.find((t) => t.id === armedId) || null;
 const allTakes = () => tracks.flatMap((t) => t.takes);
-const newTrack = (name) => ({ id: nextTrackId++, name: name || 'Track', armed: false, takes: [], volume: 0.8, pan: 0, mute: false, solo: false });
+const newTrack = (name) => ({ id: nextTrackId++, name: name || 'Track', armed: false, takes: [], volume: 0.8, pan: 0, mute: false, solo: false, patch: null });
 // Effective playback gain for a track given the global solo state.
 function trackGain(t, anySolo) { return anySolo ? (t.solo ? t.volume : 0) : (t.mute ? 0 : t.volume); }
 function buildGroups() {
@@ -87,6 +88,19 @@ document.addEventListener('keydown', (e) => {
   if (e.shiftKey) redo(); else undo();
 });
 
+// Delete / Backspace removes the selected clips (Cmd/Ctrl+click to multi-select).
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+  if (/^(INPUT|TEXTAREA)$/.test((e.target.tagName || '')) || e.target.isContentEditable) return;
+  const sel = getSelectedClips();
+  if (!sel.length) return;
+  e.preventDefault();
+  pushUndo();
+  for (const it of sel) { const t = tracks.find((k) => k.id === it.trackId); if (t) t.takes = t.takes.filter((k) => k.n !== it.n); }
+  clearClipSelection();
+  renderTrack(); updateTransport();
+});
+
 // ── Clip clipboard + ops (right-click menu) ──
 let clipboard = null;
 function copyClip(trackId, n) {
@@ -110,10 +124,14 @@ function splitClip(trackId, n) {
   const res = splitTakeAt(tk, playheadSec - (tk.x || 0) / PX_PER_SEC, takeSeq + 1, PX_PER_SEC);
   if (res) { pushUndo(); takeSeq++; t.takes.splice(i, 1, ...res); renderTrack(); }
 }
-function deleteClip(trackId, n) {
-  const t = tracks.find((k) => k.id === trackId);
-  if (t) { pushUndo(); t.takes = t.takes.filter((k) => k.n !== n); renderTrack(); updateTransport(); }
+function deleteClips(items) {
+  if (!items || !items.length) return;
+  pushUndo();
+  for (const it of items) { const t = tracks.find((k) => k.id === it.trackId); if (t) t.takes = t.takes.filter((k) => k.n !== it.n); }
+  clearClipSelection();
+  renderTrack(); updateTransport();
 }
+function deleteClip(trackId, n) { deleteClips([{ trackId, n }]); }
 
 let ctxMenu = null;
 function closeCtxMenu() { if (ctxMenu) { ctxMenu.remove(); ctxMenu = null; } }
@@ -135,10 +153,6 @@ function openCtxMenu(x, y, items) {
 }
 document.addEventListener('click', closeCtxMenu);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCtxMenu(); });
-// x offset (px) where the next clip starts in a track: end of its last take.
-function nextClipX(track) {
-  return (track ? track.takes : []).reduce((acc, k) => acc + Math.max(8, Math.round((k.duration || 0) * PX_PER_SEC)), 0);
-}
 let playheadSec = 0;
 // Move the playhead to a time position (seconds) on the track lane.
 function setPlayhead(sec) {
@@ -308,9 +322,33 @@ function loadPreset(preset) {
   currentChain = r.chain; nextId = r.nextId;
   activePresetName = preset.name;
   rebuildGraph();
+  saveTrackPatch(armedTrack()); // the armed track now owns this preset
   renderBrowser();
   renderTrack();
   setPresets(false); // close the drawer after picking (narrow screens)
+}
+
+// ── Per-track patch (each track remembers its own amp/effects preset) ──
+// A "patch" is the current chain + amp reverb + preset name. Captured when you
+// leave a track and restored when you return to it.
+function captureChainData() {
+  return currentChain.map((u) => ({ type: u.type, params: { ...u.params }, bypassed: !!u.bypassed }));
+}
+function saveTrackPatch(track) {
+  if (!track) return;
+  track.patch = { chain: captureChainData(), reverb: { ...ampReverb }, name: activePresetName };
+}
+function loadTrackPatch(track) {
+  if (!track || !track.patch) return false;
+  const p = track.patch;
+  ampReverb = p.reverb ? { ...p.reverb } : { size: 0.4, mix: 0 };
+  chainStore.saveReverb(ampReverb);
+  const r = chainState.fromPreset(p.chain.filter((e) => registry[e.type]), nextId);
+  currentChain = r.chain; nextId = r.nextId;
+  activePresetName = p.name || null;
+  rebuildGraph();
+  renderBrowser();
+  return true;
 }
 
 function renderBrowser() {
@@ -322,7 +360,10 @@ let snapOn = true;
 const SNAP_PX = 16; // one beat (0.5s @ 120 BPM 4/4) at 32 px/sec
 // Hold Ctrl to bypass snapping entirely (free, sub-pixel-precise placement).
 function snapPx(x, free) { return (snapOn && !free) ? Math.round(x / SNAP_PX) * SNAP_PX : x; }
-const clipWidth = (tk) => Math.max(8, Math.round((tk.duration || 0) * PX_PER_SEC));
+// Visible/played length of a take in seconds — `len` once trimmed, else the full
+// recorded `duration`. `offset` is how far into the samples playback starts.
+const clipLen = (tk) => (tk.len != null ? tk.len : (tk.duration || 0));
+const clipWidth = (tk) => Math.max(8, Math.round(clipLen(tk) * PX_PER_SEC));
 const occupiedExcept = (track, n) => track.takes.filter((k) => k.n !== n).map((k) => ({ x: k.x, w: clipWidth(k) }));
 
 function renderTrack() {
@@ -332,10 +373,13 @@ function renderTrack() {
     tracks,
     armedId,
     snap: snapOn,
+    playheadSec,
     onToggleSnap: () => { snapOn = !snapOn; renderTrack(); },
     onAddTrack: () => {
       pushUndo();
+      saveTrackPatch(armedTrack());            // persist the current track's patch
       const t = newTrack(activePresetName);
+      t.patch = { chain: captureChainData(), reverb: { ...ampReverb }, name: activePresetName }; // new track starts as a copy of the current sound
       tracks.forEach((k) => { k.armed = false; });
       t.armed = true; armedId = t.id; tracks.push(t);
       renderTrack();
@@ -346,20 +390,57 @@ function renderTrack() {
     onPan: (id, p) => { const t = tracks.find((k) => k.id === id); if (t) { t.pan = p; if (player.isPlaying()) player.setTrackPan(id, p); } },
     onRemoveTrack: (id) => {
       pushUndo();
+      const removingArmed = armedId === id;
       tracks = tracks.filter((t) => t.id !== id);
-      if (armedId === id) armedId = tracks.length ? tracks[tracks.length - 1].id : null;
+      if (removingArmed) {
+        armedId = tracks.length ? tracks[tracks.length - 1].id : null;
+        loadTrackPatch(armedTrack()); // restore the newly-armed track's patch
+      }
       tracks.forEach((t) => { t.armed = t.id === armedId; });
       renderTrack(); updateTransport();
     },
-    onArm: (id) => { armedId = id; tracks.forEach((t) => { t.armed = t.id === id; }); renderTrack(); },
+    // Switching tracks saves the current track's patch and restores the target's.
+    onArm: (id) => {
+      if (id === armedId) return;
+      saveTrackPatch(armedTrack());
+      armedId = id;
+      tracks.forEach((t) => { t.armed = t.id === id; });
+      loadTrackPatch(armedTrack());
+      renderTrack();
+    },
     onRename: (id, name) => { const t = tracks.find((k) => k.id === id); if (t) { pushUndo(); t.name = name; renderTrack(); } },
     onMoveClip: (trackId, n, x, free) => {
       const t = tracks.find((k) => k.id === trackId); const tk = t && t.takes.find((k) => k.n === n);
       if (tk) { pushUndo(); tk.x = Math.max(0, Math.round(resolveNoOverlap(occupiedExcept(t, n), snapPx(x, free), clipWidth(tk)))); renderTrack(); }
     },
+    // Trim a clip by dragging an edge: non-destructive (offset into samples + len).
+    onTrimClip: (trackId, n, offset, len, x) => {
+      const t = tracks.find((k) => k.id === trackId); const tk = t && t.takes.find((k) => k.n === n);
+      if (tk) { pushUndo(); tk.offset = Math.max(0, offset); tk.len = Math.max(0.05, len); tk.x = Math.max(0, Math.round(x)); renderTrack(); }
+    },
+    // Group move: each clip avoids overlapping the clips that AREN'T moving, but
+    // moving clips don't fight each other. One undo, one re-render.
+    onMoveClips: (moves, free) => {
+      if (!moves || !moves.length) return;
+      pushUndo();
+      const moving = new Set(moves.map((m) => `${m.trackId}:${m.n}`));
+      for (const m of moves) {
+        const t = tracks.find((k) => k.id === m.trackId); const tk = t && t.takes.find((k) => k.n === m.n);
+        if (!tk) continue;
+        const others = t.takes.filter((k) => k.n !== m.n && !moving.has(`${t.id}:${k.n}`)).map((k) => ({ x: k.x, w: clipWidth(k) }));
+        tk.x = Math.max(0, Math.round(resolveNoOverlap(others, snapPx(m.x, free), clipWidth(tk))));
+      }
+      renderTrack();
+    },
     onDeleteClip: (trackId, n) => {
       const t = tracks.find((k) => k.id === trackId);
       if (t) { pushUndo(); t.takes = t.takes.filter((k) => k.n !== n); renderTrack(); updateTransport(); }
+    },
+    onDeleteClips: (items) => {
+      if (!items || !items.length) return;
+      pushUndo();
+      for (const it of items) { const t = tracks.find((k) => k.id === it.trackId); if (t) t.takes = t.takes.filter((k) => k.n !== it.n); }
+      renderTrack(); updateTransport();
     },
   });
 }
@@ -407,9 +488,10 @@ function showStats() {
 function startMeter() {
   const timeBuf = new Uint8Array(analyser.fftSize);
   pitchBuf = new Float32Array(analyser.fftSize);
+  let lastPitch = 0;
   function loop() {
     rafId = requestAnimationFrame(loop);
-    // input meter (time-domain bytes) — feeds the toolbar VOL meter
+    // input meter (time-domain bytes) — cheap, runs every frame
     analyser.getByteTimeDomainData(timeBuf);
     let peak = 0;
     for (let i = 0; i < timeBuf.length; i++) {
@@ -417,18 +499,24 @@ function startMeter() {
       if (v > peak) peak = v;
     }
     { const m = $('meter'); if (m) m.style.width = Math.min(100, peak / 128 * 100 * 1.5) + '%'; }
-    // note detection — same McLeod Pitch Method the tuner uses.
-    analyser.getFloatTimeDomainData(pitchBuf);
-    const res = detectPitchMPM(pitchBuf, ctx.sampleRate);
-    const circle = $('note-circle');
-    if (!circle) return;
-    if (res && res.freq > 0 && res.clarity > 0.9) {
-      lastNoteMs = performance.now();
-      circle.textContent = noteLabel(freqToNote(res.freq));
-      circle.classList.add('active');
-    } else if (performance.now() - lastNoteMs > 1200) {
-      // Keep the last note name visible; just dim it once the note has stopped ringing.
-      circle.classList.remove('active');
+    // Note detection (McLeod Pitch Method) is O(n·maxLag) and allocates — far too
+    // heavy to run at 60 fps; it can starve the audio render thread and cause
+    // playback dropouts. Throttle to ~13 Hz, which is plenty for a note readout.
+    const now = performance.now();
+    if (now - lastPitch >= 75) {
+      lastPitch = now;
+      analyser.getFloatTimeDomainData(pitchBuf);
+      const res = detectPitchMPM(pitchBuf, ctx.sampleRate);
+      const circle = $('note-circle');
+      if (circle) {
+        if (res && res.freq > 0 && res.clarity > 0.9) {
+          lastNoteMs = now;
+          circle.textContent = noteLabel(freqToNote(res.freq));
+          circle.classList.add('active');
+        } else if (now - lastNoteMs > 1200) {
+          circle.classList.remove('active'); // dim once the note stops ringing
+        }
+      }
     }
   }
   loop();
@@ -684,15 +772,17 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
   if (stored && Array.isArray(stored) && stored.length) loadStoredChain(stored);
   else loadPreset(PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0]);
   renderBrowser();
-  // Start with one armed track named after the active preset.
+  // Start with one armed track named after the active preset; it owns the
+  // initial chain so per-track patch memory works from the first switch.
   const t0 = newTrack(activePresetName); t0.armed = true;
   tracks = [t0]; armedId = t0.id;
+  saveTrackPatch(t0);
   renderTrack();
 })();
 
 // Toolbar transport cluster: inert transport (ground for recording) + working
 // metronome and tuner. The tuner taps the live engine analyser when running.
-mountTransport($('transport-cluster'), {
+const transport = mountTransport($('transport-cluster'), {
   getLiveAnalyser: () => analyser,
   onGain: (v) => { if (gainOut) gainOut.gain.value = v; },
 });
@@ -702,47 +792,67 @@ mountTransport($('transport-cluster'), {
   const recBtn = $('tp-record');
   if (recBtn) recBtn.addEventListener('click', () => {
     if (!ctx) return; // only while live
+    if (recBtn.classList.contains('counting')) return; // ignore re-click mid count-in
     const track = armedTrack();
     if (!track) return; // need an armed track to record into
     if (recorder.isRecording()) {
       clearLiveClip();
       const t = recorder.stop();
+      transport.endSession();
       recBtn.classList.remove('recording');
       if (t && t.samples.length) {
         pushUndo();
-        track.takes.push({ ...t, n: ++takeSeq, name: track.name, x: nextClipX(track) });
+        track.takes.push({ ...t, n: ++takeSeq, name: track.name, x: recStartX });
         renderTrack();
         updateTransport();
       }
     } else {
       if (player.isPlaying()) { player.stop(); reflectPlay(); }
-      recorder.start();
-      recBtn.classList.add('recording');
-      // Grow a purple clip in real time in the armed track's strip.
-      const area = $('track-lane') && $('track-lane').querySelector(`.track-strip[data-track-id="${track.id}"]`);
-      if (area) {
-        const startT = ctx.currentTime, x = nextClipX(track);
-        liveClip = document.createElement('div');
-        liveClip.className = 'track-clip recording-clip';
-        liveClip.style.cssText = `left:${x}px;top:6px;height:80px;width:0px`;
-        const lbl = document.createElement('div'); lbl.className = 'clip-label'; lbl.textContent = `${track.name || 'Take'} #${takeSeq + 1}`;
-        const canvas = document.createElement('canvas'); canvas.className = 'clip-wave'; canvas.height = 80;
-        liveClip.append(lbl, canvas);
-        area.appendChild(liveClip);
-        let lastDraw = 0;
-        const grow = () => {
-          if (!liveClip) return;
-          const w = Math.max(0, (ctx.currentTime - startT) * PX_PER_SEC);
-          liveClip.style.width = `${w}px`;
-          const now = performance.now();
-          if (now - lastDraw > 50) { // redraw the live waveform ~20fps
-            lastDraw = now;
-            canvas.width = Math.max(1, Math.floor(w));
-            drawWaveform(canvas, recorder.samplesSoFar(), { color: '#d8daf8' });
-          }
-          liveRAF = requestAnimationFrame(grow);
-        };
-        grow();
+      // Actually begin capture + grow the live clip. Deferred past the count-in.
+      const begin = () => {
+        recBtn.classList.remove('counting');
+        if (!ctx || recorder.isRecording()) return;
+        recorder.start();
+        recBtn.classList.add('recording');
+        // Grow a purple clip in real time in the armed track's strip.
+        const area = $('track-lane') && $('track-lane').querySelector(`.track-strip[data-track-id="${track.id}"]`);
+        if (area) {
+          // Recording starts AT the playhead (where the user parked it), not at
+          // the end of the track. The clip + the stored take share this anchor.
+          const startT = ctx.currentTime, startSec = Math.max(0, playheadSec);
+          const x = Math.round(startSec * PX_PER_SEC); recStartX = x;
+          liveClip = document.createElement('div');
+          liveClip.className = 'track-clip recording-clip';
+          liveClip.style.cssText = `left:${x}px;top:6px;height:80px;width:0px`;
+          const lbl = document.createElement('div'); lbl.className = 'clip-label'; lbl.textContent = `${track.name || 'Take'} #${takeSeq + 1}`;
+          const canvas = document.createElement('canvas'); canvas.className = 'clip-wave'; canvas.height = 80;
+          liveClip.append(lbl, canvas);
+          area.appendChild(liveClip);
+          let lastDraw = 0;
+          const grow = () => {
+            if (!liveClip) return;
+            const elapsed = ctx.currentTime - startT;
+            const w = Math.max(0, elapsed * PX_PER_SEC);
+            liveClip.style.width = `${w}px`;
+            setPlayhead(startSec + elapsed); // playhead rides the leading edge while recording
+            const now = performance.now();
+            if (now - lastDraw > 50) { // redraw the live waveform ~20fps
+              lastDraw = now;
+              canvas.width = Math.max(1, Math.floor(w));
+              drawWaveform(canvas, recorder.samplesSoFar(), { color: '#d8daf8' });
+            }
+            liveRAF = requestAnimationFrame(grow);
+          };
+          grow();
+        }
+      };
+      // Count-in and/or metronome → one continuous beat grid; recording starts
+      // on the downbeat. No count-in and no metronome → begin immediately.
+      if (transport.needsSession()) {
+        if (transport.isCountIn()) recBtn.classList.add('counting');
+        transport.recordSession(begin);
+      } else {
+        begin();
       }
     }
   });
@@ -787,11 +897,16 @@ mountTransport($('transport-cluster'), {
       if (clip && clip.dataset.takeId) {
         e.preventDefault();
         const tid = Number(clip.dataset.trackId), n = Number(clip.dataset.takeId);
+        // If the right-clicked clip is part of a multi-selection, Delete removes
+        // the whole selection; otherwise just this clip.
+        const sel = getSelectedClips();
+        const inSel = sel.some((s) => s.trackId === tid && s.n === n);
+        const targets = inSel && sel.length > 1 ? sel : [{ trackId: tid, n }];
         openCtxMenu(e.clientX, e.clientY, [
           ctxItem('Copy', () => copyClip(tid, n)),
           ctxItem('Paste at playhead', () => pasteClip(tid), !clipboard),
           ctxItem('Split at playhead', () => splitClip(tid, n)),
-          ctxItem('Delete', () => deleteClip(tid, n)),
+          ctxItem(targets.length > 1 ? `Delete ${targets.length} clips` : 'Delete', () => deleteClips(targets)),
         ]);
         return;
       }

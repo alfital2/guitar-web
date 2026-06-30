@@ -24,4 +24,10 @@ describe('createMetronome (no audio)', () => {
     m.start(); expect(m.isRunning()).toBe(true);
     m.toggle(); expect(m.isRunning()).toBe(false);
   });
+  it('startSession fires the downbeat immediately when there is no audio', () => {
+    const m = createMetronome();
+    let down = false;
+    m.startSession({ countBeats: 4, recordMetro: false, onDownbeat: () => { down = true; } });
+    expect(down).toBe(true); // no AudioContext → synchronous downbeat
+  });
 });

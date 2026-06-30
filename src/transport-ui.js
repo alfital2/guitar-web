@@ -51,7 +51,25 @@ export function mountTransport(container, { getLiveAnalyser, onGain }) {
   const metronome = createMetronome({
     onBeat: (b) => { metroBtn.classList.add(b % 4 === 0 ? 'beat-accent' : 'beat'); setTimeout(() => metroBtn.classList.remove('beat', 'beat-accent'), 90); },
   });
-  metroBtn.addEventListener('click', () => { metronome.toggle(); metroBtn.classList.toggle('on', metronome.isRunning()); });
+  // The metronome no longer free-runs: clicking ARMS it (active colour). It only
+  // clicks while recording (see the record flow in main.js).
+  let metroArmed = false;
+  metroBtn.title = 'Metronome — clicks while recording';
+  metroBtn.addEventListener('click', () => { metroArmed = !metroArmed; metroBtn.classList.toggle('on', metroArmed); });
+
+  // ── Count-in toggle (4 beats before recording) ──
+  let countOn = false;
+  const countWrap = el('div', 'countin');
+  const countBtn = el('button', 'count-toggle'); countBtn.id = 'count-toggle'; countBtn.type = 'button';
+  countBtn.title = 'Count-in — 4 beats before recording';
+  countBtn.setAttribute('aria-label', 'Count-in before recording');
+  countBtn.innerHTML = `<svg viewBox="0 0 26 12" width="20" height="12" aria-hidden="true">
+    <circle cx="3" cy="6" r="2.3" fill="currentColor"/>
+    <circle cx="10" cy="6" r="2.1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <circle cx="17" cy="6" r="2.1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+    <circle cx="24" cy="6" r="2.1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+  countBtn.addEventListener('click', () => { countOn = !countOn; countBtn.classList.toggle('on', countOn); });
+  countWrap.append(countBtn);
 
   // BPM scrub (drag vertical / wheel) + click-to-type.
   const setBpm = (v) => { const n = clampTempo(v); metronome.setTempo(n); bpmVal.textContent = String(n); };
@@ -98,6 +116,9 @@ export function mountTransport(container, { getLiveAnalyser, onGain }) {
     onState: (s) => {
       tunerBtn.classList.toggle('on', s.on);
       strip.hidden = !s.on;
+      // The tuner readout pops out to the right and would overlap the NOTE box —
+      // hide NOTE while the tuner is open (it shows the note anyway).
+      container.classList.toggle('tuner-open', s.on);
       if (s.error) { noteEl.textContent = s.error; }
     },
   });
@@ -108,5 +129,17 @@ export function mountTransport(container, { getLiveAnalyser, onGain }) {
   const noteCircle = el('span', 'note-circle'); noteCircle.id = 'note-circle'; noteCircle.textContent = '—';
   noteBox.append(el('span', 'tp-note-cap', 'NOTE'), noteCircle);
 
-  container.append(volg, transport, metro, tunerWrap, noteBox);
+  container.append(volg, transport, metro, countWrap, tunerWrap, noteBox);
+
+  // Controller for the record flow (main.js): count-in + record-gated metronome
+  // on ONE continuous beat grid (no seam between count-in and the first beat).
+  return {
+    isCountIn: () => countOn,
+    isMetroArmed: () => metroArmed,
+    needsSession: () => countOn || metroArmed,
+    // Runs count-in (if armed) then calls onDownbeat when recording should start;
+    // the metronome keeps clicking through the take when armed.
+    recordSession: (onDownbeat) => metronome.startSession({ countBeats: countOn ? 4 : 0, recordMetro: metroArmed, onDownbeat }),
+    endSession: () => metronome.stop(),
+  };
 }
