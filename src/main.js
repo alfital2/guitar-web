@@ -2,7 +2,6 @@
 import { registry } from './effects/index.js';
 import { buildChain } from './engine.js';
 import { PRESETS, validatePreset, GB_CATEGORIES } from './presets.js';
-import { renderPresetPicker } from './ui.js';
 import { renderPresetBrowser } from './preset-browser.js';
 import { renderPedalboard } from './chain-ui/pedalboard.js';
 import { renderAmp } from './chain-ui/amp.js';
@@ -571,13 +570,10 @@ async function start() {
     applyActiveCalibration();
 
     const defaultPreset = PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0];
-    renderPresetPicker($('presets'), PRESETS, loadPreset);
     // The chain may already be populated (edited before Start). If so, just wire
     // the existing model to audio; otherwise fall back to the default preset.
     if (currentChain.length === 0) loadPreset(defaultPreset);
     else rebuildGraph();
-    const sel = $('presets').querySelector('select');
-    if (sel) sel.selectedIndex = PRESETS.indexOf(defaultPreset);
 
     renderCalibControls();
     startMeter();

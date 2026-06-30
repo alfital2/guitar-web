@@ -143,6 +143,20 @@
   .btn-power { padding: 6px 16px; border-radius: 7px; font-weight: 700; letter-spacing: 0.02em; border: 1px solid transparent; }
   .btn-power.on { background: var(--green); color: #04210d; border-color: var(--green); box-shadow: 0 0 10px rgba(50,215,75,0.4); }
   .btn-power.off { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.55); border-color: rgba(255,255,255,0.12); }
+  /* "Start here" callout pointing at the power button (only while powered off). */
+  .start-hint {
+    position: relative; display: inline-flex; align-items: center; margin-right: 9px;
+    padding: 5px 11px; font: 700 11px var(--font); color: #04210d; background: var(--green);
+    border-radius: 6px; white-space: nowrap; box-shadow: 0 2px 8px rgba(50,215,75,0.35);
+    animation: hint-bob 1.15s ease-in-out infinite;
+  }
+  .start-hint-tip {
+    position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 0; height: 0;
+    border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid var(--green);
+  }
+  @keyframes hint-bob { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-4px); } }
+  @media (prefers-reduced-motion: reduce) { .start-hint { animation: none; } }
+  body:not(.powered-off) .start-hint { display: none; }
   /* Until the engine is powered on, the workspace waits — dimmed + desaturated. */
   body.powered-off #track-lane, body.powered-off .amp-strip, body.powered-off .pedalboard-strip { opacity: 0.45; filter: grayscale(0.6); }
   @media (prefers-reduced-motion: no-preference) {
@@ -706,7 +720,7 @@
     <button id="presets-toggle" class="icon btn-dim presets-toggle" title="Presets" aria-label="Open presets">☰ Presets</button>
     <div id="transport-cluster"></div>
     <div class="toolbar-actions">
-      <div id="presets"></div>
+      <div class="start-hint">Start here<i class="start-hint-tip"></i></div>
       <button id="power" class="btn-power off" title="Power on the amp engine">⏻ Power</button>
       <button id="settings-toggle" class="icon btn-dim" aria-label="Settings" title="Settings">⚙</button>
     </div>

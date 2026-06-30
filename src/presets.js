@@ -19,10 +19,13 @@ export const PRESETS = [clean, mayerEdge, mayerLead, knopflerSultans, asatoClean
   funkAutowah, fuzzFace, ambientWash, surfTremolo, swirlPhaser, octaveDown,
   ...GB_PRESETS];
 
-// GarageBand patches grouped by browser category, for the preset browser panel.
+// Browser categories: GarageBand patches plus the artist/showcase presets that
+// used to live in the toolbar dropdown.
 export const GB_CATEGORIES = [
   { id: 'clean', label: '01 Clean Guitar', presets: GB_PRESETS.filter((p) => p.category === 'clean') },
   { id: 'crunch', label: '02 Crunch Guitar', presets: GB_PRESETS.filter((p) => p.category === 'crunch') },
+  { id: 'artists', label: '03 Artist Rigs', presets: [mayerEdge, mayerLead, knopflerSultans, asatoClean, hensonClean, hetfieldRhythm, hammettLead] },
+  { id: 'showcase', label: '04 Showcase FX', presets: [clean, funkAutowah, fuzzFace, ambientWash, surfTremolo, swirlPhaser, octaveDown] },
 ];
 
 export function validatePreset(preset, registry) {
