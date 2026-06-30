@@ -140,9 +140,14 @@
     background: var(--accent); border: none; color: #120900; font-weight: 700; padding: 6px 18px;
   }
   /* Amp-engine power toggle — visually distinct from the play (▶) button. */
-  .btn-power { background: var(--green); border: none; color: #04210d; font-weight: 700; padding: 6px 16px; border-radius: 7px; letter-spacing: 0.02em; }
-  .btn-power-off { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.55); font-weight: 600; padding: 6px 14px; border-radius: 7px; }
-  .btn-power[disabled] { filter: grayscale(0.5) brightness(0.7); }
+  .btn-power { padding: 6px 16px; border-radius: 7px; font-weight: 700; letter-spacing: 0.02em; border: 1px solid transparent; }
+  .btn-power.on { background: var(--green); color: #04210d; border-color: var(--green); box-shadow: 0 0 10px rgba(50,215,75,0.4); }
+  .btn-power.off { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.55); border-color: rgba(255,255,255,0.12); }
+  /* Until the engine is powered on, the workspace waits — dimmed + desaturated. */
+  body.powered-off #track-lane, body.powered-off .amp-strip, body.powered-off .pedalboard-strip { opacity: 0.45; filter: grayscale(0.6); }
+  @media (prefers-reduced-motion: no-preference) {
+    #track-lane, .amp-strip, .pedalboard-strip { transition: opacity .25s, filter .25s; }
+  }
   .btn-dim {
     background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.35);
   }
@@ -702,8 +707,7 @@
     <div id="transport-cluster"></div>
     <div class="toolbar-actions">
       <div id="presets"></div>
-      <button id="start" class="btn-power" title="Power on the amp engine">⏻ Power</button>
-      <button id="stop" class="btn-power-off" disabled title="Power off">⏻ Off</button>
+      <button id="power" class="btn-power off" title="Power on the amp engine">⏻ Power</button>
       <button id="settings-toggle" class="icon btn-dim" aria-label="Settings" title="Settings">⚙</button>
     </div>
   </div>

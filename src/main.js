@@ -584,7 +584,7 @@ async function start() {
     showStats();
     setTimeout(showStats, 600);
 
-    $('start').disabled = true; $('stop').disabled = false;
+    setPower(true);
     { const r = $('tp-record'); if (r) { r.disabled = false; r.title = 'Record'; } }
     listDevices();
   } catch (e) {
@@ -605,7 +605,7 @@ function stop() {
   if (stream) stream.getTracks().forEach(t => t.stop());
   if (ctx) ctx.close();
   ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = reverbStage = null;
-  $('start').disabled = false; $('stop').disabled = true;
+  setPower(false);
   prevBars = null;
   { const fl = $('freq-label'); if (fl) { fl.textContent = '— Hz'; fl.style.color = ''; } }
 }
@@ -623,8 +623,15 @@ async function listDevices() {
   }
 }
 
-$('start').addEventListener('click', start);
-$('stop').addEventListener('click', stop);
+// Single power toggle: off → start the engine, on → stop it. While off, the
+// workspace (track lane / amp / pedalboard) is dimmed until powered on.
+function setPower(on) {
+  const b = $('power');
+  if (b) { b.classList.toggle('on', on); b.classList.toggle('off', !on); b.title = on ? 'Power off the amp engine' : 'Power on the amp engine'; }
+  document.body.classList.toggle('powered-off', !on);
+}
+$('power').addEventListener('click', () => { if (ctx) stop(); else start(); });
+setPower(false);
 $('calib-save').addEventListener('click', saveCalibration);
 $('calib-cancel').addEventListener('click', stopCalibration);
 $('calib-start').addEventListener('click', startCalibration);
