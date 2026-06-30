@@ -185,13 +185,8 @@
   .vol-wrap { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .vol-wrap .vol-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #2e2e36; }
   /* VOL: accent fill (painted in JS) under a translucent glass-bead thumb */
-  #gain { -webkit-appearance: none; appearance: none; width: 92px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.16); cursor: pointer; }
-  /* Simple slider thumb: a clean round handle on the accent-filled track. */
-  #gain::-webkit-slider-thumb, .track-vol::-webkit-slider-thumb {
-    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; margin-top: -5px;
-    background: #fff; border: none; box-shadow: 0 1px 3px rgba(0,0,0,0.5); cursor: pointer; }
-  #gain::-moz-range-thumb, .track-vol::-moz-range-thumb {
-    width: 16px; height: 16px; border-radius: 50%; background: #fff; border: none; box-shadow: 0 1px 3px rgba(0,0,0,0.5); cursor: pointer; }
+  /* Plain native slider — the browser handles fill + thumb position. */
+  #gain { width: 92px; accent-color: var(--accent); cursor: pointer; }
   #gain-label { font: 10px var(--mono); color: #3a3a44; width: 28px; }
   .dot { display: none; }
 
@@ -317,8 +312,7 @@
   /* Fader + pan row */
   .track-mix { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 8px; margin-top: auto; }
   .mix-label { font-size: 8px; font-weight: 800; letter-spacing: 0.1em; color: var(--very-muted); }
-  .track-vol { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 3px;
-    background: linear-gradient(90deg, rgba(var(--accent-rgb),0.9) var(--fill,80%), rgba(255,255,255,0.13) var(--fill,80%)); }
+  .track-vol { width: 100%; min-width: 0; accent-color: var(--accent); cursor: pointer; }
   .track-pan { position: relative; width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%;
     background: radial-gradient(circle at 35% 26%, rgba(255,255,255,0.22), rgba(54,54,62,0.5) 58%, rgba(20,20,26,0.62));
     border: 1px solid rgba(255,255,255,0.26);

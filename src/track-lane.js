@@ -65,10 +65,7 @@ function trackHeader(track, armedId, h) {
   const mix = el('div', 'track-mix');
   const vol = el('input', 'track-vol'); vol.type = 'range'; vol.min = '0'; vol.max = '1'; vol.step = '0.01';
   vol.value = String(track.volume == null ? 0.8 : track.volume); vol.setAttribute('aria-label', 'Track volume');
-  // Paint the accent fill to the left of the thumb (the right stays neutral).
-  const paintVol = () => vol.style.setProperty('--fill', `${parseFloat(vol.value) * 100}%`);
-  paintVol();
-  vol.addEventListener('input', () => { paintVol(); if (h.onVolume) h.onVolume(track.id, parseFloat(vol.value)); });
+  vol.addEventListener('input', () => { if (h.onVolume) h.onVolume(track.id, parseFloat(vol.value)); });
   const pan = el('span', 'track-pan'); pan.title = 'Pan (drag) · double-click to center';
   const panDot = el('span', 'track-pan-dot'); pan.appendChild(panDot);
   const panVal = track.pan || 0;
