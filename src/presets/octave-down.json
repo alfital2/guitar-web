@@ -1,0 +1,7 @@
+{ "name": "Octave Down", "artist": "Showcase", "song": "Sub-octave synth bass", "chain": [
+  { "type": "compressor", "params": { "threshold": -20, "ratio": 3, "attack": 0.005, "release": 0.2, "makeup": 3 } },
+  { "type": "pitchshift", "params": { "semitones": -12, "mix": 0.6 } },
+  { "type": "eq",         "params": { "bass": 7, "mid": 5, "midFreq": 500, "treble": 4 } },
+  { "type": "cabinet",    "params": { "brightness": 3, "body": 7, "mix": 1 } },
+  { "type": "reverb",     "params": { "size": 0.4, "mix": 0.1 } }
+] }

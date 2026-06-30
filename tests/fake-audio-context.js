@@ -15,6 +15,15 @@ export class FakeAudioContext {
   createDynamicsCompressor() { return this._mk('compressor', { threshold: param(-24), knee: param(30), ratio: param(12), attack: param(0.003), release: param(0.25) }); }
   createDelay() { return this._mk('delay', { delayTime: param(0) }); }
   createConvolver() { return this._mk('convolver', { buffer: null }); }
+  createChannelMerger(n = 2) { return this._mk('merger', { numberOfInputs: n }); }
+  createStereoPanner() { return this._mk('panner', { pan: param(0) }); }
+  createConstantSource() {
+    const ctx = this;
+    const n = this._mk('constant', { offset: param(0) });
+    n.start = () => { ctx.constStarts = (ctx.constStarts || 0) + 1; };
+    n.stop = () => {};
+    return n;
+  }
   createOscillator() {
     const ctx = this;
     const n = this._mk('oscillator', { frequency: { value: 440 }, type: 'sine' });

@@ -18,6 +18,47 @@ export function makeSoftClipCurve(amount, n = 2048) {
   return curve;
 }
 
+// Hard clip with a knee. amount 0..10 -> steeper, more aggressive clipping than
+// the tube-ish soft clip. Used for fuzz/octave fuzz.
+export function makeHardClipCurve(amount, n = 2048) {
+  const k = 1 + amount * 8;             // much hotter than soft clip
+  const bias = 0.18 * (amount / 10);    // strong asymmetry -> octave-ish overtones
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    let y = (k * x + bias) / (1 + Math.abs(k * x + bias)); // saturating, near-square at high k
+    y -= bias / (1 + Math.abs(bias));    // recenter so f(0)=0
+    curve[i] = Math.max(-1, Math.min(1, y));
+  }
+  return curve;
+}
+
+// Full-wave rectifier: y = |x|. Doubles the fundamental frequency, producing the
+// octave-up overtone behind an Octavia-style fuzz. depth 0..1 blends |x| with x.
+export function makeRectifierCurve(depth = 1, n = 2048) {
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = depth * (Math.abs(x) * 2 - 1) + (1 - depth) * x; // |x| remapped to -1..1
+  }
+  return curve;
+}
+
+// Soft-knee gate transfer curve mapping a unipolar envelope (0..1, fed in the
+// upper half of the curve domain) to a gain multiplier 0..1. Below `threshold`
+// the gain falls toward 0; above it, toward 1. `knee` widens the transition.
+export function makeGateCurve(threshold, knee = 0.06, n = 2048) {
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;   // -1..1; envelope arrives as 0..1 (upper half)
+    const env = Math.max(0, x);
+    // smoothstep from (threshold-knee) to (threshold+knee)
+    const t = Math.min(1, Math.max(0, (env - (threshold - knee)) / (2 * knee)));
+    curve[i] = t * t * (3 - 2 * t);
+  }
+  return curve;
+}
+
 export function makeReverbImpulse(ctx, seconds, decay) {
   const rate = ctx.sampleRate;
   const length = Math.round(seconds * rate);
