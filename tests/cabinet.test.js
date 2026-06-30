@@ -16,4 +16,11 @@ describe('cabinet effect', () => {
     expect(fx.output.kind).toBe('gain');
     expect(fx.output.gain.value).toBe(1);
   });
+  it('exposes a presence param and wires a high-shelf for it', () => {
+    expect(schema.params.map(p => p.key)).toContain('presence');
+    const ctx = new FakeAudioContext();
+    // builds without presence (defaults neutral) and with an explicit value
+    expect(() => create(ctx, { brightness: 4, body: 6, mix: 1 })).not.toThrow();
+    expect(() => create(ctx, { brightness: 4, body: 6, presence: 8, mix: 1 })).not.toThrow();
+  });
 });

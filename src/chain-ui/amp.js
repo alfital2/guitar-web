@@ -7,9 +7,51 @@ const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.cla
 // inline stroke), pointer is white, with an engraved 0..10 number ring.
 const AMP_KNOB_STYLE = { cap: ['#3a3a40', '#1a1a1e', '#08080a'], pointer: '#f4f4f6', numbered: true };
 
-export function renderAmp(container, modules, onParamChange) {
+// Read-only "value strip" shown when the amp is collapsed: one slim brushed-metal
+// row of label + current value per knob, grouped by amp section. Built from the
+// freshly-rendered head so values + formatting always match the live knobs.
+function buildStrip(head) {
+  const strip = el('div', 'amp-vstrip');
+  const groups = [...head.querySelectorAll('.amp-group')];
+  groups.forEach((g, gi) => {
+    if (gi > 0) strip.appendChild(el('div', 'amp-vstrip-div'));
+    const sec = el('div', 'amp-vstrip-sec');
+    const sh = el('div', 'amp-vstrip-sec-head');
+    sh.textContent = (g.querySelector('.amp-group-head') || {}).textContent || '';
+    const chips = el('div', 'amp-vstrip-chips');
+    g.querySelectorAll('.amp-knob').forEach((k) => {
+      const c = el('div', 'amp-vstrip-chip');
+      const v = el('div', 'amp-vstrip-val');
+      v.textContent = (k.querySelector('.val') || {}).textContent || '';
+      const l = el('div', 'amp-vstrip-lbl');
+      l.textContent = (k.querySelector('.amp-knob-label') || {}).textContent || '';
+      c.append(v, l);
+      chips.appendChild(c);
+    });
+    sec.append(sh, chips);
+    strip.appendChild(sec);
+  });
+  const exp = el('div', 'amp-vstrip-exp');
+  exp.innerHTML = '<span>TUNE TO EDIT</span><span class="amp-vstrip-chev">▾</span>';
+  strip.appendChild(exp);
+  return strip;
+}
+
+// Copy current knob values from the head into the strip (by index) so the strip
+// is accurate when re-collapsing after edits.
+function syncStrip(strip, head) {
+  const vals = [...head.querySelectorAll('.amp-knob .val')];
+  [...strip.querySelectorAll('.amp-vstrip-val')].forEach((cell, i) => {
+    if (vals[i]) cell.textContent = vals[i].textContent;
+  });
+}
+
+export function renderAmp(container, modules, onParamChange, opts = {}) {
   container.innerHTML = '';
   if (!modules.length) return;
+
+  const collapsed = opts.collapsed !== false; // default collapsed
+  const wrap = el('div', 'amp-wrap' + (collapsed ? ' collapsed' : ''));
 
   const head = el('div', 'amp-head');
 
@@ -46,6 +88,26 @@ export function renderAmp(container, modules, onParamChange) {
 
   const corners = ['tl', 'tr', 'bl', 'br'].map((c) => el('div', `amp-corner amp-corner-${c}`));
 
-  head.append(handle, panel, grille, ...corners);
-  container.appendChild(head);
+  // Collapse chevron (top-right of the head) — folds the amp back to the strip.
+  const collapseBtn = el('button', 'amp-collapse-btn');
+  collapseBtn.type = 'button';
+  collapseBtn.title = 'Collapse amp to value strip';
+  collapseBtn.setAttribute('aria-label', 'Collapse amp');
+  collapseBtn.innerHTML = '<span>▴</span>';
+
+  head.append(handle, panel, grille, ...corners, collapseBtn);
+
+  // Collapsed value strip; tap anywhere (or the "TUNE TO EDIT" affordance) to expand.
+  const strip = buildStrip(head);
+
+  const setCollapsed = (c) => {
+    if (c) syncStrip(strip, head);
+    wrap.classList.toggle('collapsed', c);
+    if (opts.onCollapse) opts.onCollapse(c);
+  };
+  strip.addEventListener('click', () => setCollapsed(false));
+  collapseBtn.addEventListener('click', (e) => { e.stopPropagation(); setCollapsed(true); });
+
+  wrap.append(strip, head);
+  container.appendChild(wrap);
 }

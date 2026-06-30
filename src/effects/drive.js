@@ -7,6 +7,7 @@ export const schema = {
     { key: 'amount',  label: 'Amount',   min: 0, max: 10, default: 2.5, step: 0.1 },
     { key: 'tone',    label: 'Tone',     min: 0, max: 10, default: 5,   step: 0.1 },
     { key: 'level',   label: 'Level',    min: 0, max: 10, default: 5,   step: 0.1 },
+    { key: 'master',  label: 'Master',   min: 0, max: 10, default: 5,   step: 0.1 },
     { key: 'blend',   label: 'Blend',    min: 0, max: 1,  default: 0.65, step: 0.01 },
     { key: 'midBump', label: 'Mid Bump', min: 0, max: 10, default: 0,   step: 0.1 },
   ],
@@ -27,6 +28,11 @@ export function create(ctx, params) {
   const dry = ctx.createGain();
   input.connect(dry); dry.connect(output);
 
+  // Power-amp master volume: a final gain after the preamp drive + blend.
+  // `level` trims the preamp output; `master` is the overall amp loudness.
+  const master = ctx.createGain();
+  output.connect(master);
+
   const apply = (p) => {
     shaper.curve = makeSoftClipCurve(p.amount);
     tone.frequency.value = mapRange(p.tone, 0, 10, 1000, 8000);
@@ -34,7 +40,8 @@ export function create(ctx, params) {
     wet.gain.value = p.blend;
     dry.gain.value = 1 - p.blend;
     output.gain.value = mapRange(p.level, 0, 10, 0, 2);
+    master.gain.value = mapRange(p.master ?? 5, 0, 10, 0, 2); // default 5 → unity
   };
   apply(params);
-  return { input, output, apply };
+  return { input, output: master, apply };
 }

@@ -36,4 +36,46 @@ describe('renderAmp', () => {
     renderAmp(el, modules, () => {});
     expect(el.querySelectorAll('.amp-head')).toHaveLength(1);
   });
+
+  it('builds a value strip with a chip per knob (label + current value)', () => {
+    const el = document.createElement('div');
+    renderAmp(el, modules, () => {});
+    const chips = el.querySelectorAll('.amp-vstrip-chip');
+    expect(chips).toHaveLength(3);
+    // first knob: amount = 2.5
+    expect(chips[0].querySelector('.amp-vstrip-val').textContent).toBe('2.5');
+    expect(chips[0].querySelector('.amp-vstrip-lbl').textContent).toBe('Amount');
+    // strip is grouped by section
+    expect(el.querySelectorAll('.amp-vstrip-sec-head')).toHaveLength(2);
+  });
+
+  it('defaults to collapsed', () => {
+    const el = document.createElement('div');
+    renderAmp(el, modules, () => {});
+    expect(el.querySelector('.amp-wrap').classList.contains('collapsed')).toBe(true);
+  });
+
+  it('respects collapsed:false', () => {
+    const el = document.createElement('div');
+    renderAmp(el, modules, () => {}, { collapsed: false });
+    expect(el.querySelector('.amp-wrap').classList.contains('collapsed')).toBe(false);
+  });
+
+  it('clicking the strip expands and fires onCollapse(false)', () => {
+    const el = document.createElement('div');
+    const onCollapse = vi.fn();
+    renderAmp(el, modules, () => {}, { collapsed: true, onCollapse });
+    el.querySelector('.amp-vstrip').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(el.querySelector('.amp-wrap').classList.contains('collapsed')).toBe(false);
+    expect(onCollapse).toHaveBeenCalledWith(false);
+  });
+
+  it('the collapse button folds back and fires onCollapse(true)', () => {
+    const el = document.createElement('div');
+    const onCollapse = vi.fn();
+    renderAmp(el, modules, () => {}, { collapsed: false, onCollapse });
+    el.querySelector('.amp-collapse-btn').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(el.querySelector('.amp-wrap').classList.contains('collapsed')).toBe(true);
+    expect(onCollapse).toHaveBeenCalledWith(true);
+  });
 });

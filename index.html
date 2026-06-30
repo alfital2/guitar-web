@@ -272,6 +272,39 @@
   .amp-led { width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffe070, var(--accent)); animation: led-amber 3s ease-in-out infinite; }
   .amp-power span { font: 800 8px var(--font); letter-spacing: 0.12em; color: #23252a; text-shadow: 0 1px 0 rgba(255,255,255,0.4); }
 
+  /* Collapse chevron (top-right of the head) — folds the amp to the value strip. */
+  .amp-collapse-btn {
+    position: absolute; top: 11px; right: 13px; z-index: 3; width: 22px; height: 22px; padding: 0;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    border-radius: 6px; border: 1px solid #000; color: #c8cace;
+    background: linear-gradient(180deg, #45454a, #232327);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.22), 0 2px 4px rgba(0,0,0,0.55); font-size: 11px; line-height: 1;
+  }
+  .amp-collapse-btn:hover { color: #fff; filter: brightness(1.12); }
+
+  /* ── Amp collapsed value strip (concept D) ──────────────
+     Read-only brushed-metal row: label + current value per knob, grouped by
+     section. Tap to expand the full amp head. */
+  .amp-wrap.collapsed .amp-head { display: none; }
+  .amp-wrap:not(.collapsed) .amp-vstrip { display: none; }
+  .amp-vstrip {
+    display: flex; align-items: stretch; max-width: 1180px; margin: 0 auto; cursor: pointer;
+    padding: 9px 6px; border-radius: 13px; border: 1px solid #8d8f95; overflow: hidden;
+    background: linear-gradient(180deg, #dfe1e4, #b9bbc0 48%, #a7a9af);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -2px 5px rgba(0,0,0,0.28), 0 8px 22px rgba(0,0,0,0.45);
+  }
+  .amp-vstrip:hover { filter: brightness(1.02); }
+  .amp-vstrip-div { width: 1px; margin: 4px 0; background: linear-gradient(180deg, transparent, rgba(0,0,0,0.22), transparent); box-shadow: 1px 0 0 rgba(255,255,255,0.5); }
+  .amp-vstrip-sec { display: flex; flex-direction: column; gap: 4px; padding: 2px 14px; flex: 0 0 auto; }
+  .amp-vstrip-sec-head { font: 800 9px/1 var(--font); letter-spacing: 0.12em; text-transform: uppercase; color: #5d5f66; text-align: center; text-shadow: 0 1px 0 rgba(255,255,255,0.55); }
+  .amp-vstrip-chips { display: flex; gap: 13px; }
+  .amp-vstrip-chip { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 34px; }
+  .amp-vstrip-val { font: 700 14px/1 'JetBrains Mono', 'SF Mono', ui-monospace, monospace; color: #1c1d20; letter-spacing: -0.01em; }
+  .amp-vstrip-lbl { font: 600 8px/1 var(--font); letter-spacing: 0.05em; text-transform: uppercase; color: #6c6e75; white-space: nowrap; }
+  .amp-vstrip-exp { margin-left: auto; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 16px; color: #56585f; }
+  .amp-vstrip-exp span:first-child { font: 700 9px/1 var(--font); letter-spacing: 0.06em; }
+  .amp-vstrip-chev { font-size: 13px; }
+
   /* ── Pedalboard ─────────────────────────────────────── */
   /* ── Track lane (recording) ─────────────────────────── */
   .track-lane { padding: 14px 20px; background: rgba(0,0,0,0.18); border-bottom: 1px solid rgba(255,255,255,0.04); }
@@ -470,34 +503,34 @@
   }
   .pb-collapse:hover { color: var(--text); background: rgba(255,255,255,0.06); }
   .pb-search input {
-    flex: 1; min-width: 0; font: 12px var(--font); color: var(--text); appearance: none; -webkit-appearance: none;
-    background: var(--library-input) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%2392929a' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat 10px center;
-    border: 1px solid rgba(0,0,0,0.3); border-radius: 8px; padding: 8px 11px 8px 32px;
+    flex: 1; min-width: 0; font: 11px var(--font); color: var(--text); appearance: none; -webkit-appearance: none;
+    background: var(--library-input) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2392929a' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E") no-repeat 10px center;
+    border: 1px solid rgba(0,0,0,0.3); border-radius: 7px; padding: 6px 11px 6px 30px;
   }
   .pb-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
   .pb-search input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.3); }
   .pb-split { display: flex; flex: 1; min-height: 0; }
   .pb-cats {
-    width: 134px; flex: 0 0 134px; border-right: 1px solid rgba(0,0,0,0.28);
-    padding: 6px 5px; display: flex; flex-direction: column; gap: 2px;
+    width: 132px; flex: 0 0 132px; border-right: 1px solid rgba(0,0,0,0.28);
+    padding: 5px 4px; display: flex; flex-direction: column; gap: 1px;
   }
   .pb-cat {
     display: flex; align-items: center; justify-content: space-between; gap: 5px; text-align: left; cursor: pointer;
-    background: transparent; border: none; border-radius: 6px; padding: 6px 7px;
-    font-size: 11.5px; font-weight: 500; color: #d4d4d8;
+    background: transparent; border: none; border-radius: 5px; padding: 4px 7px;
+    font-size: 11px; font-weight: 400; color: #c2c2c7;
   }
   .pb-cat-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pb-cat:hover { background: rgba(255,255,255,0.05); }
-  .pb-cat.active { background: rgba(255,255,255,0.12); color: #fff; }
-  .pb-chev { color: rgba(255,255,255,0.35); font-size: 14px; }
-  .pb-patches { flex: 1; min-width: 0; overflow-y: auto; padding: 6px 5px; display: flex; flex-direction: column; gap: 1px; }
+  .pb-cat.active { background: rgba(255,255,255,0.1); color: #f0f0f2; }
+  .pb-chev { color: rgba(255,255,255,0.32); font-size: 12px; }
+  .pb-patches { flex: 1; min-width: 0; overflow-y: auto; padding: 5px 4px; display: flex; flex-direction: column; gap: 0; }
   .pb-patch {
-    text-align: left; cursor: pointer; background: transparent; border: none; border-radius: 6px;
-    padding: 6px 9px; font-size: 12px; color: #e8e8ea;
+    text-align: left; cursor: pointer; background: transparent; border: none; border-radius: 5px;
+    padding: 3px 9px; font-size: 11px; font-weight: 400; color: #c8c8cd;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .pb-patch:hover { background: rgba(255,255,255,0.06); }
-  .pb-patch.active { background: rgba(255,255,255,0.14); font-weight: 600; color: #fff; }
+  .pb-patch.active { background: rgba(255,255,255,0.12); font-weight: 500; color: #f0f0f2; }
   .pb-empty { padding: 12px; font-size: 12px; color: rgba(255,255,255,0.4); font-style: italic; }
   /* Tighten amp spacing on smaller widths so the knob rows stay together longer,
      then let the groups wrap rather than overflow the enclosure. */
@@ -520,12 +553,17 @@
     }
     body.presets-open .preset-browser { transform: translateX(0); }
     body.presets-open .presets-close { display: inline-flex; }
+    /* Drawer is open → the toolbar button is redundant. */
+    body.presets-open .presets-toggle { display: none; }
   }
   /* On wide screens the library is a static sidebar — never show drawer chrome. */
   @media (min-width: 1041px) {
     #presets-backdrop, .presets-close { display: none !important; }
     /* Wide screens: the persistent sidebar can be collapsed away. */
     body.presets-hidden .preset-browser { display: none; }
+    /* Sidebar visible → hide the toolbar button; show it only when collapsed. */
+    .presets-toggle { display: none; }
+    body.presets-hidden .presets-toggle { display: inline-flex; }
   }
   /* On narrow screens the browser is a drawer; the collapse chevron is N/A. */
   @media (max-width: 1040px) { .pb-collapse { display: none; } }

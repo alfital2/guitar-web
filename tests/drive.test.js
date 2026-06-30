@@ -23,4 +23,13 @@ describe('drive effect', () => {
     // capture the waveshaper node via connections is awkward; assert apply runs without throwing
     expect(() => fx.apply({ amount: 8, tone: 7, level: 6, blend: 0.7, midBump: 4 })).not.toThrow();
   });
+  it('exposes a master param that defaults to unity gain', () => {
+    expect(schema.params.map(p => p.key)).toContain('master');
+    const ctx = new FakeAudioContext();
+    // no master passed → default 5 → unity output gain
+    const fx = create(ctx, { amount: 3, tone: 5, level: 5, blend: 0.65, midBump: 0 });
+    expect(fx.output.gain.value).toBeCloseTo(1, 5);
+    fx.apply({ amount: 3, tone: 5, level: 5, master: 10, blend: 0.65, midBump: 0 });
+    expect(fx.output.gain.value).toBeCloseTo(2, 5);
+  });
 });

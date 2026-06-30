@@ -32,6 +32,7 @@ let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
 // Reverb lives in the amp now (post-pedalboard, always on), not as a pedal.
 const REVERB_ID = '__amp_reverb__';
 let ampReverb = { size: 0.4, mix: 0 }; // amp reverb params (size, wet mix)
+let ampCollapsed = chainStore.loadAmpCollapsed(); // amp folded to value strip
 let reverbStage = null;                // audio node: engine.output -> reverbStage -> normGain
 let calibrationEq, calibRAF, calibState, calibCountdown;
 let pitchBuf, lastNoteMs = 0;
@@ -212,7 +213,10 @@ function rebuildGraph() {
   // so it reuses the amp-knob UI), placed after the drive/eq/cabinet groups.
   const ampModules = [...locked, { instanceId: REVERB_ID, schema: reverbFx.schema, params: ampReverb }];
   try {
-    renderAmp($('amp'), ampModules, onAmpParam);
+    renderAmp($('amp'), ampModules, onAmpParam, {
+      collapsed: ampCollapsed,
+      onCollapse: (c) => { ampCollapsed = c; chainStore.saveAmpCollapsed(c); },
+    });
     renderPedalboard($('chain'), view, {
       onParamChange: setParamLive,
       onAdd: addEffect,

@@ -4,6 +4,7 @@
 const KEY = 'gs-chain';
 const REVERB_KEY = 'gs-amp-reverb';
 const PRESETS_HIDDEN_KEY = 'gs-presets-hidden';
+const AMP_COLLAPSED_KEY = 'gs-amp-collapsed';
 
 export function save(chain) {
   try {
@@ -47,4 +48,17 @@ export function savePresetsHidden(hidden) {
 
 export function loadPresetsHidden() {
   try { return localStorage.getItem(PRESETS_HIDDEN_KEY) === '1'; } catch { return false; }
+}
+
+// Amp collapsed-to-value-strip state. Defaults to collapsed (true) so the amp
+// stays compact until the user chooses to tune it.
+export function saveAmpCollapsed(collapsed) {
+  try { localStorage.setItem(AMP_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch {}
+}
+
+export function loadAmpCollapsed() {
+  try {
+    const v = localStorage.getItem(AMP_COLLAPSED_KEY);
+    return v === null ? true : v === '1';
+  } catch { return true; }
 }
