@@ -1,0 +1,4 @@
+{ "name": "Vox AC10", "artist": "Neural Amp", "song": "Captured amp — Vox AC10 chime", "category": "pro", "normDb": -2.5,
+  "chain": [
+    { "type": "neuralamp", "params": { "model": 3, "trim": 5, "level": 5 } }
+  ] }

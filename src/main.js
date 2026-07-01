@@ -15,7 +15,7 @@ import { detectPitchMPM } from './pitch/mpm.js';
 import { freqToNote, noteLabel } from './pitch/note.js';
 import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
-import { measureLoudnessGain } from './normalize.js';
+import { measureLoudnessGain, isNeuralChain } from './normalize.js';
 import { mountTransport } from './transport-ui.js';
 import { renderTrackLane, PX_PER_SEC, getSelectedClips, clearClipSelection } from './track-lane.js';
 import { punchTakes } from './take-ops.js';
@@ -186,6 +186,8 @@ let currentChain = [];   // array of units (chain-state model) — source of tru
 let nextId = 1;          // monotonic instanceId source
 let normTimer = null;    // debounce handle for loudness re-measure
 let normSig = null;      // last-measured chain structure signature
+let currentNormDb = null; // fixed loudness offset for neural presets — the offline
+                          // measure can't load their wasm+model (design §7)
 
 const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
 const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
@@ -323,6 +325,8 @@ function loadPreset(preset) {
   const r = chainState.fromPreset(rest, nextId);
   currentChain = r.chain; nextId = r.nextId;
   activePresetName = preset.name;
+  // Neural presets ship a fixed, pre-measured normDb (applied in scheduleNormalize).
+  currentNormDb = typeof preset.normDb === 'number' ? preset.normDb : null;
   rebuildGraph();
   saveTrackPatch(armedTrack()); // the armed track now owns this preset
   renderBrowser();
@@ -348,6 +352,7 @@ function loadTrackPatch(track) {
   const r = chainState.fromPreset(p.chain.filter((e) => registry[e.type]), nextId);
   currentChain = r.chain; nextId = r.nextId;
   activePresetName = p.name || null;
+  currentNormDb = null; // track patches don't persist normDb; neural falls back to unity
   rebuildGraph();
   renderBrowser();
   return true;
@@ -461,6 +466,7 @@ function loadStoredChain(data) {
   const valid = rest.filter((e) => registry[e.type]); // drop unknown types defensively
   const r = chainState.fromPreset(valid, nextId);
   currentChain = r.chain; nextId = r.nextId;
+  currentNormDb = null; // persisted chains don't carry normDb; neural falls back to unity
   rebuildGraph();
 }
 
@@ -468,6 +474,16 @@ function loadStoredChain(data) {
 // (debounced). Param-only edits keep the signature, so they don't re-measure.
 function scheduleNormalize() {
   if (!normGain) return;
+  // Neural presets: skip the offline render entirely — their AudioWorklet wasm +
+  // .nam model can't be loaded/awaited in an OfflineAudioContext (design §7).
+  // Apply the preset's fixed, pre-measured normDb directly (0 dB / unity if the
+  // chain arrived without one, e.g. restored via a track patch).
+  if (isNeuralChain(currentChain)) {
+    normGain.gain.value = 10 ** ((currentNormDb ?? 0) / 20);
+    normSig = null;          // force a fresh measure when a normal preset loads next
+    clearTimeout(normTimer);
+    return;
+  }
   // Reverb wet mix affects output loudness, so fold it into the signature.
   const sig = chainState.signature(currentChain) + `|rv${ampReverb.size},${ampReverb.mix}`;
   if (sig === normSig) return;

@@ -12,11 +12,17 @@ import ambientWash from './presets/ambient-wash.json' with { type: 'json' };
 import surfTremolo from './presets/surf-tremolo.json' with { type: 'json' };
 import swirlPhaser from './presets/swirl-phaser.json' with { type: 'json' };
 import octaveDown from './presets/octave-down.json' with { type: 'json' };
+import proJcm from './presets/pro-jcm.json' with { type: 'json' };
+import pro5153 from './presets/pro-5153.json' with { type: 'json' };
+import proDeluxe from './presets/pro-deluxe.json' with { type: 'json' };
+import proAc10 from './presets/pro-ac10.json' with { type: 'json' };
+import proJc from './presets/pro-jc.json' with { type: 'json' };
 import { GB_PRESETS } from './presets/garageband.js';
 
 // Artist/utility presets, then all GarageBand patches (tagged with a category).
 export const PRESETS = [clean, mayerEdge, mayerLead, knopflerSultans, asatoClean, hensonClean, hetfieldRhythm, hammettLead,
   funkAutowah, fuzzFace, ambientWash, surfTremolo, swirlPhaser, octaveDown,
+  proJcm, pro5153, proDeluxe, proAc10, proJc,
   ...GB_PRESETS];
 
 // Browser categories: GarageBand patches plus the artist/showcase presets that
@@ -26,6 +32,10 @@ export const GB_CATEGORIES = [
   { id: 'crunch', label: '02 Crunch Guitar', presets: GB_PRESETS.filter((p) => p.category === 'crunch') },
   { id: 'artists', label: '03 Artist Rigs', presets: [mayerEdge, mayerLead, knopflerSultans, asatoClean, hensonClean, hetfieldRhythm, hammettLead] },
   { id: 'showcase', label: '04 Showcase FX', presets: [clean, funkAutowah, fuzzFace, ambientWash, surfTremolo, swirlPhaser, octaveDown] },
+  // 05 Professional: real captured amps (NAM WaveNet). Each preset is a single
+  // `neuralamp` amp-head node carrying a fixed, pre-measured normDb (the offline
+  // loudness path can't render the wasm model — see normalize.js / design §7).
+  { id: 'pro', label: '05 Professional', presets: [proJcm, pro5153, proDeluxe, proAc10, proJc] },
 ];
 
 export function validatePreset(preset, registry) {

@@ -41,6 +41,15 @@ function rms(data, start, end) {
 const OfflineCtx = typeof OfflineAudioContext !== 'undefined' ? OfflineAudioContext
   : (typeof webkitOfflineAudioContext !== 'undefined' ? webkitOfflineAudioContext : null);
 
+// A neural-amp chain can't be loudness-measured offline: its amp node is an
+// AudioWorklet whose wasm engine + .nam model arrive asynchronously via
+// postMessage, which an OfflineAudioContext render can't await (design §7).
+// Detect it so callers skip the offline render and apply the preset's fixed,
+// pre-measured normDb instead.
+export function isNeuralChain(chain) {
+  return Array.isArray(chain) && chain.some((e) => e && e.type === 'neuralamp');
+}
+
 // K-weighting (ITU-R BS.1770 / LUFS): a high-pass (RLB) + a ~+4 dB high-shelf
 // that approximate the ear's frequency sensitivity. Measuring loudness through
 // these — instead of flat RMS — makes bright/distorted presets (which sound
@@ -73,6 +82,7 @@ async function kWeightedReference(sampleRate, length, settle) {
 export async function measureLoudnessGain(chain, {
   sampleRate = 48000, seconds = 0.7, settle = 0.2, target = null, min = 0.06, max = 4, reverb = null,
 } = {}) {
+  if (isNeuralChain(chain)) return null; // neural: use the preset's fixed normDb (design §7)
   if (!OfflineCtx) return 1;
   const length = Math.floor(sampleRate * seconds);
   const offline = new OfflineCtx(1, length, sampleRate);
