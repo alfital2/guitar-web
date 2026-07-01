@@ -1,0 +1,4 @@
+{ "name": "Marshall JCM", "artist": "Neural Amp", "song": "Captured amp — Marshall JCM800 crunch", "category": "pro", "normDb": -4.0,
+  "chain": [
+    { "type": "neuralamp", "params": { "model": 0, "trim": 5, "level": 5 } }
+  ] }

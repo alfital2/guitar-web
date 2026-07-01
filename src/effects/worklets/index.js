@@ -4,6 +4,7 @@
 const URLS = [
   new URL('./pitchshift-processor.js', import.meta.url).href,
   new URL('./looper-processor.js', import.meta.url).href,
+  new URL('./neural-amp-processor.js', import.meta.url).href,
 ];
 
 const loaded = new WeakSet();

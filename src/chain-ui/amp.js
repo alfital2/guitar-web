@@ -7,6 +7,12 @@ const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.cla
 // inline stroke), pointer is white, with an engraved 0..10 number ring.
 const AMP_KNOB_STYLE = { cap: ['#3a3a40', '#1a1a1e', '#08080a'], pointer: '#f4f4f6', numbered: true };
 
+// Friendly captured-amp names for the neural amp head's model <select>. Index
+// order matches MODELS in src/effects/neuralamp.js: ['jcm','5153','deluxe','ac10','jc'].
+// Exported so a drift-guard test can assert the two lists stay the same length
+// (see tests/neuralamp-registry.test.js).
+export const NEURAL_LABELS = ['Marshall JCM', 'EVH 5153', 'Fender Deluxe', 'Vox AC10', 'Roland JC'];
+
 // Read-only "value strip" shown when the amp is collapsed: one slim brushed-metal
 // row of label + current value per knob, grouped by amp section. Built from the
 // freshly-rendered head so values + formatting always match the live knobs.
@@ -66,7 +72,28 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
     const gh = el('div', 'amp-group-head');
     gh.textContent = m.schema.label;
     const row = el('div', 'amp-group-knobs');
+
+    // Neural amp head: the 'model' param is a discrete captured-amp chooser, so
+    // it renders as a <select> (not a sweepable knob). It sits between the group
+    // head and the Trim/Level knob row and fires the SAME onParamChange handler.
+    const modelParam = m.type === 'neuralamp' ? m.schema.params.find((p) => p.key === 'model') : null;
+    group.appendChild(gh);
+    if (modelParam) {
+      const sel = el('select', 'amp-model-select');
+      sel.setAttribute('aria-label', modelParam.label);
+      NEURAL_LABELS.forEach((name, i) => {
+        const o = el('option');
+        o.value = String(i);
+        o.textContent = name;
+        sel.appendChild(o);
+      });
+      sel.value = String(m.params[modelParam.key] ?? modelParam.default);
+      sel.addEventListener('change', () => onParamChange(m.instanceId, modelParam.key, Number(sel.value)));
+      group.appendChild(sel);
+    }
+
     for (const p of m.schema.params) {
+      if (p === modelParam) continue; // rendered as the <select> above
       const slot = el('div', 'amp-knob');
       const { el: kEl } = createKnob(p, m.params[p.key] ?? p.default, (v) => onParamChange(m.instanceId, p.key, v), 44, AMP_KNOB_STYLE);
       const lbl = el('div', 'amp-knob-label');
@@ -74,7 +101,7 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
       slot.append(kEl, lbl);
       row.appendChild(slot);
     }
-    group.append(gh, row);
+    group.appendChild(row);
     panel.appendChild(group);
   });
 

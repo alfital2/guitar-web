@@ -25,12 +25,13 @@ import * as pitchshift from './pitchshift.js';
 import * as looper from './looper.js';
 import * as autopan from './autopan.js';
 import * as rotary from './rotary.js';
+import * as neuralamp from './neuralamp.js';
 
 const mods = [
   compressor, drive, eq, cabinet, delay, reverb, chorus,
   boost, fuzz, octave, tremolo, vibrato, flanger, phaser, ringmod,
   autowah, gate, wah, tapeEcho, pingpong, widener, limiter,
-  pitchshift, looper, autopan, rotary,
+  pitchshift, looper, autopan, rotary, neuralamp,
 ];
 
 export const registry = Object.fromEntries(

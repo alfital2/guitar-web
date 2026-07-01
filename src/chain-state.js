@@ -1,6 +1,6 @@
 // src/chain-state.js
 // Pure ordered-chain model. No DOM, no audio. Array order == signal order.
-const AMP_TYPES = new Set(['drive', 'eq', 'cabinet']);
+const AMP_TYPES = new Set(['drive', 'eq', 'cabinet', 'neuralamp']);
 
 export function fromPreset(presetChain, startId) {
   let nextId = startId;

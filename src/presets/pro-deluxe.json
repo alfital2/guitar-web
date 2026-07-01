@@ -1,0 +1,4 @@
+{ "name": "Fender Deluxe", "artist": "Neural Amp", "song": "Captured amp — Fender Deluxe clean/edge", "category": "pro", "normDb": -1.5,
+  "chain": [
+    { "type": "neuralamp", "params": { "model": 2, "trim": 5, "level": 5 } }
+  ] }

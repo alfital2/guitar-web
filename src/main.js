@@ -15,7 +15,7 @@ import { detectPitchMPM } from './pitch/mpm.js';
 import { freqToNote, noteLabel } from './pitch/note.js';
 import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
-import { measureLoudnessGain } from './normalize.js';
+import { measureLoudnessGain, isNeuralChain } from './normalize.js';
 import { mountTransport } from './transport-ui.js';
 import { renderTrackLane, PX_PER_SEC, getSelectedClips, clearClipSelection } from './track-lane.js';
 import { punchTakes } from './take-ops.js';
@@ -27,6 +27,7 @@ import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
+import { connectInputChannel } from './audio/input-channel.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
@@ -36,6 +37,8 @@ let ampReverb = { size: 0.4, mix: 0 }; // amp reverb params (size, wet mix)
 let ampCollapsed = chainStore.loadAmpCollapsed(); // amp folded to value strip
 let reverbStage = null;                // audio node: engine.output -> reverbStage -> normGain
 let calibrationEq, calibRAF, calibState, calibCountdown;
+let inputSplitter = null;   // ChannelSplitterNode after source; picks a hardware input channel
+let inputChannel = 0;       // selected input channel: 0 = input 1, 1 = input 2 (persists across power cycles)
 let pitchBuf, lastNoteMs = 0;
 let prevBars = null;
 let accentRGB = '240,180,41'; // current theme accent for canvas drawing
@@ -186,6 +189,8 @@ let currentChain = [];   // array of units (chain-state model) — source of tru
 let nextId = 1;          // monotonic instanceId source
 let normTimer = null;    // debounce handle for loudness re-measure
 let normSig = null;      // last-measured chain structure signature
+let currentNormDb = null; // fixed loudness offset for neural presets — the offline
+                          // measure can't load their wasm+model (design §7)
 
 const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
 const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
@@ -323,6 +328,8 @@ function loadPreset(preset) {
   const r = chainState.fromPreset(rest, nextId);
   currentChain = r.chain; nextId = r.nextId;
   activePresetName = preset.name;
+  // Neural presets ship a fixed, pre-measured normDb (applied in scheduleNormalize).
+  currentNormDb = typeof preset.normDb === 'number' ? preset.normDb : null;
   rebuildGraph();
   saveTrackPatch(armedTrack()); // the armed track now owns this preset
   renderBrowser();
@@ -348,6 +355,7 @@ function loadTrackPatch(track) {
   const r = chainState.fromPreset(p.chain.filter((e) => registry[e.type]), nextId);
   currentChain = r.chain; nextId = r.nextId;
   activePresetName = p.name || null;
+  currentNormDb = null; // track patches don't persist normDb; neural falls back to unity
   rebuildGraph();
   renderBrowser();
   return true;
@@ -461,6 +469,7 @@ function loadStoredChain(data) {
   const valid = rest.filter((e) => registry[e.type]); // drop unknown types defensively
   const r = chainState.fromPreset(valid, nextId);
   currentChain = r.chain; nextId = r.nextId;
+  currentNormDb = null; // persisted chains don't carry normDb; neural falls back to unity
   rebuildGraph();
 }
 
@@ -468,6 +477,16 @@ function loadStoredChain(data) {
 // (debounced). Param-only edits keep the signature, so they don't re-measure.
 function scheduleNormalize() {
   if (!normGain) return;
+  // Neural presets: skip the offline render entirely — their AudioWorklet wasm +
+  // .nam model can't be loaded/awaited in an OfflineAudioContext (design §7).
+  // Apply the preset's fixed, pre-measured normDb directly (0 dB / unity if the
+  // chain arrived without one, e.g. restored via a track patch).
+  if (isNeuralChain(currentChain)) {
+    normGain.gain.value = 10 ** ((currentNormDb ?? 0) / 20);
+    normSig = null;          // force a fresh measure when a normal preset loads next
+    clearTimeout(normTimer);
+    return;
+  }
   // Reverb wet mix affects output loudness, so fold it into the signature.
   const sig = chainState.signature(currentChain) + `|rv${ampReverb.size},${ampReverb.mix}`;
   if (sig === normSig) return;
@@ -628,6 +647,7 @@ async function start() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       audio: { deviceId: $('input').value ? { exact: $('input').value } : undefined,
+        channelCount: 2,
         echoCancellation: false, noiseSuppression: false, autoGainControl: false, latency: 0 },
       video: false,
     });
@@ -644,11 +664,13 @@ async function start() {
     if (outId && outId !== 'default' && hasSetSinkId) { try { await ctx.setSinkId(outId); } catch {} }
     source = ctx.createMediaStreamSource(stream);
 
-    // Analyser tap off source (read-only; not in the effects path). Used by both the
-    // input meter (time-domain) and calibration capture (frequency-domain).
+    // Analyser tap (read-only; not in the effects path). Used by the input meter
+    // (time-domain), calibration capture (frequency-domain) and the tuner
+    // (getLiveAnalyser). Wired below off the SELECTED splitter output — the same
+    // channel that feeds calibrationEq — so it follows the chosen hardware input
+    // instead of a down-mix of both channels.
     analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
-    source.connect(analyser);
 
     gainOut = ctx.createGain();
     gainOut.gain.value = parseFloat($('gain').value);
@@ -665,9 +687,15 @@ async function start() {
     reverbStage = reverbFx.create(ctx, ampReverb);
     reverbStage.output.connect(normGain);
 
-    // Calibration EQ sits between source and the artist chain.
+    // Calibration EQ sits between source and the artist chain. A ChannelSplitter
+    // in front of it lets the user pick which hardware input channel (1 or 2)
+    // feeds the chain — e.g. a 2-in interface with the guitar on input 2. The
+    // analyser tap is routed off the same splitter output (see routeInputChannel
+    // below) so the meter, calibration capture and tuner track the selection too.
     calibrationEq = createCalibrationEq(ctx);
-    source.connect(calibrationEq.input);
+    inputSplitter = ctx.createChannelSplitter(2);
+    source.connect(inputSplitter);
+    routeInputChannel(inputChannel);
     applyActiveCalibration();
 
     const defaultPreset = PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0];
@@ -685,10 +713,72 @@ async function start() {
     { const r = $('tp-record'); if (r) { r.disabled = false; r.title = 'Record'; } }
     updateTransport(); // enable skip-to-start now that we're powered
     listDevices();
+    if (new URLSearchParams(location.search).has('e2e')) installE2EBridge();
   } catch (e) {
     $('error').textContent = 'Could not start: ' + e.message;
     console.error(e);
   }
+}
+
+// ── E2E test bridge (headless Playwright only; installed when the URL has ?e2e=1) ──
+// The app is mic-driven and keeps ctx/calibrationEq/normGain as module-locals, so a
+// headless test can neither inject a deterministic signal nor read processed output.
+// This closure exposes exactly enough of the LIVE graph to do both: a continuous
+// sawtooth into the chain input (calibrationEq.input) and an RMS/HF tap on the wet
+// bus (normGain). Never installed in normal use. See tests/neural-e2e.mjs.
+function installE2EBridge() {
+  let osc = null, toneGain = null, outTap = null;
+  const proCat = () => GB_CATEGORIES.find((c) => c.id === 'pro');
+  const neuralUnit = () => currentChain.find((u) => u.type === 'neuralamp');
+  const ensureTap = () => {
+    if (!outTap) { outTap = ctx.createAnalyser(); outTap.fftSize = 2048; normGain.connect(outTap); }
+    return outTap;
+  };
+  const api = {
+    booted: () => !!ctx && ctx.state === 'running',
+    sampleRate: () => ctx.sampleRate,
+    clock: () => ({ ctxTime: ctx.currentTime, wall: performance.now() }),
+    proPresetNames: () => (proCat() ? proCat().presets.map((p) => p.name) : []),
+    chainTypes: () => currentChain.map((u) => u.type),
+    loadPresetByName: (name) => {
+      const p = PRESETS.find((x) => x.name === name);
+      if (!p) throw new Error('no preset named ' + name);
+      loadPreset(p);
+      return true;
+    },
+    feedTone: (freq = 110, amp = 0.25) => {
+      api.stopTone();
+      osc = ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = freq;
+      toneGain = ctx.createGain(); toneGain.gain.value = amp;
+      osc.connect(toneGain).connect(calibrationEq.input);
+      osc.start();
+    },
+    stopTone: () => {
+      if (osc) { try { osc.stop(); } catch {} osc.disconnect(); osc = null; }
+      if (toneGain) { toneGain.disconnect(); toneGain = null; }
+    },
+    getOutputMetrics: () => {
+      const a = ensureTap();
+      const t = new Float32Array(a.fftSize);
+      a.getFloatTimeDomainData(t);
+      let sum = 0, finite = true;
+      for (let i = 0; i < t.length; i++) { const v = t[i]; if (!Number.isFinite(v)) finite = false; sum += v * v; }
+      const f = new Float32Array(a.frequencyBinCount);
+      a.getFloatFrequencyData(f); // magnitude in dB
+      const binHz = (ctx.sampleRate / 2) / f.length;
+      let lo = 0, hi = 0;
+      for (let i = 0; i < f.length; i++) { const p = Math.pow(10, f[i] / 10); if (i * binHz >= 2000) hi += p; else lo += p; }
+      return { rms: Math.sqrt(sum / t.length), finite, hf: hi / (lo + hi + 1e-12) };
+    },
+    addPedalBefore: (type) => { const amp = neuralUnit(); addEffect(type, amp ? amp.instanceId : null); },
+    addPedalAfter: (type) => {
+      const amp = neuralUnit();
+      const i = currentChain.findIndex((u) => u.instanceId === amp.instanceId);
+      const after = currentChain[i + 1];
+      addEffect(type, after ? after.instanceId : null);
+    },
+  };
+  window.__neuralE2E = api;
 }
 
 function stop() {
@@ -702,11 +792,31 @@ function stop() {
   { const c = $('note-circle'); if (c) { c.textContent = '—'; c.classList.remove('active'); } }
   if (stream) stream.getTracks().forEach(t => t.stop());
   if (ctx) ctx.close();
-  ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = reverbStage = null;
+  ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = reverbStage = inputSplitter = null;
   setPower(false);
   updateTransport(); // disable skip-to-start when powered off
   prevBars = null;
   { const fl = $('freq-label'); if (fl) { fl.textContent = '— Hz'; fl.style.color = ''; } }
+}
+
+// Route the splitter's selected channel to both live-graph consumers:
+// calibrationEq (the processed/recorded path) and analyser (input meter,
+// calibration capture, tuner). connectInputChannel()'s disconnect() clears ALL
+// of the splitter's outputs, so calling it twice in a row would undo the first
+// destination's wiring — reuse it for calibrationEq, then fan the analyser out
+// manually on the same splitter output. No-op before Start, when the splitter
+// (and its consumers) aren't up yet.
+function routeInputChannel(ch) {
+  if (!inputSplitter || !calibrationEq || !analyser) return;
+  connectInputChannel(inputSplitter, ch, calibrationEq.input);
+  inputSplitter.connect(analyser, ch);
+}
+
+// Re-route the live input to a different hardware channel (1 or 2). Persists the
+// selection so it survives power cycles; no-op on the graph until Start wires it.
+function setInputChannel(ch) {
+  inputChannel = Math.min(1, Math.max(0, ch | 0));
+  routeInputChannel(inputChannel);
 }
 
 async function listDevices() {
@@ -734,6 +844,7 @@ setPower(false);
 $('calib-save').addEventListener('click', saveCalibration);
 $('calib-cancel').addEventListener('click', stopCalibration);
 $('calib-start').addEventListener('click', startCalibration);
+$('input-channel').addEventListener('change', (e) => setInputChannel(+e.target.value));
 
 // Settings slide-in panel
 function setSettings(open) {

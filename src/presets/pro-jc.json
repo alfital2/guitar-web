@@ -1,0 +1,4 @@
+{ "name": "Roland JC", "artist": "Neural Amp", "song": "Captured amp — Roland JC clean", "category": "pro", "normDb": -1.0,
+  "chain": [
+    { "type": "neuralamp", "params": { "model": 4, "trim": 5, "level": 5 } }
+  ] }
