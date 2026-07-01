@@ -105,13 +105,16 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
     panel.appendChild(group);
   });
 
-  // Silver grille cloth with brand script + power lamp.
+  // Dark grille with glowing vacuum tubes behind a woven mesh + brand + power lamp.
   const grille = el('div', 'amp-grille');
+  const tubes = el('div', 'amp-tubes');
+  tubes.innerHTML = '<i class="amp-tube"></i><i class="amp-tube"></i><i class="amp-tube"></i><i class="amp-tube"></i>';
+  const mesh = el('div', 'amp-mesh');
   const logo = el('div', 'amp-logo');
   logo.textContent = 'Studio';
   const power = el('div', 'amp-power');
   power.innerHTML = '<span class="amp-led"></span><span>POWER</span>';
-  grille.append(logo, power);
+  grille.append(tubes, mesh, logo, power);
 
   const corners = ['tl', 'tr', 'bl', 'br'].map((c) => el('div', `amp-corner amp-corner-${c}`));
 

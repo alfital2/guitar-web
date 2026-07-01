@@ -302,6 +302,13 @@ function addEffect(type, beforeId) {
   }
   currentChain = chain;
   rebuildGraph();
+  // One-shot entrance sheen on the pedal that was just added (see .pedal--enter).
+  requestAnimationFrame(() => {
+    const el = $('chain')?.querySelector(`.pedal[data-instance-id="${newId}"]`);
+    if (!el) return;
+    el.classList.add('pedal--enter');
+    el.addEventListener('animationend', () => el.classList.remove('pedal--enter'), { once: true });
+  });
 }
 
 function removeEffect(instanceId) {

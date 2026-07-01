@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script>/* Cheap-config is now the DEFAULT (CSS aurora + panel blur, no WebGL bg, no
+   always-on app animations). Load with ?heavy to compare the old WebGL version. */
+  if (!location.search.includes('heavy')) document.documentElement.classList.add('perf-lite');</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Guitar Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,9 +54,38 @@
     overflow-x: hidden;
   }
 
+  /* ── Ambient background (atmospheric depth) ─────────────
+     A tiny canvas of drifting amber/cool blobs, upscaled + blurred by CSS into a
+     seamless mist that glows through the semi-transparent panels. Static grain on
+     top. Both layers are pointer-events:none and sit BELOW the UI (.window @ z2).
+     The whole motion budget is ~24fps on a 200px buffer — see src/bg.js. */
+  /* Container for the selected background effect; each effect appends its own
+     canvas (sized 100%). No blur here — effects manage their own look. */
+  #bg-fx {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    transform: translateZ(0);      /* own GPU layer, no repaint of the page */
+  }
+  #bg-fx canvas { width: 100%; height: 100%; display: block; }
+  /* Soft vignette over the effect so the centre reads as lit and edges settle. */
+  .bg-vignette {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(118% 90% at 50% 38%, transparent 42%, rgba(0,0,0,0.55) 100%);
+  }
+  .grain {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    opacity: 0.035; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  /* (.window is lifted above these layers via z-index in its own rule below;
+     each effect's canvas shows through the panels' translucent fills.) */
+
+  /* ClickSpark overlay — transient amber bursts (drawn in interactions.js). */
+  .spark-fx { position: fixed; inset: 0; z-index: 95; pointer-events: none; width: 100%; height: 100%; }
+
   /* ── Window (fills the viewport) ────────────────────── */
   .window {
-    width: 100%; min-height: 100vh; background: var(--window);
+    width: 100%; min-height: 100vh; background: transparent;
+    position: relative; z-index: 2;     /* sit above the ambient bg layers */
     display: flex; align-items: stretch;
   }
   .window-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -225,10 +257,10 @@
      panel with engraved groups + numbered knobs, silver grille cloth + script. */
   .amp-head {
     position: relative; width: fit-content; max-width: 1060px; margin: 0 auto; border-radius: 16px; padding: 34px 20px 20px;
+    /* Fine black leather tolex: dark diffuse-lit fractal grain + form shading. */
     background:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='tx'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55 0.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23tx)'/%3E%3C/svg%3E"),
-      linear-gradient(180deg, #1b1b1d, #0e0e10);
-    background-size: 90px 90px, auto;
+      linear-gradient(180deg, rgba(255,255,255,0.05), transparent 14%, rgba(0,0,0,0.3)),
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='200'%20height='200'%3E%3Cfilter%20id='tx'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.55'%20numOctaves='2'%20seed='6'%20stitchTiles='stitch'%20result='n'/%3E%3CfeDiffuseLighting%20in='n'%20surfaceScale='2.6'%20diffuseConstant='0.9'%20lighting-color='%23202024'%3E%3CfeDistantLight%20azimuth='235'%20elevation='52'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect%20width='200'%20height='200'%20filter='url(%23tx)'/%3E%3C/svg%3E") 0 0 / 200px 200px;
     border: 1px solid #000;
     box-shadow: 0 18px 50px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 0 0 2px rgba(0,0,0,0.55);
   }
@@ -262,9 +294,11 @@
     position: relative; display: flex; flex-wrap: nowrap; align-items: stretch; justify-content: center; gap: 8px 2px;
     margin: 10px 16px 14px; padding: 8px 12px; border-radius: 8px;
     background:
-      repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, rgba(0,0,0,0.045) 1px 2px),
-      linear-gradient(180deg, #dadce0 0%, #b8bbc1 46%, #9c9fa5 54%, #c4c7cd 100%);
-    border: 1px solid #5a5c61; box-shadow: inset 0 1px 0 rgba(255,255,255,0.75), inset 0 -2px 6px rgba(0,0,0,0.28), 0 2px 6px rgba(0,0,0,0.5);
+      linear-gradient(118deg, transparent 15%, rgba(255,255,255,0.95) 18.5%, transparent 22%,
+        transparent 50%, rgba(255,255,255,0.75) 53.5%, transparent 57%,
+        transparent 74%, rgba(255,255,255,0.6) 77%, transparent 80%),
+      linear-gradient(180deg, #eef1f4 0%, #ffffff 11%, #c6ccd2 30%, #b0b7be 45%, #d2d8dd 60%, #f4f7fa 78%, #b6bdc3 100%);
+    border: 1px solid #5a5c61; box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -2px 6px rgba(0,0,0,0.24), 0 2px 6px rgba(0,0,0,0.5);
   }
   .amp-group { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; padding: 14px 10px 9px; position: relative; }
   .amp-group::before {
@@ -289,20 +323,46 @@
   .amp-knob .knob .val, .amp-knob .knob .label { display: none; }
   .amp-knob-label { font: 800 8px/1 var(--font); letter-spacing: 0.1em; text-transform: uppercase; color: #2c2e33; text-shadow: 0 1px 0 rgba(255,255,255,0.65); }
   .amp-grille {
-    position: relative; margin: 0 16px; height: 130px; border-radius: 8px; overflow: hidden; display: flex; align-items: center; padding: 0 26px;
+    position: relative; margin: 0 16px; height: 150px; border-radius: 10px; overflow: hidden; display: flex; align-items: center; padding: 0 26px;
+    background: linear-gradient(180deg, #14100c, #0b0908);
+    border: 1px solid #000; box-shadow: inset 0 0 0 3px #000, inset 0 2px 10px rgba(0,0,0,0.8);
+  }
+  /* Glowing vacuum tubes behind a woven mesh. */
+  .amp-tubes { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 70px; pointer-events: none; }
+  .amp-tube { position: relative; width: 38px; height: 104px; border-radius: 19px 19px 8px 8px;
+    background: linear-gradient(180deg, rgba(255,180,90,0.25), rgba(255,120,40,0.5) 55%, rgba(120,50,10,0.6));
+    box-shadow: 0 0 38px 13px rgba(255,140,50,0.4), inset 0 0 13px rgba(255,220,150,0.6);
+    animation: amp-tube 3.4s ease-in-out infinite; }
+  .amp-tube::before { content: ''; position: absolute; left: 50%; top: 20px; transform: translateX(-50%); width: 4px; height: 62px;
+    background: linear-gradient(180deg, #fff3d0, #ff8a2c); border-radius: 2px; box-shadow: 0 0 10px 3px rgba(255,180,80,0.9); }
+  .amp-tube:nth-child(2) { animation-delay: .6s; } .amp-tube:nth-child(3) { animation-delay: 1.2s; } .amp-tube:nth-child(4) { animation-delay: 1.8s; }
+  @keyframes amp-tube { 0%, 100% { opacity: .8; } 50% { opacity: 1; } }
+  .amp-mesh { position: absolute; inset: 0; z-index: 2; pointer-events: none;
     background:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect width='3' height='3' fill='%23ffffff' fill-opacity='0.16'/%3E%3Crect x='3' y='3' width='3' height='3' fill='%23ffffff' fill-opacity='0.16'/%3E%3Crect x='3' width='3' height='3' fill='%23000' fill-opacity='0.28'/%3E%3Crect y='3' width='3' height='3' fill='%23000' fill-opacity='0.28'/%3E%3C/svg%3E"),
-      linear-gradient(180deg, #9da0a5, #7c7f84);
-    background-size: 6px 6px, auto; border: 1px solid #3a3c40; box-shadow: inset 0 0 0 3px rgba(0,0,0,0.4), inset 0 2px 10px rgba(0,0,0,0.45);
-  }
+      radial-gradient(circle at 50% 50%, rgba(0,0,0,0.55) 0.9px, transparent 1.4px) 0 0 / 5px 5px,
+      radial-gradient(circle at 50% 50%, rgba(0,0,0,0.55) 0.9px, transparent 1.4px) 2.5px 2.5px / 5px 5px,
+      linear-gradient(180deg, rgba(255,255,255,0.04), transparent 40%);
+    box-shadow: inset 0 0 50px rgba(0,0,0,0.6); }
+  @media (prefers-reduced-motion: reduce) { .amp-tube { animation: none; } }
   .amp-logo {
-    font-family: 'Pacifico', cursive; font-size: 38px; line-height: 1;
-    background: linear-gradient(180deg, #fff, #9a9da2 58%, #54565b); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.55));
+    position: relative; overflow: hidden; z-index: 3;
+    font-family: 'Pacifico', cursive; font-size: 40px; line-height: 1;
+    background: linear-gradient(180deg, #fff, #b7bcc2 55%, #6a6f75); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.7));
   }
-  .amp-power { margin-left: auto; display: flex; align-items: center; gap: 7px; }
-  .amp-led { width: 7px; height: 7px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffe070, var(--accent)); animation: led-amber 3s ease-in-out infinite; }
-  .amp-power span { font: 800 8px var(--font); letter-spacing: 0.12em; color: #23252a; text-shadow: 0 1px 0 rgba(255,255,255,0.4); }
+  /* ShinyText: a specular glint sweeps the chrome wordmark every few seconds. */
+  .amp-logo::after {
+    content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 38%; pointer-events: none;
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,0.6), transparent);
+    transform: skewX(-18deg); animation: logo-glint 6.5s ease-in-out infinite;
+  }
+  @keyframes logo-glint { 0%, 72% { left: -60%; } 88%, 100% { left: 135%; } }
+  @media (prefers-reduced-motion: reduce) { .amp-logo::after { display: none; } }
+  .amp-power { position: relative; z-index: 3; margin-left: auto; display: flex; align-items: center; gap: 9px; }
+  .amp-led { width: 14px; height: 14px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, #fff, #ffcf6a 34%, #e07a10 70%, #7a3d00);
+    box-shadow: 0 0 13px 4px rgba(255,150,40,0.8), inset 0 -1px 2px rgba(0,0,0,0.5); animation: led-amber 2.6s ease-in-out infinite; }
+  .amp-power span { font: 800 9px var(--font); letter-spacing: 0.14em; color: #d8d8dd; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
 
   /* Collapse chevron (top-right of the head) — folds the amp to the value strip. */
   .amp-collapse-btn {
@@ -336,6 +396,40 @@
   .amp-vstrip-exp { margin-left: auto; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 16px; color: #56585f; }
   .amp-vstrip-exp span:first-child { font: 700 9px/1 var(--font); letter-spacing: 0.06em; }
   .amp-vstrip-chev { font-size: 13px; }
+
+  /* ── Amp WOW pass (perf-safe fake-glass + autonomous motion, no cursor) ──
+     Glass gloss + a slow specular sheen on the always-visible value strip, a
+     warm pulsing "tube" glow behind the grille, and a gloss on the panel.
+     All CSS; no backdrop-filter, so it never samples the animated background. */
+  .amp-vstrip { position: relative; overflow: hidden; filter: drop-shadow(0 0 16px rgba(var(--accent-rgb),0.16)); }
+  .amp-vstrip::before {
+    content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.08) 32%, transparent 56%);
+    mix-blend-mode: screen;
+  }
+  .amp-vstrip::after {
+    content: ''; position: absolute; top: -20%; bottom: -20%; left: -60%; width: 36%; z-index: 3; pointer-events: none;
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,0.55), transparent);
+    transform: skewX(-18deg); animation: amp-sheen 7s ease-in-out infinite;
+  }
+  @keyframes amp-sheen { 0%, 76% { left: -60%; } 91%, 100% { left: 150%; } }
+
+  .amp-grille { position: relative; }
+  .amp-grille::after {
+    content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(62% 130% at 22% 128%, rgba(255,180,70,0.28), transparent 62%);
+    mix-blend-mode: screen; animation: amp-tube 4.5s ease-in-out infinite;
+  }
+  @keyframes amp-tube { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+  .amp-panel { position: relative; }
+  .amp-panel::after {
+    content: ''; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+    background: linear-gradient(180deg, rgba(255,255,255,0.14), transparent 22%); mix-blend-mode: screen;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .amp-vstrip::after, .amp-grille::after { animation: none; }
+  }
 
   /* ── Pedalboard ─────────────────────────────────────── */
   /* ── Track lane (recording) ─────────────────────────── */
@@ -464,19 +558,60 @@
   /* Bespoke faceplate pedal: art sizes the box (width set inline per effect),
      controls overlay on top. The whole face is the drag handle (.pedal-grip),
      knobs sit above it and capture their own pointer events. */
+  /* ── CSS pedal (bespoke per effect via --c; recreated hardware shell) ── */
   .pedal {
-    position: relative; border-radius: 14px; overflow: hidden;
-    box-shadow: 0 10px 28px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.4);
+    position: relative; height: 268px; border-radius: 16px; overflow: hidden; isolation: isolate;
+    background: linear-gradient(148deg,
+      color-mix(in srgb, var(--c, #8a8a90) 46%, #fff) 0%, color-mix(in srgb, var(--c) 82%, #fff) 20%,
+      var(--c) 48%, color-mix(in srgb, var(--c) 70%, #000) 74%, color-mix(in srgb, var(--c) 44%, #000) 100%);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.6), inset 0 2px 0 rgba(255,255,255,0.5),
+      inset 0 -12px 22px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(0,0,0,0.45);
   }
-  .pedal-art { display: block; width: 100%; height: auto; }
+  .pedal-body-gloss { position: absolute; inset: 0; z-index: 4; pointer-events: none; border-radius: inherit;
+    background: repeating-linear-gradient(118deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 3px),
+      linear-gradient(150deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.05) 16%, transparent 38%);
+    mix-blend-mode: screen; }
   .pedal-grip { position: absolute; inset: 0; z-index: 1; cursor: grab; }
   .pedal.lifting .pedal-grip { cursor: grabbing; }
-  .pedal-knobs { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-  /* each knob is absolutely placed (left/top set inline per the pedal's layout),
-     centered horizontally on its slot x */
-  .pedal-knobs .knob { position: absolute; transform: translateX(-50%); pointer-events: auto; }
-  .pedal-knobs .knob .label { display: none; }
-  .pedal-knobs .knob .val { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.7); }
+  .pedal-screw { position: absolute; width: 12px; height: 12px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 36% 30%, #f6f8fa, #c2c7cc 30%, #757b81 66%, #34383c);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.6), inset 0 -1px 1px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.6); }
+  .pedal-screw::after { content: ''; position: absolute; inset: 2.5px; border-radius: 50%;
+    background: linear-gradient(90deg, transparent 41%, rgba(0,0,0,0.5) 41% 59%, transparent 59%),
+      linear-gradient(0deg, transparent 41%, rgba(0,0,0,0.5) 41% 59%, transparent 59%); }
+  .pedal-screw-tl { top: 9px; left: 9px; } .pedal-screw-tr { top: 9px; right: 9px; }
+  .pedal-screw-bl { bottom: 9px; left: 9px; } .pedal-screw-br { bottom: 9px; right: 9px; }
+  .pedal-plate { position: absolute; left: 14px; right: 14px; top: 22px; height: 112px; border-radius: 11px; z-index: 1; overflow: hidden;
+    background: radial-gradient(130% 96% at 50% 16%, color-mix(in srgb, var(--c) 24%, #17110a), color-mix(in srgb, var(--c) 9%, #0d0906) 74%);
+    box-shadow: inset 0 3px 8px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.08), 0 1px 0 rgba(255,255,255,0.16); }
+  .pedal-glow { position: absolute; inset: 0;
+    background: radial-gradient(56% 52% at 50% 40%, color-mix(in srgb, var(--c) 40%, transparent), transparent 62%),
+      radial-gradient(122% 100% at 50% 46%, transparent 54%, rgba(0,0,0,0.5)); }
+  .pedal-rays { position: absolute; inset: -40%;
+    background: repeating-conic-gradient(from -8deg at 50% 50%, color-mix(in srgb, var(--c) 55%, #fff5d8) 0deg 7deg, transparent 7deg 22deg);
+    -webkit-mask: radial-gradient(46% 46% at 50% 42%, #000 40%, transparent 82%);
+    mask: radial-gradient(46% 46% at 50% 42%, #000 40%, transparent 82%); opacity: .5; animation: pedal-rays 44s linear infinite; }
+  @keyframes pedal-rays { to { transform: rotate(360deg); } }
+  .pedal-motif { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
+    color: color-mix(in srgb, var(--c) 24%, #fff);
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)) drop-shadow(0 0 5px color-mix(in srgb, var(--c) 60%, transparent)); }
+  .pedal-motif svg { width: 86px; height: 58px; stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .pedal-motif .fill { fill: currentColor; stroke: none; }
+  .pedal-lens { position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(130% 82% at 30% 8%, rgba(255,255,255,0.4), rgba(255,255,255,0.06) 26%, transparent 48%),
+      radial-gradient(100% 66% at 50% 112%, rgba(255,255,255,0.1), transparent 56%);
+    box-shadow: inset 0 0 18px rgba(0,0,0,0.5), inset 0 2px 3px rgba(255,255,255,0.26), inset 0 -3px 5px rgba(0,0,0,0.38); }
+  .pedal-led { position: absolute; top: 32px; right: 24px; width: 8px; height: 8px; border-radius: 50%; z-index: 5;
+    background: radial-gradient(circle at 40% 35%, #fff, #ff6a45 40%, #b21500); box-shadow: 0 0 9px 2px rgba(255,80,40,0.85); }
+  .pedal-knobs { position: absolute; left: 8px; right: 8px; top: 144px; z-index: 3;
+    display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); justify-items: center; column-gap: 3px; row-gap: 3px; }
+  .pedal-knob { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .pedal-knob .knob .label, .pedal-knob .knob .val { display: none; }
+  .pedal-knob b { font: 800 6.5px var(--font, 'Inter'); letter-spacing: .02em; text-transform: uppercase;
+    color: color-mix(in srgb, var(--c) 32%, #140d04); text-shadow: 0 1px 0 rgba(255,255,255,0.3); white-space: nowrap; }
+  .pedal-word { position: absolute; left: 0; right: 0; bottom: 60px; text-align: center; z-index: 4; padding: 0 6px; line-height: 1;
+    font-family: var(--font, 'Inter'); color: color-mix(in srgb, var(--c) 20%, #fff8ea);
+    text-shadow: 0 2px 0 rgba(0,0,0,0.45), 0 -1px 0 rgba(255,255,255,0.32); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* Knob name tooltip — single body-level element (never clipped by the pedal),
      positioned above the active knob; shown only while tuning or on hover. */
   #knob-tip.knob-tip {
@@ -492,28 +627,23 @@
   }
   #knob-tip.knob-tip.on { opacity: 1; }
   @media (prefers-reduced-motion: no-preference) { #knob-tip.knob-tip { transition: opacity .12s ease; } }
-  /* Generous footswitch hit area around the LED — toggles power, never drags */
+  /* Footswitch = bypass toggle: a chrome dome on a faceted nut. */
   .pedal-power {
-    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 46px; height: 26px; z-index: 3; cursor: pointer; pointer-events: auto;
-    display: flex; align-items: center; justify-content: center;
-    background: none; border: none; padding: 0; margin: 0;
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+    width: 42px; height: 42px; border-radius: 50%; z-index: 3; padding: 0; border: none; cursor: pointer;
+    background: conic-gradient(#46494d, #26292d, #4f5357, #26292d, #4f5357, #26292d, #4f5357, #26292d, #46494d);
+    box-shadow: 0 6px 11px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.24), inset 0 -2px 4px rgba(0,0,0,0.7);
   }
-  .pedal-power:focus-visible { outline: none; }
-  .pedal-power:focus-visible .pedal-led { box-shadow: 0 0 0 2px rgba(255,255,255,0.55), 0 0 9px var(--pedal-color, #636368); }
-  .pedal-led {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--pedal-color, #636368); box-shadow: 0 0 9px var(--pedal-color, #636368), 0 0 3px var(--pedal-color, #636368), inset 0 0 2px rgba(255,255,255,0.5);
-  }
-  .pedal-power:hover .pedal-led { filter: brightness(1.25); }
-  /* powered off (bypassed): LED dark, faceplate dimmed — chain still passes signal */
-  .pedal.bypassed .pedal-led {
-    background: #2a2a2e; box-shadow: inset 0 1px 2px rgba(0,0,0,0.8), 0 0 0 1px rgba(0,0,0,0.5);
-  }
-  .pedal.bypassed .pedal-art { opacity: 0.4; filter: saturate(0.45) brightness(0.8); }
-  .pedal.bypassed .pedal-knobs { opacity: 0.6; }
+  .pedal-power::after { content: ''; position: absolute; inset: 5px; border-radius: 50%;
+    background: radial-gradient(circle at 48% 26%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 38%),
+      linear-gradient(180deg, #d6dade 0%, #aab0b6 34%, #868c92 56%, #a6acb2 76%, #cfd4d8 96%);
+    box-shadow: inset 0 2px 3px rgba(255,255,255,0.55), inset 0 -3px 5px rgba(0,0,0,0.4); }
+  .pedal-power:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.5), 0 6px 11px rgba(0,0,0,0.6); }
+  /* powered off (bypassed): LED dark, pedal dimmed — chain still passes signal */
+  .pedal.bypassed .pedal-led { background: radial-gradient(circle at 40% 35%, #6a6a70, #2a2a2e 60%); box-shadow: inset 0 1px 2px rgba(0,0,0,0.8); }
+  .pedal.bypassed { filter: saturate(0.55) brightness(0.8); }
   @media (prefers-reduced-motion: no-preference) {
-    .pedal-art, .pedal-led, .pedal-knobs { transition: opacity .15s ease, background .15s ease, box-shadow .15s ease; }
+    .pedal, .pedal-led { transition: filter .15s ease, background .15s ease; }
   }
   .pedalboard-empty { color: #242428; font-size: 12px; padding: 16px 0; text-align: center; letter-spacing: 0.04em; font-style: italic; }
 
@@ -538,6 +668,7 @@
   .preset-browser {
     width: clamp(274px, 20vw, 304px); flex: 0 0 auto; display: flex; flex-direction: column;
     background: var(--library); border-right: 1px solid rgba(0,0,0,0.35); overflow: hidden;
+    position: relative;
   }
   .pb-search { padding: 10px 10px 8px; border-bottom: 1px solid rgba(0,0,0,0.28); display: flex; align-items: center; gap: 7px; }
   .pb-collapse {
@@ -563,17 +694,37 @@
     font-size: 11px; font-weight: 400; color: #c2c2c7;
   }
   .pb-cat-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pb-cat:hover { background: rgba(255,255,255,0.05); }
-  .pb-cat.active { background: rgba(255,255,255,0.1); color: #f0f0f2; }
-  .pb-chev { color: rgba(255,255,255,0.32); font-size: 12px; }
-  .pb-patches { flex: 1; min-width: 0; overflow-y: auto; padding: 5px 4px; display: flex; flex-direction: column; gap: 0; }
-  .pb-patch {
-    text-align: left; cursor: pointer; background: transparent; border: none; border-radius: 5px;
-    padding: 3px 9px; font-size: 11px; font-weight: 400; color: #c8c8cd;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  .pb-cat { position: relative; z-index: 1; transition: color .2s, background .2s, box-shadow .2s; }
+  .pb-cat:hover { background: rgba(255,255,255,0.05); color: #fff; }
+  .pb-cat.active {
+    color: #fff;
+    background: linear-gradient(90deg, rgba(var(--accent-rgb),0.26), rgba(var(--accent-rgb),0.05));
+    box-shadow: inset 2px 0 0 var(--accent), 0 0 12px rgba(var(--accent-rgb),0.22);
   }
-  .pb-patch:hover { background: rgba(255,255,255,0.06); }
-  .pb-patch.active { background: rgba(255,255,255,0.12); font-weight: 500; color: #f0f0f2; }
+  .pb-cat.active .pb-chev { color: var(--accent); }
+  .pb-chev { color: rgba(255,255,255,0.32); font-size: 12px; transition: color .2s, transform .2s; }
+  .pb-cat:hover .pb-chev { transform: translateX(2px); }
+  .pb-patches { position: relative; z-index: 1; flex: 1; min-width: 0; overflow-y: auto; padding: 5px 4px; display: flex; flex-direction: column; gap: 1px; }
+  .pb-patch {
+    position: relative; text-align: left; cursor: pointer; background: transparent;
+    border: 1.5px solid transparent; border-radius: 6px;
+    padding: 4px 10px; font-size: 11px; font-weight: 400; color: #c8c8cd;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    transition: color .2s, transform .18s, background .2s, box-shadow .2s;
+  }
+  /* Hover: bold accent sweep in from the left + slide + glow (FlowingMenu vibe). */
+  .pb-patch:hover {
+    color: #fff; transform: translateX(3px);
+    background: linear-gradient(90deg, rgba(var(--accent-rgb),0.28), rgba(var(--accent-rgb),0.02) 85%);
+    box-shadow: inset 2px 0 0 var(--accent), 0 0 16px rgba(var(--accent-rgb),0.2);
+  }
+  /* Active patch: a clean static accent highlight (no animation). */
+  .pb-patch.active {
+    color: #fff; font-weight: 600; transform: translateX(3px);
+    background: linear-gradient(90deg, rgba(var(--accent-rgb),0.30), rgba(var(--accent-rgb),0.06));
+    border-color: rgba(var(--accent-rgb),0.5);
+    box-shadow: inset 2px 0 0 var(--accent), 0 0 14px rgba(var(--accent-rgb),0.22);
+  }
   .pb-empty { padding: 12px; font-size: 12px; color: rgba(255,255,255,0.4); font-style: italic; }
   /* Tighten amp spacing on smaller widths so the knob rows stay together longer,
      then let the groups wrap rather than overflow the enclosure. */
@@ -643,7 +794,17 @@
   .fx-tile:hover { background: var(--surface-hi); color: var(--text); border-color: var(--border-hi); }
   .fx-tile:active { cursor: grabbing; }
   .fx-tile-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; background: var(--pedal-color, #636368); box-shadow: 0 0 7px var(--pedal-color, #636368); }
-  .fx-tile .fx-art { height: 48px; width: auto; max-width: 46px; flex: 0 0 auto; border-radius: 5px; display: block; box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+  /* Mini pedal icon in the Add-Effect tiles (matches the new CSS pedals). */
+  .fx-tile-pedal { position: relative; flex: 0 0 auto; width: 46px; height: 58px; border-radius: 9px; overflow: hidden;
+    background: linear-gradient(148deg, color-mix(in srgb, var(--c) 46%, #fff) 0%, var(--c) 48%, color-mix(in srgb, var(--c) 46%, #000) 100%);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.4), inset 0 0 0 1px rgba(0,0,0,0.4); }
+  .fx-tile-plate { position: absolute; inset: 7px 6px 18px; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(120% 96% at 50% 16%, color-mix(in srgb, var(--c) 24%, #17110a), color-mix(in srgb, var(--c) 9%, #0d0906) 74%);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.7); color: color-mix(in srgb, var(--c) 26%, #fff); }
+  .fx-tile-plate svg { width: 30px; height: 22px; stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .fx-tile-plate .fill { fill: currentColor; stroke: none; }
+  .fx-tile-gloss { position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255,255,255,0.3), rgba(255,255,255,0.04) 20%, transparent 42%); mix-blend-mode: screen; }
   .fx-tile-label { font-family: var(--font, inherit); letter-spacing: var(--font-ls, 0); }
   /* Drag ghost following the cursor */
   .fx-ghost {
@@ -750,17 +911,68 @@
 
   .hidden { display: none !important; }
 
+  /* ── Perf A/B kill-switch: load with ?lite to strip every always-on GPU/paint
+     cost (background layer, all infinite animations, every backdrop/CSS blur).
+     Diagnostic only — compare fan/energy ?lite vs normal to localise the heat. */
+  html.perf-lite #bg-fx,
+  html.perf-lite .bg-vignette,
+  html.perf-lite .grain { display: none !important; }
+  html.perf-lite *, html.perf-lite *::before, html.perf-lite *::after { animation: none !important; }
+  /* backdrop-filter blur on the glass panels is KEPT — it was never the heat
+     (that was the WebGL shader + the ambient 42px blur on a 24fps-redrawn
+     canvas). Panels sit over dark areas, so their blur is cheap. */
+  html.perf-lite .amb-canvas, html.perf-lite [style*="blur"] { filter: none !important; }
+
+  /* ── Cheap CSS aurora (lite only) ─────────────────────────────────────────
+     Off everywhere by default; the ?lite site turns it on. Each ribbon is a
+     soft gradient, blurred ONCE into its own composited layer, then animated
+     with transform alone — the GPU just moves a static texture, so it stays
+     silent even though it looks like the WebGL aurora. */
+  .css-aurora { display: none; }
+  html.perf-lite .css-aurora {
+    display: block; position: fixed; inset: 0; z-index: 0;
+    pointer-events: none; overflow: hidden; background: #06070c;
+  }
+  /* ONE composited layer: all four spectrum gradients stacked as multiple
+     backgrounds on a single element, so the GPU keeps ONE texture (not four)
+     and just slides it. NO blur, NO blend-mode, NO scale — translate only, so
+     the layer never re-rasters. This is the whole aurora, cheaply. */
+  /* Cover only the top band — the lower half is black (::after fade), so there's
+     no point compositing aurora pixels down there. Halving the layer area ~halves
+     the idle GPU cost of the compositor animation. */
+  html.perf-lite .css-aurora .aur-layer {
+    position: absolute; inset: -25% -25% auto -25%; height: 70%;
+    will-change: transform; transform: translateZ(0);
+    background:
+      radial-gradient(46% 55% at 34% 2%,  rgba(158,205,74,0.65), transparent 60%),   /* lime hotspot */
+      radial-gradient(52% 62% at 66% 4%,  rgba(150,104,214,0.72), rgba(120,90,210,0.28) 48%, transparent 74%), /* purple bridge */
+      radial-gradient(60% 72% at 6% 0%,   rgba(78,196,96,0.95), rgba(60,170,90,0.32) 45%, transparent 70%),   /* green TL */
+      radial-gradient(60% 72% at 98% 0%,  rgba(74,66,228,0.95), rgba(60,54,190,0.38) 46%, transparent 72%);   /* indigo TR */
+    animation: aur-drift 18s ease-in-out infinite alternate !important;
+  }
+  /* Baked bottom fade to black — static, so free. Gives the reference's dark
+     lower half; the single drifting layer carries the motion. */
+  html.perf-lite .css-aurora::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, transparent 0%, transparent 34%, rgba(6,7,12,0.72) 66%, #06070c 100%);
+  }
+  @keyframes aur-drift { from { transform: translate3d(-7%, -4%, 0) rotate(-2.5deg); }
+                         to   { transform: translate3d(8%, 5%, 0)  rotate(2.5deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    html.perf-lite .css-aurora .aur-layer { animation: none !important; }
+  }
+
   /* ── Liquid glass (Chrome only — html.liquid; Safari lacks backdrop-filter:url) ──
      Translucent, refractive frosted surfaces on the floating chrome: toolbar,
      the Settings + Presets drawers, the Add-Effect window and its tiles. Safari
      keeps the existing solid surfaces (these rules simply don't apply there). */
   /* Specular highlight stack (the Apple "lit glass edge" look): bright top inner
-     line, soft inner glow, a thin light rim, and a deep drop. Lighter blur lets
-     the lens refraction (#liquid-glass) read through. */
+     line, soft inner glow, a thin light rim, and a deep drop. Plain frosted blur
+     (the GPU-heavy #liquid-glass refraction lens was dropped for perf). */
   html.liquid .toolbar {
     background: rgba(34,34,40,0.5);
     -webkit-backdrop-filter: blur(8px) saturate(1.7);
-    backdrop-filter: url(#liquid-glass) blur(6px) saturate(1.7);
+    backdrop-filter: blur(8px) saturate(1.7);
     border-bottom: 1px solid rgba(255,255,255,0.16);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -10px 22px rgba(255,255,255,0.04), 0 6px 22px rgba(0,0,0,0.4);
   }
@@ -768,7 +980,7 @@
   html.liquid .preset-browser {
     background: rgba(30,30,36,0.52);
     -webkit-backdrop-filter: blur(9px) saturate(1.6);
-    backdrop-filter: url(#liquid-glass) blur(7px) saturate(1.6);
+    backdrop-filter: blur(9px) saturate(1.6);
     border-left: 1px solid rgba(255,255,255,0.18);
     box-shadow: inset 1px 0 0 rgba(255,255,255,0.4), inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -40px 80px rgba(255,255,255,0.03), 0 0 60px rgba(0,0,0,0.55);
   }
@@ -777,7 +989,7 @@
   html.liquid .fx-modal {
     background: rgba(34,34,40,0.5);
     -webkit-backdrop-filter: blur(10px) saturate(1.7);
-    backdrop-filter: url(#liquid-glass) blur(8px) saturate(1.7);
+    backdrop-filter: blur(10px) saturate(1.7);
     border: 1px solid rgba(255,255,255,0.2);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -30px 60px rgba(255,255,255,0.04), 0 30px 80px rgba(0,0,0,0.7);
   }
@@ -794,6 +1006,13 @@
 </style>
 </head>
 <body>
+<div id="bg-fx" aria-hidden="true"></div>
+<div class="bg-vignette" aria-hidden="true"></div>
+<div class="grain" aria-hidden="true"></div>
+<!-- Cheap CSS aurora — shown only on the ?lite site. Pre-blurred gradient
+     ribbons animated by transform only (rasterized once, GPU slides the texture:
+     no per-frame reblur, no JS, no backdrop recompute → near-zero cost). -->
+<div class="css-aurora" aria-hidden="true"><i class="aur-layer"></i></div>
 <div class="window">
   <aside id="preset-browser" class="preset-browser" aria-label="Patches"></aside>
   <div class="window-main">
@@ -822,11 +1041,6 @@
   </section>
   </div>
 </div>
-
-<!-- Liquid-glass refraction filter (used via backdrop-filter on Chrome only) -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <filter id="liquid-glass" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feImage href="data:image/png;base64,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" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="m"/><feDisplacementMap in="SourceGraphic" in2="m" scale="48" xChannelSelector="R" yChannelSelector="G"/></filter>
-</svg>
 <div id="presets-backdrop" class="settings-backdrop" hidden></div>
 <button id="presets-close" class="icon btn-dim presets-close" aria-label="Close presets">✕</button>
 <div id="settings-backdrop" class="settings-backdrop" hidden></div>
@@ -888,6 +1102,8 @@
     </section>
   </div>
 </aside>
+<script type="module" src="src/bg.js"></script>
+<script type="module" src="src/fx-ui/interactions.js"></script>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

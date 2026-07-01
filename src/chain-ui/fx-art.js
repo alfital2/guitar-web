@@ -46,6 +46,34 @@ export const FX_KNOBS = {
   delay: 4, 'tape-echo': 5, pingpong: 4, reverb: 2, widener: 1,
   limiter: 2, pitchshift: 2, looper: 2,
 };
+// Per-effect motif: inline SVG (viewBox 0 0 102 80), stroke = currentColor,
+// `.fill` elements paint solid. Used by the CSS pedal recreation.
+export const FX_MOTIFS = {
+  compressor: `<path stroke-width="5" fill="none" d="M12 54 A42 42 0 0 1 90 54"/><line stroke-width="4" x1="51" y1="54" x2="74" y2="20"/><circle class="fill" cx="51" cy="54" r="4"/>`,
+  boost: `<path class="fill" d="M51 8 L78 42 H63 V60 H39 V42 H24 Z"/>`,
+  gate: `<path stroke-width="5" fill="none" d="M10 42 q9 -20 18 0 t18 0 M56 42 H92"/><line stroke-width="3" stroke-dasharray="4 5" x1="52" y1="22" x2="52" y2="60"/>`,
+  fuzz: `<path stroke-width="8" fill="none" stroke-linejoin="miter" d="M8 46 H26 V22 H45 V62 H63 V22 H82 V46 H94"/>`,
+  octave: `<path stroke-width="4" fill="none" d="M51 6 L90 40 L51 74 L12 40 Z"/><path stroke-width="4" fill="none" d="M51 24 L72 40 L51 56 L30 40 Z"/>`,
+  wah: `<g stroke-width="4" fill="none"><path d="M14 20 L88 12 M14 32 L88 24 M14 44 L88 36"/></g><path class="fill" d="M20 60 L80 34 L80 46 L28 68 Z"/>`,
+  autowah: `<path stroke-width="6" fill="none" d="M12 58 Q51 6 90 58"/>`,
+  chorus: `<g stroke-width="4" fill="none"><path d="M8 26 q11 -11 22 0 t22 0 t22 0 t22 0"/><path d="M8 40 q11 -11 22 0 t22 0 t22 0 t22 0"/><path d="M8 54 q11 -11 22 0 t22 0 t22 0 t22 0"/></g>`,
+  flanger: `<g stroke-width="4" fill="none"><path d="M22 8 Q52 40 22 72"/><path d="M36 8 Q66 40 36 72"/><path d="M50 8 Q80 40 50 72"/></g>`,
+  phaser: `<g stroke-width="4" fill="none"><circle cx="51" cy="40" r="11"/><circle cx="51" cy="40" r="24"/><path d="M12 50 C34 50 34 30 51 30 C68 30 68 50 90 50"/></g>`,
+  tremolo: `<g class="fill"><rect x="16" y="34" width="7" height="14" rx="2"/><rect x="30" y="24" width="7" height="34" rx="2"/><rect x="44" y="16" width="7" height="50" rx="2"/><rect x="58" y="24" width="7" height="34" rx="2"/><rect x="72" y="34" width="7" height="14" rx="2"/></g>`,
+  vibrato: `<path stroke-width="6" fill="none" d="M8 40 q8 -18 16 0 t16 0 t16 0 t16 0 t16 0"/>`,
+  autopan: `<path stroke-width="5" fill="none" d="M14 46 Q51 6 88 46"/><circle class="fill" cx="14" cy="46" r="5"/><circle class="fill" cx="88" cy="46" r="5"/>`,
+  rotary: `<circle stroke-width="4" fill="none" cx="51" cy="40" r="22"/><g stroke-width="4"><line x1="51" y1="40" x2="51" y2="18"/><line x1="51" y1="40" x2="70" y2="51"/><line x1="51" y1="40" x2="32" y2="51"/></g><circle class="fill" cx="51" cy="40" r="5"/>`,
+  ringmod: `<circle class="fill" cx="51" cy="40" r="6"/><g stroke-width="3" fill="none"><ellipse cx="51" cy="40" rx="34" ry="13"/><ellipse cx="51" cy="40" rx="34" ry="13" transform="rotate(60 51 40)"/><ellipse cx="51" cy="40" rx="34" ry="13" transform="rotate(-60 51 40)"/></g>`,
+  delay: `<g class="fill"><rect x="18" y="20" width="8" height="42" rx="2"/><rect x="36" y="26" width="8" height="36" rx="2" opacity=".75"/><rect x="54" y="34" width="8" height="28" rx="2" opacity=".5"/><rect x="72" y="42" width="8" height="20" rx="2" opacity=".3"/></g>`,
+  'tape-echo': `<g stroke-width="4" fill="none"><circle cx="33" cy="40" r="17"/><circle cx="69" cy="40" r="17"/></g><circle class="fill" cx="33" cy="40" r="4"/><circle class="fill" cx="69" cy="40" r="4"/>`,
+  pingpong: `<path stroke-width="5" fill="none" d="M14 14 L51 54 L88 14"/><circle class="fill" cx="14" cy="14" r="5"/><circle class="fill" cx="88" cy="14" r="5"/>`,
+  reverb: `<g stroke-width="4" fill="none"><path d="M31 52 A22 22 0 0 1 71 52"/><path d="M20 52 A34 34 0 0 1 82 52"/><path d="M42 52 A11 11 0 0 1 60 52"/></g>`,
+  widener: `<g stroke-width="5" fill="none"><path d="M44 40 H14 M23 31 L14 40 L23 49"/><path d="M58 40 H88 M79 31 L88 40 L79 49"/></g>`,
+  limiter: `<line stroke-width="4" x1="10" y1="20" x2="92" y2="20"/><path stroke-width="5" fill="none" d="M10 54 q11 -30 22 0 t22 0 t22 0 t22 0"/>`,
+  pitchshift: `<g stroke-width="5" fill="none"><path d="M34 46 V16 M26 24 L34 16 L42 24"/><path d="M68 22 V52 M60 44 L68 52 L76 44"/></g>`,
+  looper: `<path stroke-width="5" fill="none" d="M30 50 A24 24 0 1 1 55 58"/><path class="fill" d="M50 46 L60 60 L44 62 Z"/>`,
+};
+
 const WIDTHS = { 1: 108, 2: 128, 3: 152, 4: 190, 5: 228 };
 const HEIGHT = 248;
 export const fxWidth = (type) => WIDTHS[FX_KNOBS[type] ?? 3] ?? 152;
@@ -159,13 +187,35 @@ function plate(id, o) {
 }
 
 // ===========================================================================
+// Premium "glass hardware" rebuild (prototype for the faceplate overhaul):
+// die-cast metal enclosure with a cylindrical anodized gradient, a recessed
+// enamel faceplate panel for depth, a diagonal glass reflection and a top gloss.
 const FUZZ = plate('fuzz', {
-  defs: `<radialGradient id="fz-burst" cx="50%" cy="42%" r="64%"><stop offset="0" stop-color="#fbeec8"/><stop offset=".55" stop-color="#e0a943"/><stop offset="1" stop-color="#7c4a12"/></radialGradient>`,
-  body: '#cf8f33', grain: .1, screw: '#6b4514',
-  motif: `<circle cx="88" cy="100" r="76" fill="url(#fz-burst)"/>
-    <g transform="translate(88 100)" opacity=".22" fill="#5e360c"><path d="M0 0 L120 -20 120 20Z"/><path d="M0 0 L100 80 70 110Z"/><path d="M0 0 L30 130 -30 130Z"/><path d="M0 0 L-100 80 -70 110Z"/><path d="M0 0 L-120 -20 -120 20Z"/><path d="M0 0 L-70 -110 -30 -130Z"/><path d="M0 0 L30 -130 70 -110Z"/></g>
-    <path d="M40 94 H60 V68 H82 V118 H106 V68 H128 V94 H146" fill="none" stroke="#3a2208" stroke-opacity=".5" stroke-width="7" stroke-linejoin="miter"/>`,
-  word: (cx, f) => wm(cx, f, 'FUZZ', 38, '#3a2208', '#fbe6b0', 204) + tag(cx, 'SUSTAIN · TONE · VOL', '#5e360c', 224, 1.5),
+  defs: `
+    <linearGradient id="fz-metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f9dca0"/><stop offset=".16" stop-color="#e7b662"/>
+      <stop offset=".5" stop-color="#c98a34"/><stop offset=".82" stop-color="#875420"/>
+      <stop offset="1" stop-color="#563310"/></linearGradient>
+    <linearGradient id="fz-gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".6"/><stop offset=".12" stop-color="#fff" stop-opacity=".18"/>
+      <stop offset=".32" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="fz-plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4c2d0b"/><stop offset="1" stop-color="#2b1806"/></linearGradient>
+    <radialGradient id="fz-burst" cx="50%" cy="40%" r="66%">
+      <stop offset="0" stop-color="#ffeabf"/><stop offset=".5" stop-color="#e2ab45"/><stop offset="1" stop-color="#6b3f0f"/></radialGradient>
+    <linearGradient id="fz-refl" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".3"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></linearGradient>`,
+  body: 'url(#fz-metal)', grain: .06, screw: '#3a2208',
+  bg: (w) => `
+    <rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="14" fill="url(#fz-gloss)"/>
+    <rect x="12" y="40" width="${w - 24}" height="150" rx="10" fill="url(#fz-plate)"/>
+    <rect x="12" y="40" width="${w - 24}" height="150" rx="10" fill="none" stroke="#000" stroke-opacity=".55" stroke-width="2"/>
+    <rect x="13.5" y="41.5" width="${w - 27}" height="147" rx="9" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="1"/>`,
+  motif: `<circle cx="88" cy="112" r="64" fill="url(#fz-burst)"/>
+    <g transform="translate(88 112)" opacity=".2" fill="#3a2208"><path d="M0 0 L108 -18 108 18Z"/><path d="M0 0 L90 72 62 98Z"/><path d="M0 0 L28 116 -28 116Z"/><path d="M0 0 L-90 72 -62 98Z"/><path d="M0 0 L-108 -18 -108 18Z"/><path d="M0 0 L-62 -98 -28 -116Z"/><path d="M0 0 L28 -116 62 -98Z"/></g>
+    <path d="M44 110 H60 V88 H80 V130 H100 V88 H118 V110 H132" fill="none" stroke="#2a1806" stroke-opacity=".55" stroke-width="7" stroke-linejoin="miter"/>`,
+  fg: (w) => `<path d="M0 0 H${(w * 0.72).toFixed(0)} L${(w * 0.4).toFixed(0)} 92 H0 Z" fill="url(#fz-refl)"/>`,
+  word: (cx, f) => wm(cx, f, 'FUZZ', 36, '#2a1806', '#ffe6b0', 214) + tag(cx, 'SUSTAIN · TONE · VOL', '#f0c67a', 232, 1.5),
 });
 
 const BOOST = plate('boost', {

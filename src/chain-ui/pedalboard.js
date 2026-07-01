@@ -1,6 +1,9 @@
 // src/chain-ui/pedalboard.js
 import { createKnob } from './knob.js';
-import { fxArtSvg, FX_FONTS, fxWidth, FX_KNOB_STYLE, FX_KNOB_LAYOUT } from './fx-art.js';
+import { fxArtSvg, FX_FONTS, fxWidth, FX_KNOB_STYLE, FX_KNOB_LAYOUT, FX_MOTIFS } from './fx-art.js';
+
+// Chrome cap for the CSS-pedal knobs (light → mid → dark), amber-ish arc per effect.
+const PEDAL_CAP = ['#eef2f5', '#aeb4ba', '#40454a'];
 
 const COLORS = {
   compressor: '#0a84ff',
@@ -197,44 +200,72 @@ function enableDrag(pedal, plate, unit, handlers, getBoard) {
 // fits inside the bespoke faceplate (which is sized to the knob count).
 const PEDAL_KNOB_SIZE = 36;
 
+// Mini pedal icon for the "Add Effect" tiles (matches the new CSS pedals).
+function pedalIcon(type, color) {
+  const d = document.createElement('div');
+  d.className = 'fx-tile-pedal';
+  d.style.setProperty('--c', color);
+  d.innerHTML = `<div class="fx-tile-plate"><svg viewBox="0 0 102 80" fill="none">${FX_MOTIFS[type] || ''}</svg></div><div class="fx-tile-gloss"></div>`;
+  return d;
+}
+
 function buildPedal(unit, handlers) {
+  const type = unit.type;
+  const color = COLORS[type] ?? '#8a8a90';
+  const font = (FX_FONTS[type] || {}).family || "'Inter', sans-serif";
+  const params = unit.schema.params;
+  const n = params.length;
+
   const pedal = document.createElement('div');
   pedal.className = 'pedal';
   pedal.dataset.instanceId = String(unit.instanceId);
-  const color = COLORS[unit.type] ?? '#636368';
-  pedal.style.setProperty('--pedal-color', color); // LED
-  pedal.style.setProperty('--c', color);           // (faceplate art uses baked colors)
-  pedal.style.width = `${fxWidth(unit.type)}px`;
+  pedal.style.setProperty('--c', color);
+  pedal.style.setProperty('--pedal-color', color);
+  pedal.style.setProperty('--cols', String(n));
+  pedal.style.setProperty('--font', font);
+  pedal.style.width = `${Math.max(126, 44 + n * 34)}px`;
+  if (unit.bypassed) pedal.classList.add('bypassed');
 
-  // Bespoke faceplate art sizes the box; the wordmark is baked into the art.
-  const art = fxArtSvg(unit.type);
-  art.classList.add('pedal-art');
+  // Recessed faceplate: rotating sunburst (fuzz only) + glow + motif + glass lens.
+  const plate = document.createElement('div');
+  plate.className = 'pedal-plate';
+  if (type === 'fuzz') { const rays = document.createElement('div'); rays.className = 'pedal-rays'; plate.appendChild(rays); }
+  const glow = document.createElement('div'); glow.className = 'pedal-glow';
+  const motif = document.createElement('div'); motif.className = 'pedal-motif';
+  motif.innerHTML = `<svg viewBox="0 0 102 80" fill="none">${FX_MOTIFS[type] || ''}</svg>`;
+  const lens = document.createElement('div'); lens.className = 'pedal-lens';
+  plate.append(glow, motif, lens);
 
-  // The whole face is the drag handle; knobs sit above it (higher z) and
-  // capture their own pointer events, so dragging works everywhere else.
+  // The whole face is the drag handle; knobs/footswitch sit above (higher z).
   const grip = document.createElement('div');
   grip.className = 'pedal-grip';
   grip.dataset.dragHandle = 'true';
   grip.setAttribute('aria-label', `${unit.schema.label} — drag to reorder`);
 
+  // Real interactive knobs in a grid (one row, widened per knob count).
   const knobs = document.createElement('div');
   knobs.className = 'pedal-knobs';
-  const layout = FX_KNOB_LAYOUT[unit.type];
-  const style = FX_KNOB_STYLE[unit.type] || {};
-  const params = unit.schema.params;
-  params.forEach((p, i) => {
-    // Per-pedal slot; fall back to an evenly-spaced row if a layout slot is missing.
-    const slot = (layout && layout[i]) || { x: fxWidth(unit.type) / 2 + (i - (params.length - 1) / 2) * 40, y: 128 };
-    const size = slot.r || PEDAL_KNOB_SIZE;
-    const { el } = createKnob(p, unit.params[p.key] ?? p.default, (v) => handlers.onParamChange(unit.instanceId, p.key, v), size, style);
-    el.style.left = `${slot.x}px`;
-    el.style.top = `${slot.y - size / 2}px`;
-    knobs.appendChild(el);
+  params.forEach((p) => {
+    const slot = document.createElement('div');
+    slot.className = 'pedal-knob';
+    const { el } = createKnob(p, unit.params[p.key] ?? p.default,
+      (v) => handlers.onParamChange(unit.instanceId, p.key, v), 30, { cap: PEDAL_CAP, accent: color, pointer: '#16181b' });
+    const lbl = document.createElement('b');
+    lbl.textContent = p.label;
+    slot.append(el, lbl);
+    knobs.appendChild(slot);
   });
 
-  if (unit.bypassed) pedal.classList.add('bypassed');
-  // Footswitch hit area: a generous button around the small LED so a press near
-  // the indicator toggles power instead of starting a drag.
+  const word = document.createElement('div');
+  word.className = 'pedal-word';
+  word.textContent = unit.schema.label.toUpperCase();
+  const wl = unit.schema.label.length;
+  word.style.fontSize = `${wl > 9 ? 12 : wl > 7 ? 15 : 19}px`;
+
+  const led = document.createElement('span');
+  led.className = 'pedal-led';
+
+  // Footswitch = bypass toggle.
   const power = document.createElement('button');
   power.type = 'button';
   power.className = 'pedal-power';
@@ -242,14 +273,15 @@ function buildPedal(unit, handlers) {
   power.setAttribute('aria-checked', unit.bypassed ? 'false' : 'true');
   power.setAttribute('aria-label', `${unit.schema.label} power`);
   power.title = unit.bypassed ? 'Off — click to power on' : 'On — click to bypass';
-  const led = document.createElement('span');
-  led.className = 'pedal-led';
-  power.appendChild(led);
-  // Stop the drag-grip from reacting to a press in this zone.
   power.addEventListener('pointerdown', (e) => e.stopPropagation());
   power.addEventListener('click', (e) => { e.stopPropagation(); handlers.onToggleBypass?.(unit.instanceId); });
 
-  pedal.append(art, grip, knobs, power);
+  const gloss = document.createElement('div'); gloss.className = 'pedal-body-gloss';
+  const screws = ['tl', 'tr', 'bl', 'br'].map((c) => {
+    const s = document.createElement('span'); s.className = `pedal-screw pedal-screw-${c}`; return s;
+  });
+
+  pedal.append(plate, grip, knobs, word, led, power, gloss, ...screws);
   return { pedal, plate: grip };
 }
 
@@ -370,7 +402,7 @@ export function openEffectsModal(handlers) {
     tile.style.setProperty('--c', color);
     const font = FX_FONTS[type];
     if (font) { tile.style.setProperty('--font', font.family); tile.style.setProperty('--font-ls', font.ls); }
-    tile.appendChild(fxArtSvg(type));
+    tile.appendChild(pedalIcon(type, color));
     const span = document.createElement('span');
     span.className = 'fx-tile-label'; span.textContent = label;
     tile.appendChild(span);
