@@ -19,31 +19,60 @@ class NeuralDeriskProcessor extends AudioWorkletProcessor {
     this._load = null;      // cwrap('nam_load')
     this._reset = null;     // cwrap('nam_reset')
     this._process = null;   // raw exported _nam_process
+    this._expectedSr = null; // cwrap('nam_expected_sr')
     this.port.onmessage = (e) => this.onMessage(e.data);
   }
 
   async onMessage(msg) {
     if (msg.type === 'wasm') {
       if (this.mod) return;                             // instantiate exactly once
-      // AudioWorkletGlobalScope has NO global `URL`; Emscripten's findWasmBinary()
-      // calls `new URL('nam.wasm', import.meta.url)` UNLESS Module.locateFile is set.
-      // We hand it the bytes via wasmBinary, so the returned path is never fetched —
-      // locateFile just short-circuits the `new URL` that would otherwise throw.
-      this.mod = await createNamModule({ wasmBinary: msg.bytes, locateFile: (p) => p });
-      this._load = this.mod.cwrap('nam_load', 'number', ['string']);
-      this._reset = this.mod.cwrap('nam_reset', null, ['number', 'number']);
-      this._process = this.mod._nam_process;
-      this.inPtr = this.mod._malloc(N * 4);             // 128 floats in
-      this.outPtr = this.mod._malloc(N * 4);            // 128 floats out
-      this.port.postMessage({ type: 'wasm-ready' });
-    } else if (msg.type === 'model') {
-      if (!this.mod) return;
-      const ok = this._load(msg.json);                 // 1 on success
-      if (ok) {
-        this._reset(sampleRate, N);                    // AudioWorkletGlobalScope global
-        this.ready = true;
+      try {
+        // AudioWorkletGlobalScope has NO global `URL`; Emscripten's findWasmBinary()
+        // calls `new URL('nam.wasm', import.meta.url)` UNLESS Module.locateFile is set.
+        // We hand it the bytes via wasmBinary, so the returned path is never fetched —
+        // locateFile just short-circuits the `new URL` that would otherwise throw.
+        this.mod = await createNamModule({ wasmBinary: msg.bytes, locateFile: (p) => p });
+        this._load = this.mod.cwrap('nam_load', 'number', ['string']);
+        this._reset = this.mod.cwrap('nam_reset', null, ['number', 'number']);
+        this._process = this.mod._nam_process;
+        this._expectedSr = this.mod.cwrap('nam_expected_sr', 'number', []);
+        this.inPtr = this.mod._malloc(N * 4);           // 128 floats in
+        this.outPtr = this.mod._malloc(N * 4);          // 128 floats out
+        this.port.postMessage({ type: 'wasm-ready', ok: true });
+      } catch (err) {
+        // Instantiation failed (bad bytes, OOM, missing import, ...) — report it
+        // gracefully instead of leaving the caller's await hanging on an
+        // unhandled rejection inside the worklet global scope.
+        this.mod = null;
+        this.port.postMessage({ type: 'wasm-ready', ok: false, error: String((err && err.message) || err) });
       }
-      this.port.postMessage({ type: 'model-ready', ok: !!ok });
+    } else if (msg.type === 'model') {
+      if (!this.mod) {
+        this.port.postMessage({ type: 'model-ready', ok: false, error: 'wasm not ready' });
+        return;
+      }
+      try {
+        const ok = this._load(msg.json);                // 1 on success, 0 on parse/build failure
+        let expectedSr = null;
+        if (ok) {
+          this._reset(sampleRate, N);                    // AudioWorkletGlobalScope global
+          this.ready = true;
+          expectedSr = this._expectedSr();                // exercise nam_expected_sr for real
+        } else {
+          // nam_load failure nulls the C++-side model (dry passthrough); mirror
+          // that on the JS side too so a bad reload can't leave `ready` stuck
+          // true from a PREVIOUSLY loaded model.
+          this.ready = false;
+        }
+        this.port.postMessage({ type: 'model-ready', ok: !!ok, expectedSr });
+      } catch (err) {
+        // nam_load/_reset/_expectedSr should not throw (nam_load itself catches
+        // internally — see nam.cpp), but guard the JS side too so any future
+        // wasm-boundary failure degrades to passthrough instead of an unhandled
+        // rejection that hangs the page.
+        this.ready = false;
+        this.port.postMessage({ type: 'model-ready', ok: false, error: String((err && err.message) || err) });
+      }
     }
   }
 

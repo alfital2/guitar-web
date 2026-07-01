@@ -6,7 +6,36 @@
 <pre id="log"></pre>
 <script type="module">
 const log = (m) => { document.getElementById('log').textContent += m + '\n'; console.log('[derisk]', m); };
-const state = { ctx: null, node: null, analyser: null, buf: null, ready: false };
+const state = { ctx: null, node: null, analyser: null, buf: null, ready: false, pendingModel: null };
+
+// Persistent handler for the node's lifetime. wasm-ready fires once (module
+// instantiation); model-ready can fire repeatedly (loadModel() may be called
+// more than once on the SAME node — that's how the negative-path test proves
+// the module survives a bad load and still accepts a later good one).
+function attachPortHandler(node, onWasmReady) {
+  node.port.onmessage = (e) => {
+    log('worklet: ' + e.data.type + (e.data.ok !== undefined ? ' ok=' + e.data.ok : '') +
+        (e.data.expectedSr !== undefined ? ' expectedSr=' + e.data.expectedSr : '') +
+        (e.data.error ? ' error=' + e.data.error : ''));
+    if (e.data.type === 'wasm-ready') onWasmReady(e.data);
+    if (e.data.type === 'model-ready') {
+      state.ready = e.data.ok;
+      if (state.pendingModel) { const r = state.pendingModel; state.pendingModel = null; r(e.data); }
+    }
+  };
+}
+
+// Post a model (JSON text, possibly malformed) to the already-running worklet
+// node and resolve with the worklet's model-ready payload ({ok, error?, expectedSr?}).
+// Never throws — callers inspect `.ok` themselves (this is how the negative-path
+// test observes a graceful failure instead of a page error / hang).
+function loadModel(json) {
+  if (!state.node) throw new Error('loadModel: call start() first');
+  return new Promise((resolve) => {
+    state.pendingModel = resolve;
+    state.node.port.postMessage({ type: 'model', json });
+  });
+}
 
 async function start(modelUrl, diUrl) {
   const ctx = new AudioContext();                     // normal ctx — no COOP/COEP
@@ -20,14 +49,10 @@ async function start(modelUrl, diUrl) {
   // Two-phase handshake. The worklet instantiates the wasm ASYNCHRONOUSLY, so we
   // MUST wait for 'wasm-ready' before posting the model — otherwise the model
   // message arrives while this.mod is still null and gets dropped.
-  let onWasmReady, onModelReady;
+  let onWasmReady;
   const wasmReady = new Promise((r) => { onWasmReady = r; });
-  const modelReady = new Promise((r) => { onModelReady = r; });
-  node.port.onmessage = (e) => {
-    log('worklet: ' + e.data.type + (e.data.ok !== undefined ? ' ok=' + e.data.ok : ''));
-    if (e.data.type === 'wasm-ready') onWasmReady(true);
-    if (e.data.type === 'model-ready') { state.ready = e.data.ok; onModelReady(e.data.ok); }
-  };
+  attachPortHandler(node, onWasmReady);
+  Object.assign(state, { ctx, node });
 
   const [wasmBytes, modelJson, diBuf] = await Promise.all([
     fetch('/assets/neural/nam.wasm').then((r) => r.arrayBuffer()),
@@ -35,9 +60,10 @@ async function start(modelUrl, diUrl) {
     fetch(diUrl).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b)),
   ]);
   node.port.postMessage({ type: 'wasm', bytes: wasmBytes }, [wasmBytes]);
-  await wasmReady;
-  node.port.postMessage({ type: 'model', json: modelJson });
-  await modelReady;
+  const wasmResult = await wasmReady;
+  if (!wasmResult.ok) throw new Error('wasm instantiation failed: ' + wasmResult.error);
+  const modelResult = await loadModel(modelJson);
+  if (!modelResult.ok) throw new Error('model did not load: ' + (modelResult.error || 'nam_load returned 0'));
 
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
@@ -60,7 +86,7 @@ async function start(modelUrl, diUrl) {
   src.start(0, startOffset);
   await ctx.resume();
 
-  Object.assign(state, { ctx, node, analyser, buf });
+  Object.assign(state, { analyser, buf });
   log('streaming ' + modelUrl.split('/').pop() + ' @ ' + ctx.sampleRate + 'Hz (DI active from ' + startOffset.toFixed(2) + 's)');
 }
 
@@ -72,7 +98,7 @@ function getOutputRMS() {
   return { rms: Math.sqrt(sum / state.buf.length), finite };
 }
 
-window.derisk = { start, getOutputRMS, ready: () => state.ready };
+window.derisk = { start, getOutputRMS, ready: () => state.ready, loadModel };
 log('ready');
 </script>
 </body>

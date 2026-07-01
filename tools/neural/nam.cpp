@@ -20,11 +20,18 @@ extern "C" {
 // Build the model from raw .nam JSON text. Returns 1 on success, 0 on failure.
 EMSCRIPTEN_KEEPALIVE
 int nam_load(const char* jsonStr) {
-  try {
+  static bool sFastTanhEnabled = false; // enable_fast_tanh() is a global toggle; do it once
+  if (!sFastTanhEnabled) {
     nam::activations::Activation::enable_fast_tanh(); // matches the shipping engine
+    sFastTanhEnabled = true;
+  }
+  try {
     auto j = nlohmann::json::parse(jsonStr);
     gModel = nam::get_dsp(j);
   } catch (...) {
+    // Requires -fwasm-exceptions (see build.sh) — without it, C++ exceptions are
+    // disabled at compile time and a throw here aborts the whole wasm module
+    // instead of being caught, so a malformed model would kill the instance.
     gModel = nullptr;
     return 0;
   }

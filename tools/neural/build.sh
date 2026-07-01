@@ -43,9 +43,14 @@ if [ ! -d "Dependencies/eigen/Eigen" ]; then
 fi
 
 # 3. compile the plain-wasm C API (contract flags; NO -sAUDIO_WORKLET, NO -pthread)
+#    -fwasm-exceptions enables REAL wasm exception handling (compile + link, since this
+#    is a single emcc invocation). Without it, C++ exceptions are compiled out entirely
+#    and nam_load's try/catch is dead code: nlohmann::json::parse on malformed JSON (or
+#    nam::get_dsp on an unsupported model) calls abort() and kills the whole wasm
+#    instance instead of returning 0 -> nam_load MUST be able to actually catch.
 mkdir -p "${OUT}"
 emcc "${HERE}/nam.cpp" $(find NAM -name '*.cpp') \
-  -std=c++17 -Os -flto -msimd128 \
+  -std=c++17 -Os -flto -msimd128 -fwasm-exceptions \
   -DNAM_USE_INLINE_GEMM -DNAM_SAMPLE_FLOAT -DEIGEN_STACK_ALLOCATION_LIMIT=0 \
   -I. -IDependencies/eigen -IDependencies/nlohmann \
   -sMODULARIZE -sEXPORT_ES6 -sENVIRONMENT=web,worker -sALLOW_MEMORY_GROWTH \
