@@ -27,6 +27,7 @@ import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
+import { connectInputChannel } from './audio/input-channel.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
@@ -36,6 +37,8 @@ let ampReverb = { size: 0.4, mix: 0 }; // amp reverb params (size, wet mix)
 let ampCollapsed = chainStore.loadAmpCollapsed(); // amp folded to value strip
 let reverbStage = null;                // audio node: engine.output -> reverbStage -> normGain
 let calibrationEq, calibRAF, calibState, calibCountdown;
+let inputSplitter = null;   // ChannelSplitterNode after source; picks a hardware input channel
+let inputChannel = 0;       // selected input channel: 0 = input 1, 1 = input 2 (persists across power cycles)
 let pitchBuf, lastNoteMs = 0;
 let prevBars = null;
 let accentRGB = '240,180,41'; // current theme accent for canvas drawing
@@ -644,6 +647,7 @@ async function start() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       audio: { deviceId: $('input').value ? { exact: $('input').value } : undefined,
+        channelCount: 2,
         echoCancellation: false, noiseSuppression: false, autoGainControl: false, latency: 0 },
       video: false,
     });
@@ -681,9 +685,13 @@ async function start() {
     reverbStage = reverbFx.create(ctx, ampReverb);
     reverbStage.output.connect(normGain);
 
-    // Calibration EQ sits between source and the artist chain.
+    // Calibration EQ sits between source and the artist chain. A ChannelSplitter
+    // in front of it lets the user pick which hardware input channel (1 or 2)
+    // feeds the chain — e.g. a 2-in interface with the guitar on input 2.
     calibrationEq = createCalibrationEq(ctx);
-    source.connect(calibrationEq.input);
+    inputSplitter = ctx.createChannelSplitter(2);
+    source.connect(inputSplitter);
+    connectInputChannel(inputSplitter, inputChannel, calibrationEq.input);
     applyActiveCalibration();
 
     const defaultPreset = PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0];
@@ -718,11 +726,18 @@ function stop() {
   { const c = $('note-circle'); if (c) { c.textContent = '—'; c.classList.remove('active'); } }
   if (stream) stream.getTracks().forEach(t => t.stop());
   if (ctx) ctx.close();
-  ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = reverbStage = null;
+  ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = reverbStage = inputSplitter = null;
   setPower(false);
   updateTransport(); // disable skip-to-start when powered off
   prevBars = null;
   { const fl = $('freq-label'); if (fl) { fl.textContent = '— Hz'; fl.style.color = ''; } }
+}
+
+// Re-route the live input to a different hardware channel (1 or 2). Persists the
+// selection so it survives power cycles; no-op on the graph until Start wires it.
+function setInputChannel(ch) {
+  inputChannel = ch | 0;
+  if (inputSplitter && calibrationEq) connectInputChannel(inputSplitter, inputChannel, calibrationEq.input);
 }
 
 async function listDevices() {
@@ -750,6 +765,7 @@ setPower(false);
 $('calib-save').addEventListener('click', saveCalibration);
 $('calib-cancel').addEventListener('click', stopCalibration);
 $('calib-start').addEventListener('click', startCalibration);
+$('input-channel').addEventListener('change', (e) => setInputChannel(+e.target.value));
 
 // Settings slide-in panel
 function setSettings(open) {
