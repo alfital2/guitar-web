@@ -44,6 +44,44 @@ describe('buildChain', () => {
     const g = buildChain(ctx, [], registry);
     expect(ctx.connections.some(c => c.from === g.input.id && c.to === g.output.id)).toBe(true);
   });
+  it('destroy() stops every started LFO source and disconnects module nodes', () => {
+    const ctx = new FakeAudioContext();
+    const lfoChain = [
+      { type: 'chorus', params: { rate: 1.5, depth: 4, mix: 0.4 } },          // 1 osc
+      { type: 'phaser', params: { rate: 0.5, depth: 6, feedback: 0.4, mix: 0.5 } }, // 1 osc + 1 constant source
+    ];
+    const g = buildChain(ctx, lfoChain, registry);
+    expect(ctx.oscStarts).toBe(2);
+    expect(ctx.constStarts).toBe(1);
+    expect(ctx.oscStops || 0).toBe(0);
+
+    g.destroy();
+
+    expect(ctx.oscStops).toBe(2);        // every started oscillator stopped
+    expect(ctx.constStops).toBe(1);      // ...and the phaser's ConstantSource too
+    // module boundary nodes are disconnected from the graph
+    for (const m of g.modules) {
+      expect(ctx.connections.some(c => c.from === m.input.id)).toBe(false);
+      expect(ctx.connections.some(c => c.from === m.output.id)).toBe(false);
+    }
+    // internal LFO wiring is gone too (nothing connects FROM an oscillator anymore)
+    expect(ctx.connections.some(c => c.fromKind === 'oscillator')).toBe(false);
+  });
+  it('destroy() keeps going when one module destroy throws', () => {
+    const ctx = new FakeAudioContext();
+    const g = buildChain(ctx, [
+      { type: 'chorus', params: { rate: 1.5, depth: 4, mix: 0.4 } },
+      { type: 'tremolo', params: { rate: 5, depth: 0.6, shape: 0 } },
+    ], registry);
+    g.modules[0].destroy = () => { throw new Error('boom'); };
+    expect(() => g.destroy()).not.toThrow();
+    expect(ctx.oscStops).toBe(1); // tremolo's LFO still got stopped
+  });
+  it('modules without started sources may omit destroy (engine guards with ?.)', () => {
+    const ctx = new FakeAudioContext();
+    const g = buildChain(ctx, chain, registry); // compressor + eq: no destroy returned
+    expect(() => g.destroy()).not.toThrow();
+  });
   it('skips a bypassed module in the signal path but keeps the chain flowing', () => {
     const ctx = new FakeAudioContext();
     const c3 = [

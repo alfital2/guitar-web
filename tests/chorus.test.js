@@ -22,4 +22,13 @@ describe('chorus effect', () => {
     const fx = create(ctx, { rate: 1, depth: 3, mix: 0.3 });
     expect(() => fx.apply({ rate: 2, depth: 6, mix: 0.5 })).not.toThrow();
   });
+  it('destroy stops the started LFO and disconnects its nodes', () => {
+    const ctx = new FakeAudioContext();
+    const fx = create(ctx, { rate: 1.5, depth: 4, mix: 0.4 });
+    expect(ctx.oscStarts).toBe(1);
+    fx.destroy();
+    expect(ctx.oscStops).toBe(1);
+    expect(ctx.connections.some(c => c.from === fx.input.id)).toBe(false);
+    expect(ctx.connections.some(c => c.fromKind === 'oscillator')).toBe(false);
+  });
 });

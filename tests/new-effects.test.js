@@ -55,8 +55,60 @@ describe('expanded effects library', () => {
       const lo = Object.fromEntries(m.schema.params.map(p => [p.key, p.min]));
       const hi = Object.fromEntries(m.schema.params.map(p => [p.key, p.max]));
       expect(() => { fx.apply(lo); fx.apply(hi); }).not.toThrow();
+      // Teardown contract: any effect that started a source must return a
+      // destroy() that stops every start()ed oscillator/ConstantSource.
+      if (ctx.oscStarts || ctx.constStarts) expect(fx.destroy).toBeTypeOf('function');
+      if (fx.destroy) {
+        expect(() => fx.destroy()).not.toThrow();
+        expect(ctx.oscStops || 0).toBe(ctx.oscStarts || 0);
+        expect(ctx.constStops || 0).toBe(ctx.constStarts || 0);
+      }
     });
   }
+
+  // apply() receives the FULL param object on any knob change (engine.setParam),
+  // so WaveShaper effects must rebuild their Float32Array curve only when the
+  // curve's own source param moved — not on every unrelated knob drag.
+  describe('WaveShaper curve rebuild guards', () => {
+    function defaults(m) { return Object.fromEntries(m.schema.params.map(p => [p.key, p.default])); }
+
+    it('fuzz: curve rebuilt only when fuzz changes', () => {
+      const ctx = new FakeAudioContext();
+      const fx = fuzz.create(ctx, defaults(fuzz));
+      const shaper = ctx.nodesByKind.waveshaper[0];
+      const curve = shaper.curve;
+      fx.apply({ ...defaults(fuzz), tone: 9, level: 1 });
+      expect(shaper.curve).toBe(curve);
+      fx.apply({ ...defaults(fuzz), fuzz: 9 });
+      expect(shaper.curve).not.toBe(curve);
+    });
+
+    it('octave: each of the two curves guarded on its own source param', () => {
+      const ctx = new FakeAudioContext();
+      const fx = octave.create(ctx, defaults(octave));
+      const [rect, fuzzShaper] = ctx.nodesByKind.waveshaper; // creation order in octave.js
+      const rectCurve = rect.curve, fuzzCurve = fuzzShaper.curve;
+      fx.apply({ ...defaults(octave), tone: 9, level: 1 });     // unrelated knobs
+      expect(rect.curve).toBe(rectCurve);
+      expect(fuzzShaper.curve).toBe(fuzzCurve);
+      fx.apply({ ...defaults(octave), octave: 0.2 });           // only octave moved
+      expect(rect.curve).not.toBe(rectCurve);
+      expect(fuzzShaper.curve).toBe(fuzzCurve);
+      fx.apply({ ...defaults(octave), octave: 0.2, fuzz: 9 });  // now only fuzz moved
+      expect(fuzzShaper.curve).not.toBe(fuzzCurve);
+    });
+
+    it('gate: gate curve rebuilt only when threshold changes', () => {
+      const ctx = new FakeAudioContext();
+      const fx = gate.create(ctx, defaults(gate));
+      const gateShaper = ctx.nodesByKind.waveshaper[1]; // [0] is the static |x| rectifier
+      const curve = gateShaper.curve;
+      fx.apply({ ...defaults(gate), release: 9 });
+      expect(gateShaper.curve).toBe(curve);
+      fx.apply({ ...defaults(gate), threshold: 8 });
+      expect(gateShaper.curve).not.toBe(curve);
+    });
+  });
 });
 
 function create(m, ctx, params) { return m.create(ctx, params); }

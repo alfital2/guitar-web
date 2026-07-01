@@ -32,4 +32,17 @@ describe('drive effect', () => {
     fx.apply({ amount: 3, tone: 5, level: 5, master: 10, blend: 0.65, midBump: 0 });
     expect(fx.output.gain.value).toBeCloseTo(2, 5);
   });
+  it('rebuilds the clip curve only when Amount changes (guarded like reverb impulse)', () => {
+    const ctx = new FakeAudioContext();
+    const fx = create(ctx, { amount: 3, tone: 5, level: 5, blend: 0.65, midBump: 0 });
+    const shaper = ctx.nodesByKind.waveshaper[0];
+    const curve = shaper.curve;
+    expect(curve).toBeInstanceOf(Float32Array);
+    // unrelated knobs move → curve NOT rebuilt (same object identity)
+    fx.apply({ amount: 3, tone: 8, level: 2, blend: 0.4, midBump: 3 });
+    expect(shaper.curve).toBe(curve);
+    // the source param moves → curve rebuilt
+    fx.apply({ amount: 7, tone: 8, level: 2, blend: 0.4, midBump: 3 });
+    expect(shaper.curve).not.toBe(curve);
+  });
 });

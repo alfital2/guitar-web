@@ -18,9 +18,13 @@ class LooperProcessor extends AudioWorkletProcessor {
     this.rec = 0;        // record write head
     this.play = 0;       // playback read head
     this.prevMode = 0;
+    this.destroyed = false; // set by {type:'destroy'} so an abandoned node stops
+    // being scheduled (process() returning true pins it alive forever)
+    this.port.onmessage = (e) => { if (e.data && e.data.type === 'destroy') this.destroyed = true; };
   }
 
   process(inputs, outputs, params) {
+    if (this.destroyed) return false;
     const output = outputs[0];
     if (!output || !output.length) return true;
     const input = inputs[0];

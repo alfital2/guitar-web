@@ -19,8 +19,14 @@ export function create(ctx, params) {
   const output = ctx.createGain();
   input.connect(pre); pre.connect(shaper); shaper.connect(tone); tone.connect(output);
 
+  // Rebuild the clip curve only when Fuzz actually moved (apply() receives the
+  // full param object on ANY knob change — see reverb.js's lastSize pattern).
+  let lastFuzz = null;
   const apply = (p) => {
-    shaper.curve = makeHardClipCurve(p.fuzz);
+    if (p.fuzz !== lastFuzz) {
+      shaper.curve = makeHardClipCurve(p.fuzz);
+      lastFuzz = p.fuzz;
+    }
     tone.frequency.value = mapRange(p.tone, 0, 10, 800, 6000);
     output.gain.value = mapRange(p.level, 0, 10, 0, 1.2);
   };

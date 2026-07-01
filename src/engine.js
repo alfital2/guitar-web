@@ -17,7 +17,7 @@ export function buildChain(ctx, chain, registry) {
       prev.connect(built.input);
       prev = built.output;
     }
-    modules.push({ type: node.type, schema: def.schema, params, apply: built.apply, input: built.input, output: built.output });
+    modules.push({ type: node.type, schema: def.schema, params, apply: built.apply, input: built.input, output: built.output, destroy: built.destroy });
   }
   prev.connect(output);
 
@@ -27,5 +27,17 @@ export function buildChain(ctx, chain, registry) {
     m.apply(m.params);
   }
 
-  return { input, output, modules, setParam };
+  // Tear down every module: stop any LFO/worklet sources it started (so they
+  // stop consuming CPU and can be garbage-collected) and disconnect its nodes
+  // from the graph. Each module is guarded independently so one bad destroy()
+  // doesn't stop the rest of the chain from being cleaned up.
+  function destroy() {
+    for (const m of modules) {
+      try { m.destroy?.(); } catch (e) { console.warn(`[engine] destroy failed for "${m.type}":`, e); }
+      try { m.input?.disconnect(); } catch {}
+      try { m.output?.disconnect(); } catch {}
+    }
+  }
+
+  return { input, output, modules, setParam, destroy };
 }

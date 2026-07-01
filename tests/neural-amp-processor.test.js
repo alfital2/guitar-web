@@ -124,4 +124,22 @@ describe('neural-amp-processor', () => {
     p.process(block(input), o, {});
     for (let i = 0; i < 128; i++) expect(o[0][0][i]).toBe(input[i]); // passthrough, no throw
   });
+
+  it('process() returns false after {type:"destroy"} so an abandoned node stops running', async () => {
+    const p = new registered['neural-amp-processor']();
+    await p.port.onmessage({ data: { type: 'wasm', bytes: new ArrayBuffer(8) } });
+    await p.port.onmessage({ data: { type: 'model', json: '{"fake":true}' } });
+    expect(p.process(block(ramp(128)), out(128), {})).toBe(true); // live: keeps rendering
+
+    await p.port.onmessage({ data: { type: 'destroy' } });
+    expect(p.process(block(ramp(128)), out(128), {})).toBe(false); // abandoned: unschedule
+    expect(p.process(block(ramp(128)), out(128), {})).toBe(false); // and stays down
+  });
+
+  it('destroy also halts a processor that never got a model (dry passthrough node)', async () => {
+    const p = new registered['neural-amp-processor']();
+    expect(p.process(block(ramp(128)), out(128), {})).toBe(true);
+    await p.port.onmessage({ data: { type: 'destroy' } });
+    expect(p.process(block(ramp(128)), out(128), {})).toBe(false);
+  });
 });

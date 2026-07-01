@@ -32,8 +32,14 @@ export function create(ctx, params) {
   input.connect(vca); vca.connect(output);
   input.connect(rect); rect.connect(smooth); smooth.connect(gateShaper); gateShaper.connect(vca.gain);
 
+  // Rebuild the gate curve only when Thresh actually moved (apply() receives
+  // the full param object on ANY knob change — see reverb.js's lastSize pattern).
+  let lastThreshold = null;
   const apply = (p) => {
-    gateShaper.curve = makeGateCurve(mapRange(p.threshold, 0, 10, 0.005, 0.15));
+    if (p.threshold !== lastThreshold) {
+      gateShaper.curve = makeGateCurve(mapRange(p.threshold, 0, 10, 0.005, 0.15));
+      lastThreshold = p.threshold;
+    }
     // Lower smoothing cutoff = slower release (gate hangs open longer).
     smooth.frequency.value = mapRange(p.release, 0, 10, 60, 6);
   };

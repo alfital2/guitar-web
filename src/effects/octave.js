@@ -27,9 +27,18 @@ export function create(ctx, params) {
   const output = ctx.createGain();
   input.connect(pre); pre.connect(fuzz); fuzz.connect(rect); rect.connect(tone); tone.connect(output);
 
+  // Each curve rebuilds only when ITS source param moved (apply() receives the
+  // full param object on ANY knob change — see reverb.js's lastSize pattern).
+  let lastOctave = null, lastFuzz = null;
   const apply = (p) => {
-    rect.curve = makeRectifierCurve(p.octave);
-    fuzz.curve = makeHardClipCurve(p.fuzz);
+    if (p.octave !== lastOctave) {
+      rect.curve = makeRectifierCurve(p.octave);
+      lastOctave = p.octave;
+    }
+    if (p.fuzz !== lastFuzz) {
+      fuzz.curve = makeHardClipCurve(p.fuzz);
+      lastFuzz = p.fuzz;
+    }
     tone.frequency.value = mapRange(p.tone, 0, 10, 900, 5500);
     output.gain.value = mapRange(p.level, 0, 10, 0, 1.0);
   };

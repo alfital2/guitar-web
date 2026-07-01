@@ -29,5 +29,11 @@ export function create(ctx, params) {
     lfoGain.gain.value = mapRange(p.depth, 0, 10, 0, 0.006);
   };
   apply(params);
-  return { input, output, apply };
+
+  const destroy = () => {
+    try { osc.stop(); } catch {}
+    for (const n of [input, output, delay, osc, lfoGain]) { try { n.disconnect(); } catch {} }
+  };
+
+  return { input, output, apply, destroy };
 }

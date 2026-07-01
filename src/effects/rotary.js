@@ -32,7 +32,7 @@ function rotor(ctx, src, dest) {
   osc.connect(tremMod); tremMod.connect(trem.gain);
   osc.connect(panMod); panMod.connect(panner.pan);
   osc.start();
-  return { osc, dopMod, tremMod, panMod, trem };
+  return { osc, dopMod, tremMod, panMod, trem, delay, panner };
 }
 
 export function create(ctx, params) {
@@ -72,5 +72,14 @@ export function create(ctx, params) {
     dry.gain.value = 1 - p.mix;
   };
   apply(params);
-  return { input, output, apply };
+
+  const destroy = () => {
+    for (const rotor of [horn, drum]) {
+      try { rotor.osc.stop(); } catch {}
+      for (const n of [rotor.osc, rotor.dopMod, rotor.tremMod, rotor.panMod, rotor.trem, rotor.delay, rotor.panner]) { try { n.disconnect(); } catch {} }
+    }
+    for (const n of [input, output, dry, wet, high, low]) { try { n.disconnect(); } catch {} }
+  };
+
+  return { input, output, apply, destroy };
 }

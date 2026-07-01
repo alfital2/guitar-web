@@ -30,5 +30,11 @@ export function create(ctx, params) {
     depthGain.gain.value = p.depth;
   };
   apply(params);
-  return { input, output, apply };
+
+  const destroy = () => {
+    try { osc.stop(); } catch {}
+    for (const n of [input, panner, output, osc, depthGain]) { try { n.disconnect(); } catch {} }
+  };
+
+  return { input, output, apply, destroy };
 }

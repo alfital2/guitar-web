@@ -53,5 +53,11 @@ export function create(ctx, params) {
     dry.gain.value = 1;
   };
   apply(params);
-  return { input, output, apply };
+
+  const destroy = () => {
+    try { osc.stop(); } catch {}
+    for (const n of [input, output, dry, delay, damp, sat, satIn, fb, wet, osc, flutterGain]) { try { n.disconnect(); } catch {} }
+  };
+
+  return { input, output, apply, destroy };
 }

@@ -115,5 +115,17 @@ export function create(ctx, params) {
   };
   apply(params);
 
-  return { input: trimGain, output: levelGain, apply };
+  // Tell the worklet to stop processing (its process() otherwise returns true
+  // forever — an abandoned node keeps running full WaveNet inference, ~13% of
+  // a core per rebuild) and disconnect this effect's nodes.
+  let destroyed = false;
+  const destroy = () => {
+    if (destroyed) return;
+    destroyed = true;
+    try { node.port.postMessage({ type: 'destroy' }); } catch {}
+    try { node.port.onmessage = null; } catch {}
+    for (const n of [trimGain, node, levelGain]) { try { n.disconnect(); } catch {} }
+  };
+
+  return { input: trimGain, output: levelGain, apply, destroy };
 }

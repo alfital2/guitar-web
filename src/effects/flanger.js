@@ -41,5 +41,11 @@ export function create(ctx, params) {
     dry.gain.value = 1;
   };
   apply(params);
-  return { input, output, apply };
+
+  const destroy = () => {
+    try { osc.stop(); } catch {}
+    for (const n of [input, output, dry, delay, fb, wet, osc, lfoGain]) { try { n.disconnect(); } catch {} }
+  };
+
+  return { input, output, apply, destroy };
 }

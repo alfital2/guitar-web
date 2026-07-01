@@ -34,5 +34,11 @@ export function create(ctx, params) {
     dry.gain.value = 1 - p.mix;
   };
   apply(params);
-  return { input, output, apply };
+
+  const destroy = () => {
+    try { carrier.stop(); } catch {}
+    for (const n of [input, output, dry, ring, wet, carrier]) { try { n.disconnect(); } catch {} }
+  };
+
+  return { input, output, apply, destroy };
 }

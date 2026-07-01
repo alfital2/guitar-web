@@ -222,6 +222,10 @@ function rebuildGraph() {
     if (engine) {
       try { calibrationEq.output.disconnect(); } catch {}
       try { engine.output.disconnect(); } catch {}
+      // Stop every LFO oscillator / worklet the old chain started before it's
+      // abandoned — otherwise running sources never GC and keep costing CPU
+      // (worst case: an abandoned neural-amp worklet keeps running inference).
+      try { engine.destroy?.(); } catch (e) { console.warn('engine destroy failed:', e); }
     }
     engine = buildChain(ctx, chainState.toEngineChain(currentChain), registry);
     if (calibrationEq) calibrationEq.output.connect(engine.input);

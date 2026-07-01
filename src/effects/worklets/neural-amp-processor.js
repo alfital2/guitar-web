@@ -52,11 +52,21 @@ class NeuralAmpProcessor extends AudioWorkletProcessor {
     this.heapBuf = null;        // ArrayBuffer identity backing the cached views
     this.inView = null;         // Float32Array view over [inPtr, inPtr+BLOCK)
     this.outView = null;        // Float32Array view over [outPtr, outPtr+BLOCK)
+    this.destroyed = false;     // true once the owning effect module tore this node down
     this.port.onmessage = (e) => this.onMessage(e.data);
   }
 
   async onMessage(msg) {
     if (!msg) return;
+    if (msg.type === 'destroy') {
+      // The owning effect was removed/rebuilt: this node is abandoned but
+      // process() would otherwise return true forever, keeping full WaveNet
+      // inference running (~13% of a core) on a node nobody can hear. Flip a
+      // flag so process() returns false, which lets the browser tear the node
+      // down instead of scheduling it every render quantum.
+      this.destroyed = true;
+      return;
+    }
     if (msg.type === 'wasm') {
       if (this.mod || this.instantiating) return; // instantiate exactly once
       this.instantiating = true;
@@ -114,6 +124,7 @@ class NeuralAmpProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs) {
+    if (this.destroyed) return false; // stop being scheduled — node is abandoned
     const output = outputs[0];
     if (!output || !output.length) return true;
     const out = output[0];

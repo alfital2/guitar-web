@@ -17,6 +17,9 @@ class PitchShiftProcessor extends AudioWorkletProcessor {
     this.write = 0;
     this.phase = 0;                      // 0..1 position within the grain window
     this.grain = Math.max(256, Math.floor(sampleRate * 0.08)); // ~80ms window
+    this.destroyed = false;              // set by {type:'destroy'} so an abandoned
+    // node stops being scheduled (process() returning true pins it alive forever)
+    this.port.onmessage = (e) => { if (e.data && e.data.type === 'destroy') this.destroyed = true; };
   }
 
   read(pos) {
@@ -30,6 +33,7 @@ class PitchShiftProcessor extends AudioWorkletProcessor {
   }
 
   process(inputs, outputs, params) {
+    if (this.destroyed) return false;
     const output = outputs[0];
     if (!output || !output.length) return true;
     const input = inputs[0];

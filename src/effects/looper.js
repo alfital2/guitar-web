@@ -20,5 +20,11 @@ export function create(ctx, params) {
     node.parameters.get('level').value = p.level;
   };
   apply(params);
-  return { input: node, output: node, apply };
+  // Make the worklet's process() return false so an abandoned node stops being
+  // scheduled (it would otherwise keep processing forever), then disconnect.
+  const destroy = () => {
+    try { node.port.postMessage({ type: 'destroy' }); } catch {}
+    try { node.disconnect(); } catch {}
+  };
+  return { input: node, output: node, apply, destroy };
 }

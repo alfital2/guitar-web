@@ -29,6 +29,18 @@ export function createMetronome({ onBeat } = {}) {
   // metronome share THIS one continuous beat grid, so there is no timing seam
   // between the last count beat and the first recorded beat.
   let session = null;
+  // Everything scheduled ahead of the audible "now": lookahead-scheduled click
+  // oscillators and pending setTimeout ids (beat-UI callbacks + an armed
+  // count-in downbeat). stop() cancels all of it — previously a scheduled
+  // downbeat could still fire (and start recording) AFTER the user hit stop.
+  const pendingTimeouts = new Set();
+  const liveOscs = new Set();
+
+  function after(ms, fn) {
+    const id = setTimeout(() => { pendingTimeouts.delete(id); fn(); }, ms);
+    pendingTimeouts.add(id);
+    return id;
+  }
 
   function click(time, accent) {
     const osc = ctx.createOscillator();
@@ -39,6 +51,8 @@ export function createMetronome({ onBeat } = {}) {
     gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.05);
     osc.connect(gain); gain.connect(ctx.destination);
     osc.start(time); osc.stop(time + 0.06);
+    liveOscs.add(osc);
+    osc.onended = () => { liveOscs.delete(osc); try { osc.disconnect(); } catch {} try { gain.disconnect(); } catch {} };
   }
 
   function scheduler() {
@@ -48,7 +62,7 @@ export function createMetronome({ onBeat } = {}) {
       const doClick = session ? (inCount || session.recordMetro) : true;
       if (doClick) {
         click(t, b % 4 === 0);
-        if (onBeat) { const d = Math.max(0, (t - ctx.currentTime) * 1000); setTimeout(() => onBeat(b), d); }
+        if (onBeat) { const d = Math.max(0, (t - ctx.currentTime) * 1000); after(d, () => onBeat(b)); }
       }
       // The downbeat (first beat after the count-in) is when recording begins.
       // Fire it on the same audio grid, exactly one beat after the last count.
@@ -56,8 +70,12 @@ export function createMetronome({ onBeat } = {}) {
         session.fired = true;
         const cb = session.onDownbeat;
         const d = Math.max(0, (t - ctx.currentTime) * 1000 - REC_LEAD_MS);
-        setTimeout(() => { if (cb) cb(); }, d);
-        if (!session.recordMetro) { stop(); return; } // count-in only → no clicks while recording
+        after(d, () => { if (cb) cb(); });
+        // Count-in only → halt the grid but do NOT cancel what's pending: the
+        // downbeat timeout just armed above must fire (it starts the recording)
+        // and the already-scheduled count clicks should play out. A user stop()
+        // during the remaining lead window still cancels everything.
+        if (!session.recordMetro) { stopTicking(); return; }
       }
       nextTime += secondsPerBeat(bpm);
       beat++;
@@ -75,10 +93,21 @@ export function createMetronome({ onBeat } = {}) {
     nextTime = ctx.currentTime + 0.05;
     timer = setInterval(scheduler, LOOKAHEAD_MS);
   }
-  function stop() {
+  // Halt the beat grid (internal — leaves already-scheduled events alone).
+  function stopTicking() {
     running = false;
     session = null;
     if (timer) { clearInterval(timer); timer = null; }
+  }
+  // Full stop: halt the grid AND cancel everything scheduled ahead — pending
+  // beat/downbeat timeouts and lookahead-scheduled click oscillators.
+  function stop() {
+    stopTicking();
+    for (const id of pendingTimeouts) clearTimeout(id);
+    pendingTimeouts.clear();
+    // stop() now → each osc's onended handler disconnects it and its gain.
+    for (const osc of liveOscs) { try { osc.stop(); } catch {} }
+    liveOscs.clear();
   }
   function toggle() { running ? stop() : start(); }
   function setTempo(v) { bpm = clampTempo(v); }

@@ -34,9 +34,18 @@ export function createTuner({ getLiveAnalyser, onReading, onState }) {
     analyser = ownAnalyser;
   }
 
+  // MPM detection is O(n·maxLag) and far too heavy for 60 fps — it can starve
+  // the audio render thread (same lesson as main.js's meter loop, which
+  // throttles to ~13 Hz). Gate detection to ~15 Hz; the rAF keeps ticking so
+  // stop() still has one handle to cancel.
+  const DETECT_MS = 66;
+  let lastDetect = 0;
   function loop() {
     raf = requestAnimationFrame(loop);
     if (!analyser) return;
+    const now = performance.now();
+    if (now - lastDetect < DETECT_MS) return;
+    lastDetect = now;
     if (!buf || buf.length !== analyser.fftSize) buf = new Float32Array(analyser.fftSize);
     analyser.getFloatTimeDomainData(buf);
     const det = detectPitchMPM(buf, analyser.context.sampleRate);

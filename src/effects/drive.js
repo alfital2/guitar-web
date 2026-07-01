@@ -33,8 +33,15 @@ export function create(ctx, params) {
   const master = ctx.createGain();
   output.connect(master);
 
+  // setParam re-applies the FULL param object on any knob change: guard the
+  // Float32Array curve rebuild so twisting tone/level doesn't recompute it
+  // (same lastX pattern as reverb.js's impulse guard).
+  let lastAmount = null;
   const apply = (p) => {
-    shaper.curve = makeSoftClipCurve(p.amount);
+    if (p.amount !== lastAmount) {
+      shaper.curve = makeSoftClipCurve(p.amount);
+      lastAmount = p.amount;
+    }
     tone.frequency.value = mapRange(p.tone, 0, 10, 1000, 8000);
     midEq.gain.value = mapRange(p.midBump, 0, 10, 0, 12);
     wet.gain.value = p.blend;

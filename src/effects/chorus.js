@@ -35,5 +35,14 @@ export function create(ctx, params) {
     dry.gain.value = 1;
   };
   apply(params);
-  return { input, output, apply };
+
+  // osc.start() never had a matching stop(): an abandoned chorus (chain
+  // edit/removal) would leave the LFO running forever. Stop it and disconnect
+  // every node this effect created.
+  const destroy = () => {
+    try { osc.stop(); } catch {}
+    for (const n of [input, output, dry, delay, wet, osc, lfoGain]) { try { n.disconnect(); } catch {} }
+  };
+
+  return { input, output, apply, destroy };
 }

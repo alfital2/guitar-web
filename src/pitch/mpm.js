@@ -3,10 +3,15 @@
 // parabolic interpolation of the chosen peak. Octave-robust and sub-cent
 // accurate for monophonic signals (guitar tuning).
 
-// NSDF over lags 0..maxLag (Tartini/McLeod). Returns Float32Array of length maxLag+1.
+// NSDF over lags 0..maxLag (Tartini/McLeod). Returns a Float32Array of length
+// maxLag+1. The buffer is a module-level scratch reused across calls (detection
+// runs in rAF loops — a fresh ~1k-float allocation per call is pure GC churn);
+// it never escapes detectPitchMPM, so reuse is safe.
+let nsdfBuf = new Float32Array(0);
 function nsdf(buf, maxLag) {
   const n = buf.length;
-  const out = new Float32Array(maxLag + 1);
+  if (nsdfBuf.length !== maxLag + 1) nsdfBuf = new Float32Array(maxLag + 1);
+  const out = nsdfBuf;
   for (let lag = 0; lag <= maxLag; lag++) {
     let acf = 0, m = 0;
     for (let i = 0; i < n - lag; i++) {
