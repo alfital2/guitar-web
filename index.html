@@ -277,6 +277,14 @@
     background: linear-gradient(180deg, #cfd2d7, #bcbfc5);
   }
   .amp-group-knobs { display: flex; gap: 10px; align-items: flex-start; }
+  .amp-model-select {
+    position: relative; z-index: 1; margin-bottom: 10px; max-width: 112px;
+    font: 700 9px/1.2 var(--font); letter-spacing: 0.04em; color: #23252a;
+    padding: 3px 6px; border-radius: 5px; border: 1px solid #6a6c71;
+    background: linear-gradient(180deg, #e9ebee, #c6c9cf);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.8), 0 1px 2px rgba(0,0,0,0.35);
+    cursor: pointer;
+  }
   .amp-knob { display: flex; flex-direction: column; align-items: center; gap: 6px; }
   .amp-knob .knob .val, .amp-knob .knob .label { display: none; }
   .amp-knob-label { font: 800 8px/1 var(--font); letter-spacing: 0.1em; text-transform: uppercase; color: #2c2e33; text-shadow: 0 1px 0 rgba(255,255,255,0.65); }
