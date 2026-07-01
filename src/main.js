@@ -709,10 +709,72 @@ async function start() {
     { const r = $('tp-record'); if (r) { r.disabled = false; r.title = 'Record'; } }
     updateTransport(); // enable skip-to-start now that we're powered
     listDevices();
+    if (new URLSearchParams(location.search).has('e2e')) installE2EBridge();
   } catch (e) {
     $('error').textContent = 'Could not start: ' + e.message;
     console.error(e);
   }
+}
+
+// ── E2E test bridge (headless Playwright only; installed when the URL has ?e2e=1) ──
+// The app is mic-driven and keeps ctx/calibrationEq/normGain as module-locals, so a
+// headless test can neither inject a deterministic signal nor read processed output.
+// This closure exposes exactly enough of the LIVE graph to do both: a continuous
+// sawtooth into the chain input (calibrationEq.input) and an RMS/HF tap on the wet
+// bus (normGain). Never installed in normal use. See tests/neural-e2e.mjs.
+function installE2EBridge() {
+  let osc = null, toneGain = null, outTap = null;
+  const proCat = () => GB_CATEGORIES.find((c) => c.id === 'pro');
+  const neuralUnit = () => currentChain.find((u) => u.type === 'neuralamp');
+  const ensureTap = () => {
+    if (!outTap) { outTap = ctx.createAnalyser(); outTap.fftSize = 2048; normGain.connect(outTap); }
+    return outTap;
+  };
+  const api = {
+    booted: () => !!ctx && ctx.state === 'running',
+    sampleRate: () => ctx.sampleRate,
+    clock: () => ({ ctxTime: ctx.currentTime, wall: performance.now() }),
+    proPresetNames: () => (proCat() ? proCat().presets.map((p) => p.name) : []),
+    chainTypes: () => currentChain.map((u) => u.type),
+    loadPresetByName: (name) => {
+      const p = PRESETS.find((x) => x.name === name);
+      if (!p) throw new Error('no preset named ' + name);
+      loadPreset(p);
+      return true;
+    },
+    feedTone: (freq = 110, amp = 0.25) => {
+      api.stopTone();
+      osc = ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = freq;
+      toneGain = ctx.createGain(); toneGain.gain.value = amp;
+      osc.connect(toneGain).connect(calibrationEq.input);
+      osc.start();
+    },
+    stopTone: () => {
+      if (osc) { try { osc.stop(); } catch {} osc.disconnect(); osc = null; }
+      if (toneGain) { toneGain.disconnect(); toneGain = null; }
+    },
+    getOutputMetrics: () => {
+      const a = ensureTap();
+      const t = new Float32Array(a.fftSize);
+      a.getFloatTimeDomainData(t);
+      let sum = 0, finite = true;
+      for (let i = 0; i < t.length; i++) { const v = t[i]; if (!Number.isFinite(v)) finite = false; sum += v * v; }
+      const f = new Float32Array(a.frequencyBinCount);
+      a.getFloatFrequencyData(f); // magnitude in dB
+      const binHz = (ctx.sampleRate / 2) / f.length;
+      let lo = 0, hi = 0;
+      for (let i = 0; i < f.length; i++) { const p = Math.pow(10, f[i] / 10); if (i * binHz >= 2000) hi += p; else lo += p; }
+      return { rms: Math.sqrt(sum / t.length), finite, hf: hi / (lo + hi + 1e-12) };
+    },
+    addPedalBefore: (type) => { const amp = neuralUnit(); addEffect(type, amp ? amp.instanceId : null); },
+    addPedalAfter: (type) => {
+      const amp = neuralUnit();
+      const i = currentChain.findIndex((u) => u.instanceId === amp.instanceId);
+      const after = currentChain[i + 1];
+      addEffect(type, after ? after.instanceId : null);
+    },
+  };
+  window.__neuralE2E = api;
 }
 
 function stop() {
