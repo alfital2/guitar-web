@@ -85,7 +85,9 @@ describe('renderPedalboard', () => {
     const el = document.createElement('div');
     renderPedalboard(el, units, noop);
     const pedal = el.querySelector('.pedal');
-    expect(pedal.querySelector('.pedal-art use').getAttribute('href')).toBe('#fx-art-compressor');
+    // WOW UI: bespoke art renders as a plate with a per-effect motif + lens.
+    expect(pedal.querySelector('.pedal-plate .pedal-motif')).toBeTruthy();
+    expect(pedal.querySelector('.pedal-plate .pedal-lens')).toBeTruthy();
     expect(pedal.querySelector('.pedal-grip[data-drag-handle]')).toBeTruthy();
     expect(pedal.querySelector('.pedal-knobs .knob')).toBeTruthy();
     expect(pedal.style.width).toMatch(/\d+px/); // width derives from knob count
@@ -95,7 +97,9 @@ describe('renderPedalboard', () => {
     renderPedalboard(el, units, noop);
     el.querySelector('.pedal-add').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     const tile = document.querySelector('.fx-tile[data-type="pingpong"]');
-    expect(tile.querySelector('.fx-art use').getAttribute('href')).toBe('#fx-art-pingpong');
+    // WOW UI: tiles render a mini pedal plate with the effect motif SVG.
+    expect(tile.querySelector('.fx-tile-plate svg')).toBeTruthy();
+    expect(tile.querySelector('.fx-tile-gloss')).toBeTruthy();
   });
 });
 
