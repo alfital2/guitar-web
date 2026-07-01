@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>NAM wasm-in-worklet de-risk</title></head>
+<body>
+<h1>NAM de-risk spike</h1>
+<pre id="log"></pre>
+<script type="module">
+const log = (m) => { document.getElementById('log').textContent += m + '\n'; console.log('[derisk]', m); };
+const state = { ctx: null, node: null, analyser: null, buf: null, ready: false };
+
+async function start(modelUrl, diUrl) {
+  const ctx = new AudioContext();                     // normal ctx — no COOP/COEP
+  // Absolute path: derisk.html is served at '/', so a relative './…' would
+  // resolve to the server root (not tools/neural/) and 404 the worklet module.
+  await ctx.audioWorklet.addModule('/tools/neural/derisk-processor.js');
+  const node = new AudioWorkletNode(ctx, 'neural-derisk-processor', {
+    numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1],
+  });
+
+  // Two-phase handshake. The worklet instantiates the wasm ASYNCHRONOUSLY, so we
+  // MUST wait for 'wasm-ready' before posting the model — otherwise the model
+  // message arrives while this.mod is still null and gets dropped.
+  let onWasmReady, onModelReady;
+  const wasmReady = new Promise((r) => { onWasmReady = r; });
+  const modelReady = new Promise((r) => { onModelReady = r; });
+  node.port.onmessage = (e) => {
+    log('worklet: ' + e.data.type + (e.data.ok !== undefined ? ' ok=' + e.data.ok : ''));
+    if (e.data.type === 'wasm-ready') onWasmReady(true);
+    if (e.data.type === 'model-ready') { state.ready = e.data.ok; onModelReady(e.data.ok); }
+  };
+
+  const [wasmBytes, modelJson, diBuf] = await Promise.all([
+    fetch('/assets/neural/nam.wasm').then((r) => r.arrayBuffer()),
+    fetch(modelUrl).then((r) => { if (!r.ok) throw new Error('model ' + r.status); return r.text(); }),
+    fetch(diUrl).then((r) => r.arrayBuffer()).then((b) => ctx.decodeAudioData(b)),
+  ]);
+  node.port.postMessage({ type: 'wasm', bytes: wasmBytes }, [wasmBytes]);
+  await wasmReady;
+  node.port.postMessage({ type: 'model', json: modelJson });
+  await modelReady;
+
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  const buf = new Float32Array(analyser.fftSize);
+
+  // di-clean.wav carries ~1s of leading silence before the DI. Loop ONLY the
+  // active region so the amp always has signal — otherwise looping the whole 2s
+  // file replays that silence and the sustained-min-RMS gate reads it as silent.
+  const ch0 = diBuf.getChannelData(0);
+  let firstActive = 0;
+  while (firstActive < ch0.length && Math.abs(ch0[firstActive]) < 1e-3) firstActive++;
+  const startOffset = firstActive < ch0.length ? firstActive / diBuf.sampleRate : 0;
+
+  const src = ctx.createBufferSource();
+  src.buffer = diBuf; src.loop = true;
+  src.loopStart = startOffset; src.loopEnd = diBuf.duration;
+  src.connect(node);
+  node.connect(analyser);
+  node.connect(ctx.destination);
+  src.start(0, startOffset);
+  await ctx.resume();
+
+  Object.assign(state, { ctx, node, analyser, buf });
+  log('streaming ' + modelUrl.split('/').pop() + ' @ ' + ctx.sampleRate + 'Hz (DI active from ' + startOffset.toFixed(2) + 's)');
+}
+
+function getOutputRMS() {
+  if (!state.analyser) return { rms: 0, finite: true };
+  state.analyser.getFloatTimeDomainData(state.buf);
+  let sum = 0, finite = true;
+  for (const v of state.buf) { if (!Number.isFinite(v)) finite = false; sum += v * v; }
+  return { rms: Math.sqrt(sum / state.buf.length), finite };
+}
+
+window.derisk = { start, getOutputRMS, ready: () => state.ready };
+log('ready');
+</script>
+</body>
+</html>
