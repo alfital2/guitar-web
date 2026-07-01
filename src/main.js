@@ -664,11 +664,13 @@ async function start() {
     if (outId && outId !== 'default' && hasSetSinkId) { try { await ctx.setSinkId(outId); } catch {} }
     source = ctx.createMediaStreamSource(stream);
 
-    // Analyser tap off source (read-only; not in the effects path). Used by both the
-    // input meter (time-domain) and calibration capture (frequency-domain).
+    // Analyser tap (read-only; not in the effects path). Used by the input meter
+    // (time-domain), calibration capture (frequency-domain) and the tuner
+    // (getLiveAnalyser). Wired below off the SELECTED splitter output — the same
+    // channel that feeds calibrationEq — so it follows the chosen hardware input
+    // instead of a down-mix of both channels.
     analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
-    source.connect(analyser);
 
     gainOut = ctx.createGain();
     gainOut.gain.value = parseFloat($('gain').value);
@@ -687,11 +689,13 @@ async function start() {
 
     // Calibration EQ sits between source and the artist chain. A ChannelSplitter
     // in front of it lets the user pick which hardware input channel (1 or 2)
-    // feeds the chain — e.g. a 2-in interface with the guitar on input 2.
+    // feeds the chain — e.g. a 2-in interface with the guitar on input 2. The
+    // analyser tap is routed off the same splitter output (see routeInputChannel
+    // below) so the meter, calibration capture and tuner track the selection too.
     calibrationEq = createCalibrationEq(ctx);
     inputSplitter = ctx.createChannelSplitter(2);
     source.connect(inputSplitter);
-    connectInputChannel(inputSplitter, inputChannel, calibrationEq.input);
+    routeInputChannel(inputChannel);
     applyActiveCalibration();
 
     const defaultPreset = PRESETS.find(p => p.name.includes('Edge of Breakup')) || PRESETS[0];
@@ -795,11 +799,24 @@ function stop() {
   { const fl = $('freq-label'); if (fl) { fl.textContent = '— Hz'; fl.style.color = ''; } }
 }
 
+// Route the splitter's selected channel to both live-graph consumers:
+// calibrationEq (the processed/recorded path) and analyser (input meter,
+// calibration capture, tuner). connectInputChannel()'s disconnect() clears ALL
+// of the splitter's outputs, so calling it twice in a row would undo the first
+// destination's wiring — reuse it for calibrationEq, then fan the analyser out
+// manually on the same splitter output. No-op before Start, when the splitter
+// (and its consumers) aren't up yet.
+function routeInputChannel(ch) {
+  if (!inputSplitter || !calibrationEq || !analyser) return;
+  connectInputChannel(inputSplitter, ch, calibrationEq.input);
+  inputSplitter.connect(analyser, ch);
+}
+
 // Re-route the live input to a different hardware channel (1 or 2). Persists the
 // selection so it survives power cycles; no-op on the graph until Start wires it.
 function setInputChannel(ch) {
-  inputChannel = ch | 0;
-  if (inputSplitter && calibrationEq) connectInputChannel(inputSplitter, inputChannel, calibrationEq.input);
+  inputChannel = Math.min(1, Math.max(0, ch | 0));
+  routeInputChannel(inputChannel);
 }
 
 async function listDevices() {

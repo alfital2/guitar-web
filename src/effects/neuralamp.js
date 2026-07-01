@@ -72,12 +72,14 @@ export function create(ctx, params) {
 
   // Fetch the selected .nam and hand it to the worklet. Shared by the
   // wasm-ready handler (first post) and apply() (live model changes).
-  // lastPostedModel is set synchronously so rapid apply() calls before the
-  // fetch resolves don't race into duplicate posts for the same index.
+  // lastPostedModel is only set once the fetch+post succeeds, so a failed
+  // fetch doesn't permanently dedupe that index — a later apply() can retry it.
   function postModel(idx) {
-    lastPostedModel = idx;
     fetchModelJson(idx)
-      .then((json) => node.port.postMessage({ type: 'model', json }))
+      .then((json) => {
+        node.port.postMessage({ type: 'model', json });
+        lastPostedModel = idx;
+      })
       .catch((err) => console.warn('[neuralamp] model fetch failed; staying passthrough:', err));
   }
 
@@ -91,6 +93,8 @@ export function create(ctx, params) {
       postModel(wantModel);
     } else if (msg.type === 'model-error') {
       console.warn('[neuralamp] worklet reported a model error; staying passthrough:', msg.error);
+    } else if (msg.type === 'wasm-error') {
+      console.warn('[neuralamp] worklet reported a wasm error; staying passthrough:', msg.error);
     }
   };
 

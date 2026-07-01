@@ -9,7 +9,9 @@ const AMP_KNOB_STYLE = { cap: ['#3a3a40', '#1a1a1e', '#08080a'], pointer: '#f4f4
 
 // Friendly captured-amp names for the neural amp head's model <select>. Index
 // order matches MODELS in src/effects/neuralamp.js: ['jcm','5153','deluxe','ac10','jc'].
-const NEURAL_LABELS = ['Marshall JCM', 'EVH 5153', 'Fender Deluxe', 'Vox AC10', 'Roland JC'];
+// Exported so a drift-guard test can assert the two lists stay the same length
+// (see tests/neuralamp-registry.test.js).
+export const NEURAL_LABELS = ['Marshall JCM', 'EVH 5153', 'Fender Deluxe', 'Vox AC10', 'Roland JC'];
 
 // Read-only "value strip" shown when the amp is collapsed: one slim brushed-metal
 // row of label + current value per knob, grouped by amp section. Built from the
