@@ -132,3 +132,41 @@ describe('renderAmp neuralamp head', () => {
     expect(cb).toHaveBeenCalledWith(20, 'trim', 5.1);
   });
 });
+
+// Unified collapse affordance: same chevron style + aria-expanded pattern as
+// the pedalboard and the preset browser, keyboard-operable strip, and the
+// silent programmatic collapse hook the transport auto-fold uses.
+describe('unified collapse affordance (amp)', () => {
+  it('collapse chevron carries .collapse-chev and aria-expanded="true"', () => {
+    const el = document.createElement('div');
+    renderAmp(el, modules, () => {}, { collapsed: false });
+    const btn = el.querySelector('.amp-collapse-btn');
+    expect(btn.classList.contains('collapse-chev')).toBe(true);
+    expect(btn.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('strip is a keyboard-focusable button; Enter/Space expands', () => {
+    const el = document.createElement('div');
+    const onCollapse = vi.fn();
+    renderAmp(el, modules, () => {}, { collapsed: true, onCollapse });
+    const strip = el.querySelector('.amp-vstrip');
+    expect(strip.getAttribute('role')).toBe('button');
+    expect(strip.getAttribute('tabindex')).toBe('0');
+    expect(strip.getAttribute('aria-expanded')).toBe('false');
+    strip.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(onCollapse).toHaveBeenCalledWith(false);
+    expect(el.querySelector('.amp-wrap').classList.contains('collapsed')).toBe(false);
+  });
+
+  it('silent amp-set-collapsed event folds/unfolds WITHOUT firing onCollapse', () => {
+    const el = document.createElement('div');
+    const onCollapse = vi.fn();
+    renderAmp(el, modules, () => {}, { collapsed: false, onCollapse });
+    const wrap = el.querySelector('.amp-wrap');
+    wrap.dispatchEvent(new CustomEvent('amp-set-collapsed', { detail: { collapsed: true } }));
+    expect(wrap.classList.contains('collapsed')).toBe(true);
+    wrap.dispatchEvent(new CustomEvent('amp-set-collapsed', { detail: { collapsed: false } }));
+    expect(wrap.classList.contains('collapsed')).toBe(false);
+    expect(onCollapse).not.toHaveBeenCalled();
+  });
+});

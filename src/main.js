@@ -5,6 +5,9 @@ import { PRESETS, validatePreset, GB_CATEGORIES } from './presets.js';
 import { renderPresetBrowser } from './preset-browser.js';
 import { renderPedalboard } from './chain-ui/pedalboard.js';
 import { renderAmp } from './chain-ui/amp.js';
+import { applyRigDock } from './chain-ui/rig-bar.js';
+import { createAutoFold } from './chain-ui/auto-fold.js';
+import { playPowerOnRitual } from './chain-ui/power-on.js';
 import { createCalibrationEq } from './calibration/calibration-eq.js';
 import { computeCorrection } from './calibration/correction.js';
 import { bandPowersFromMagnitudes } from './calibration/bands.js';
@@ -56,6 +59,30 @@ let recStartX = 0;                   // px x-position where the current take beg
 // you hear and is independent of the master Vol slider.
 const recorder = createRecorder({ getSource: () => normGain, getContext: () => ctx });
 const player = createPlayer();
+
+// ── Transport auto-fold ──
+// While recording/playing the tracks deserve the vertical space: fold the amp
+// + pedalboard into the rig bar on transport start, and restore each panel to
+// its PRE-transport state on stop (a panel the user had collapsed manually
+// stays collapsed). The fold goes through the panels' silent set-collapsed
+// events (same code path as the UI controls, incl. the amp strip value sync)
+// so nothing re-renders and the audio graph is untouched; persistence only
+// happens on restore, so storage always matches the user's real preference.
+const autoFold = createAutoFold({
+  getState: () => ({ amp: ampCollapsed, board: boardCollapsed }),
+  setState: ({ amp, board }, restoring) => {
+    ampCollapsed = amp; boardCollapsed = board;
+    if (restoring) { chainStore.saveAmpCollapsed(amp); chainStore.saveBoardCollapsed(board); }
+    $('amp')?.querySelector('.amp-wrap')?.dispatchEvent(new CustomEvent('amp-set-collapsed', { detail: { collapsed: amp } }));
+    $('chain')?.querySelector('.board-wrap')?.dispatchEvent(new CustomEvent('board-set-collapsed', { detail: { collapsed: board } }));
+    applyRigDock(ampCollapsed, boardCollapsed);
+  },
+});
+// Restore the panels only when the transport is fully idle — a seek/skip stops
+// PLAYBACK, but must not unfold the rig mid-recording.
+function restoreFoldIfIdle() {
+  if (!recorder.isRecording() && !player.isPlaying()) autoFold.restore();
+}
 
 const armedTrack = () => tracks.find((t) => t.id === armedId) || null;
 const allTakes = () => tracks.flatMap((t) => t.takes);
@@ -243,7 +270,7 @@ function rebuildGraph() {
   try {
     renderAmp($('amp'), ampModules, onAmpParam, {
       collapsed: ampCollapsed,
-      onCollapse: (c) => { ampCollapsed = c; chainStore.saveAmpCollapsed(c); },
+      onCollapse: (c) => { ampCollapsed = c; chainStore.saveAmpCollapsed(c); applyRigDock(ampCollapsed, boardCollapsed); },
     });
     renderPedalboard($('chain'), view, {
       onParamChange: setParamLive,
@@ -257,12 +284,14 @@ function rebuildGraph() {
       getLiveParams: (id) => currentChain.find((u) => u.instanceId === id)?.params,
     }, {
       collapsed: boardCollapsed,
-      onCollapse: (c) => { boardCollapsed = c; chainStore.saveBoardCollapsed(c); },
+      onCollapse: (c) => { boardCollapsed = c; chainStore.saveBoardCollapsed(c); applyRigDock(ampCollapsed, boardCollapsed); },
     });
   } catch (e) {
     $('error').textContent = 'render: ' + e.message;
     console.error(e);
   }
+  // Rig bar: both panels collapsed → their strips dock into one slim row.
+  applyRigDock(ampCollapsed, boardCollapsed);
 
   chainStore.save(currentChain);
   scheduleNormalize();
@@ -768,6 +797,9 @@ async function start() {
     setTimeout(showStats, 600);
 
     setPower(true);
+    // One-shot power-on ritual: tubes warm up, then the chain connectors light
+    // once left→right and settle (≤2s; skipped under prefers-reduced-motion).
+    playPowerOnRitual();
     { const r = $('tp-record'); if (r) { r.disabled = false; r.title = 'Record'; } }
     updateTransport(); // enable skip-to-start now that we're powered
     listDevices();
@@ -851,6 +883,7 @@ function stop() {
   if (recorder.isRecording()) recorder.stop();
   if (player.isPlaying()) { player.stop(); reflectPlay(); }
   clearLiveClip();
+  restoreFoldIfIdle(); // power-off ends any transport — un-fold the panels
   { const r = $('tp-record'); if (r) { r.disabled = true; r.classList.remove('recording'); r.title = 'Record — available with recording'; } }
   stopCalibration();
   $('meter').style.width = '0%';
@@ -939,6 +972,8 @@ function setPresets(open) {
 function setPresetsHidden(hidden) {
   document.body.classList.toggle('presets-hidden', hidden);
   chainStore.savePresetsHidden(hidden);
+  // The toolbar button is the sidebar's expand/collapse control on wide screens.
+  $('presets-toggle')?.setAttribute('aria-expanded', String(!hidden));
 }
 const isNarrow = () => window.matchMedia('(max-width: 1040px)').matches;
 $('presets-toggle').addEventListener('click', () => {
@@ -948,6 +983,7 @@ $('presets-toggle').addEventListener('click', () => {
 $('presets-close').addEventListener('click', () => setPresets(false));
 $('presets-backdrop').addEventListener('click', () => setPresets(false));
 if (chainStore.loadPresetsHidden()) document.body.classList.add('presets-hidden');
+$('presets-toggle')?.setAttribute('aria-expanded', String(!chainStore.loadPresetsHidden()));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { setSettings(false); setPresets(false); } });
 $('diag').textContent = `${isSafari ? 'Safari' : 'Chrome'} · setSinkId: ${hasSetSinkId ? 'yes' : 'no'}`;
 
@@ -991,6 +1027,7 @@ const transport = mountTransport($('transport-cluster'), {
       const t = recorder.stop();
       transport.endSession();
       recBtn.classList.remove('recording');
+      restoreFoldIfIdle(); // transport idle again — un-fold to the pre-record state
       if (t && t.samples.length) {
         pushUndo();
         const newStart = recStartX / PX_PER_SEC;
@@ -1001,6 +1038,7 @@ const transport = mountTransport($('transport-cluster'), {
       }
     } else {
       if (player.isPlaying()) { player.stop(); reflectPlay(); }
+      autoFold.fold(); // free the vertical space for the take (incl. the count-in)
       // Actually begin capture + grow the live clip. Deferred past the count-in.
       const begin = () => {
         recBtn.classList.remove('counting');
@@ -1054,16 +1092,17 @@ const transport = mountTransport($('transport-cluster'), {
   // Play / Stop playback of recorded takes; the playhead sweeps the timeline.
   const playBtn = $('tp-play');
   if (playBtn) playBtn.addEventListener('click', () => {
-    if (player.isPlaying()) { player.stop(); reflectPlay(); return; }
+    if (player.isPlaying()) { player.stop(); reflectPlay(); restoreFoldIfIdle(); return; }
     if (!allTakes().length) return;
-    player.play(buildGroups(), playheadSec, setPlayhead, () => { reflectPlay(); setPlayhead(0); });
+    player.play(buildGroups(), playheadSec, setPlayhead, () => { reflectPlay(); setPlayhead(0); restoreFoldIfIdle(); });
     reflectPlay();
+    autoFold.fold(); // playback started — free the vertical space for the tracks
   });
 
   // Skip to start: stop playback and park the playhead at bar 1.
   const skipBtn = $('tp-start');
   if (skipBtn) skipBtn.addEventListener('click', () => {
-    player.stop(); reflectPlay(); setPlayhead(0);
+    player.stop(); reflectPlay(); setPlayhead(0); restoreFoldIfIdle();
   });
 
   // Seek + scrub: click an empty part of the timeline to move the playhead, or
@@ -1074,7 +1113,7 @@ const transport = mountTransport($('transport-cluster'), {
     const tl = lane.querySelector('.track-timeline');
     if (!tl) return;
     const x = e_x(clientX, tl);
-    player.stop(); reflectPlay();
+    player.stop(); reflectPlay(); restoreFoldIfIdle();
     setPlayhead(snapPx(Math.max(0, x), free) / PX_PER_SEC);
   }
   function e_x(clientX, tl) { return clientX - tl.getBoundingClientRect().left + tl.scrollLeft; }

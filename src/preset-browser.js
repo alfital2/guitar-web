@@ -20,9 +20,12 @@ export function renderPresetBrowser(container, categories, onSelect, activeName,
   input.type = 'search'; input.placeholder = 'Search Sounds'; input.value = search;
   searchWrap.appendChild(input);
   if (onCollapse) {
+    // Unified `.collapse-chev` style + aria-expanded pattern (same as the amp
+    // and pedalboard chevrons); the sidebar is expanded whenever it's visible.
     const collapse = document.createElement('button');
-    collapse.type = 'button'; collapse.className = 'pb-collapse';
+    collapse.type = 'button'; collapse.className = 'pb-collapse collapse-chev';
     collapse.title = 'Hide patches'; collapse.setAttribute('aria-label', 'Hide patches');
+    collapse.setAttribute('aria-expanded', 'true');
     collapse.textContent = '⟨';
     collapse.addEventListener('click', onCollapse);
     searchWrap.appendChild(collapse);

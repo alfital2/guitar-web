@@ -76,6 +76,12 @@ export const NEURAL_LABELS = ['Marshall JCM', 'EVH 5153', 'Fender Deluxe', 'Vox 
 // freshly-rendered head so values + formatting always match the live knobs.
 function buildStrip(head) {
   const strip = el('div', 'amp-vstrip');
+  // Expand affordance: same semantics as the board strip + preset browser —
+  // keyboard-focusable, aria-expanded reflects the (collapsed) panel state.
+  strip.setAttribute('role', 'button');
+  strip.setAttribute('tabindex', '0');
+  strip.setAttribute('aria-expanded', 'false');
+  strip.setAttribute('aria-label', 'Expand amp to edit');
   const groups = [...head.querySelectorAll('.amp-group')];
   groups.forEach((g, gi) => {
     if (gi > 0) strip.appendChild(el('div', 'amp-vstrip-div'));
@@ -96,7 +102,7 @@ function buildStrip(head) {
     strip.appendChild(sec);
   });
   const exp = el('div', 'amp-vstrip-exp');
-  exp.innerHTML = '<span>TUNE TO EDIT</span><span class="amp-vstrip-chev">▾</span>';
+  exp.innerHTML = '<span>TAP TO EDIT</span><span class="amp-vstrip-chev">▾</span>';
   strip.appendChild(exp);
   return strip;
 }
@@ -191,10 +197,13 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
   const corners = ['tl', 'tr', 'bl', 'br'].map((c) => el('div', `amp-corner amp-corner-${c}`));
 
   // Collapse chevron (top-right of the head) — folds the amp back to the strip.
-  const collapseBtn = el('button', 'amp-collapse-btn');
+  // Shares the unified `.collapse-chev` style + aria-expanded pattern with the
+  // board chevron and the preset-browser collapse control.
+  const collapseBtn = el('button', 'amp-collapse-btn collapse-chev');
   collapseBtn.type = 'button';
   collapseBtn.title = 'Collapse amp to value strip';
   collapseBtn.setAttribute('aria-label', 'Collapse amp');
+  collapseBtn.setAttribute('aria-expanded', 'true');
   collapseBtn.innerHTML = '<span>▴</span>';
 
   // Pre-rendered amber "tube warming up" glow layer (opacity-animated via CSS
@@ -204,15 +213,22 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
   head.append(handle, panel, grille, ...corners, collapseBtn);
   if (warmGlow) head.appendChild(warmGlow);
 
-  // Collapsed value strip; tap anywhere (or the "TUNE TO EDIT" affordance) to expand.
+  // Collapsed value strip; tap anywhere (or the "TAP TO EDIT" affordance) to expand.
   const strip = buildStrip(head);
 
-  const setCollapsed = (c) => {
+  const setCollapsed = (c, notify = true) => {
     if (c) syncStrip(strip, head);
     wrap.classList.toggle('collapsed', c);
-    if (opts.onCollapse) opts.onCollapse(c);
+    if (notify && opts.onCollapse) opts.onCollapse(c);
   };
-  strip.addEventListener('click', () => setCollapsed(false));
+  // Programmatic collapse (transport auto-fold): same path as the UI controls
+  // (incl. the strip value sync) but silent — the dispatcher owns persistence.
+  wrap.addEventListener('amp-set-collapsed', (e) => setCollapsed(!!(e.detail && e.detail.collapsed), false));
+  const expand = () => setCollapsed(false);
+  strip.addEventListener('click', expand);
+  strip.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); expand(); }
+  });
   collapseBtn.addEventListener('click', (e) => { e.stopPropagation(); setCollapsed(true); });
 
   wrap.append(strip, head);

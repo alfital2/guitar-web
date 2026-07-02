@@ -424,7 +424,12 @@ export function openEffectsModal(handlers) {
 function buildBoardStrip(units) {
   const strip = document.createElement('div');
   strip.className = 'board-strip';
+  // Expand affordance: unified with the amp strip + preset browser —
+  // keyboard-focusable, aria-expanded reflects the (collapsed) panel state.
   strip.setAttribute('role', 'button');
+  strip.setAttribute('tabindex', '0');
+  strip.setAttribute('aria-expanded', 'false');
+  strip.setAttribute('aria-label', 'Expand effects chain to edit');
   strip.title = 'Effects chain — click to edit';
   let placedAmp = false;
   units.forEach((u) => {
@@ -500,21 +505,31 @@ export function renderPedalboard(container, units, handlers, opts = {}) {
 
   // Collapse chevron (top-right of the board) — folds the chain to the strip,
   // freeing the vertical real estate once tuning is done (mirrors the amp).
+  // Shares the unified `.collapse-chev` style + aria-expanded pattern with the
+  // amp chevron and the preset-browser collapse control.
   const collapseBtn = document.createElement('button');
   collapseBtn.type = 'button';
-  collapseBtn.className = 'board-collapse-btn';
+  collapseBtn.className = 'board-collapse-btn collapse-chev';
   collapseBtn.title = 'Collapse pedalboard';
   collapseBtn.setAttribute('aria-label', 'Collapse pedalboard');
+  collapseBtn.setAttribute('aria-expanded', 'true');
   collapseBtn.innerHTML = '<span>▴</span>';
   board.appendChild(collapseBtn);
 
   const strip = buildBoardStrip(units);
-  const setCollapsed = (c) => {
+  const setCollapsed = (c, notify = true) => {
     wrap.classList.toggle('collapsed', c);
-    opts.onCollapse?.(c);
+    if (notify) opts.onCollapse?.(c);
   };
-  strip.addEventListener('click', () => setCollapsed(false));
+  const expand = () => setCollapsed(false);
+  strip.addEventListener('click', expand);
+  strip.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); expand(); }
+  });
   collapseBtn.addEventListener('click', (e) => { e.stopPropagation(); setCollapsed(true); });
+  // Programmatic collapse (transport auto-fold): same path as the UI controls
+  // but silent — the dispatcher owns persistence.
+  wrap.addEventListener('board-set-collapsed', (e) => setCollapsed(!!(e.detail && e.detail.collapsed), false));
 
   wrap.append(strip, board);
   container.appendChild(wrap);
