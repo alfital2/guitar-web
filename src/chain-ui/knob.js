@@ -74,6 +74,16 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
     svgEl('stop', { offset: '0%', 'stop-color': 'rgba(255,255,255,0.2)' }),
     svgEl('stop', { offset: '100%', 'stop-color': 'rgba(255,255,255,0)' }),
   );
+  // Machined-chrome bezel ring around the cap: a top-lit vertical sheen
+  // (bright crown → dark waist → light rim) reads as turned metal under the
+  // one top-left light. Deep-dish GB knob look; static, costs nothing.
+  const bez = svgEl('linearGradient', { id: `${uid}-b`, x1: '0', y1: '0', x2: '0', y2: '1' });
+  bez.append(
+    svgEl('stop', { offset: '0%', 'stop-color': '#f4f6f8' }),
+    svgEl('stop', { offset: '38%', 'stop-color': '#9aa0a6' }),
+    svgEl('stop', { offset: '60%', 'stop-color': '#54595f' }),
+    svgEl('stop', { offset: '100%', 'stop-color': '#c8ced3' }),
+  );
   const glow = svgEl('filter', { id: `${uid}-g`, x: '-100%', y: '-100%', width: '300%', height: '300%' });
   glow.append(
     svgEl('feGaussianBlur', { stdDeviation: '2', result: 'b' }),
@@ -81,7 +91,7 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
   const merge = svgEl('feMerge', {});
   merge.append(svgEl('feMergeNode', { in: 'b' }), svgEl('feMergeNode', { in: 'SourceGraphic' }));
   glow.append(merge);
-  defs.append(grad, hi, glow);
+  defs.append(grad, hi, glow, bez);
 
   const ticks = svgEl('g', { class: 'knob-ticks' });
   for (let i = 0; i <= 10; i++) {
@@ -116,6 +126,11 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
     }
   }
 
+  // Machined chrome bezel ring (drawn behind the cap so its outer edge frames
+  // the dish) and a crisp top-left specular glint arc over the crown.
+  const ring = svgEl('circle', { class: 'knob-ring', cx: String(C), cy: String(C), r: (RC + RC * 0.24).toFixed(2), fill: 'none', stroke: `url(#${uid}-b)`, 'stroke-width': (RC * 0.34).toFixed(2) });
+  const specArc = svgEl('path', { class: 'knob-specarc', d: arcPath(C, C, RC * 0.62, -74, -16), fill: 'none', stroke: 'rgba(255,255,255,0.85)', 'stroke-width': (RC * 0.11).toFixed(2), 'stroke-linecap': 'round' });
+
   // Cap. 'round' = circular cap + a pointer line; 'chicken' = a rotating
   // chicken-head cap whose beak is the indicator (vintage vibe).
   let capg = null, ptr = null;
@@ -126,12 +141,12 @@ export function createKnob(param, value, onChange, small = false, style = {}) {
       svgEl('path', { d: `M ${C} ${(C - RC - 4).toFixed(2)} L ${(C - 3.6).toFixed(2)} ${(C - RC + 2).toFixed(2)} L ${(C + 3.6).toFixed(2)} ${(C - RC + 2).toFixed(2)} Z`, fill: pointerCol, stroke: 'rgba(0,0,0,0.4)', 'stroke-width': '0.5' }),
       svgEl('circle', { class: 'knob-spec', cx: (C - RC * 0.18).toFixed(2), cy: (C - RC * 0.24).toFixed(2), r: (RC * 0.5).toFixed(2), fill: `url(#${uid}-h)` }),
     );
-    svg.append(defs, ticks, nums, track, arc, capg);
+    svg.append(defs, ticks, nums, track, arc, ring, capg);
   } else {
     const cap = svgEl('circle', { class: 'knob-cap', cx: String(C), cy: String(C), r: String(RC), fill: `url(#${uid}-c)`, stroke: 'rgba(0,0,0,0.6)', 'stroke-width': '0.75' });
     const spec = svgEl('circle', { class: 'knob-spec', cx: (C - RC * 0.15).toFixed(2), cy: (C - RC * 0.22).toFixed(2), r: (RC * 0.52).toFixed(2), fill: `url(#${uid}-h)` });
     ptr = svgEl('line', { class: 'knob-pointer', stroke: pointerCol, 'stroke-width': '2', 'stroke-linecap': 'round' });
-    svg.append(defs, ticks, nums, track, arc, cap, spec, ptr);
+    svg.append(defs, ticks, nums, track, arc, ring, cap, spec, specArc, ptr);
   }
 
   const valEl = document.createElement('span'); valEl.className = 'val';

@@ -274,7 +274,16 @@ function buildPedal(unit, handlers) {
   power.setAttribute('aria-label', `${unit.schema.label} power`);
   power.title = unit.bypassed ? 'Off — click to power on' : 'On — click to bypass';
   power.addEventListener('pointerdown', (e) => e.stopPropagation());
-  power.addEventListener('click', (e) => { e.stopPropagation(); handlers.onToggleBypass?.(unit.instanceId); });
+  power.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Tactile footswitch stomp: a 90ms scale(.96) press (transform-only). The
+    // class is cleared on animationend so a rapid re-toggle re-triggers it.
+    power.classList.remove('fs-press');
+    void power.offsetWidth; // reflow so the animation restarts
+    power.classList.add('fs-press');
+    power.addEventListener('animationend', () => power.classList.remove('fs-press'), { once: true });
+    handlers.onToggleBypass?.(unit.instanceId);
+  });
 
   const gloss = document.createElement('div'); gloss.className = 'pedal-body-gloss';
   const screws = ['tl', 'tr', 'bl', 'br'].map((c) => {
@@ -426,6 +435,7 @@ export function renderPedalboard(container, units, handlers) {
   const firstLockedId = units.find((u) => u.locked)?.instanceId;
   let placedAmp = false;
   let prevPlaced = false; // whether a connector should precede the next item
+  let pedalIndex = 0;     // for staggering the per-pedal glint
   units.forEach((u) => {
     if (u.locked) {
       // Place the AMP anchor once, at the first locked module's position.
@@ -438,6 +448,9 @@ export function renderPedalboard(container, units, handlers) {
     }
     if (prevPlaced) board.appendChild(connector());
     const { pedal, plate } = buildPedal(u, handlers);
+    // Stagger the autonomous specular glint (CSS ::after) by row position so the
+    // pedals don't all flash at once.
+    pedal.style.setProperty('--gi', String(pedalIndex++));
     enableDrag(pedal, plate, u, handlers, () => board);
     board.appendChild(pedal);
     prevPlaced = true;

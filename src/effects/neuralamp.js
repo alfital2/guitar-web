@@ -52,6 +52,17 @@ function fetchModelJson(index) {
 // 0..10 → linear gain, centred so 5 = unity: 10 ** ((v - 5) * 0.1).
 function gainFor(v) { return Math.pow(10, ((v ?? 5) - 5) * 0.1); }
 
+// Broadcast warm-up lifecycle so the amp head can show a "tube warming up"
+// state while a .nam model loads (masking the model-load dry gap). Guarded so
+// the module still imports cleanly in non-DOM contexts (tests, worklets).
+//   neural-amp-loading  — a model post is in flight (create or a live change)
+//   neural-amp-ready    — the worklet confirmed the model is live ({type:'ready'})
+//   neural-amp-error    — the worklet reported a wasm/model failure (passthrough)
+function emitNeural(name, detail) {
+  if (typeof window === 'undefined' || !window.dispatchEvent) return;
+  try { window.dispatchEvent(new CustomEvent(name, { detail })); } catch {}
+}
+
 export function create(ctx, params) {
   const trimGain = ctx.createGain();
   const levelGain = ctx.createGain();
@@ -75,12 +86,16 @@ export function create(ctx, params) {
   // lastPostedModel is only set once the fetch+post succeeds, so a failed
   // fetch doesn't permanently dedupe that index — a later apply() can retry it.
   function postModel(idx) {
+    emitNeural('neural-amp-loading', { model: idx });
     fetchModelJson(idx)
       .then((json) => {
         node.port.postMessage({ type: 'model', json });
         lastPostedModel = idx;
       })
-      .catch((err) => console.warn('[neuralamp] model fetch failed; staying passthrough:', err));
+      .catch((err) => {
+        console.warn('[neuralamp] model fetch failed; staying passthrough:', err);
+        emitNeural('neural-amp-error', { model: idx, error: String((err && err.message) || err) });
+      });
   }
 
   // Drive the wasm → wasm-ready → model handshake ourselves rather than
@@ -91,10 +106,14 @@ export function create(ctx, params) {
     if (msg.type === 'wasm-ready') {
       wasmReady = true;
       postModel(wantModel);
+    } else if (msg.type === 'ready') {
+      emitNeural('neural-amp-ready', { model: wantModel });
     } else if (msg.type === 'model-error') {
       console.warn('[neuralamp] worklet reported a model error; staying passthrough:', msg.error);
+      emitNeural('neural-amp-error', { model: wantModel, error: msg.error });
     } else if (msg.type === 'wasm-error') {
       console.warn('[neuralamp] worklet reported a wasm error; staying passthrough:', msg.error);
+      emitNeural('neural-amp-error', { model: wantModel, error: msg.error });
     }
   };
 

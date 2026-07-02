@@ -39,6 +39,8 @@ let reverbStage = null;                // audio node: engine.output -> reverbSta
 let calibrationEq, calibRAF, calibState, calibCountdown;
 let inputSplitter = null;   // ChannelSplitterNode after source; picks a hardware input channel
 let inputChannel = 0;       // selected input channel: 0 = input 1, 1 = input 2 (persists across power cycles)
+let chMeters = null;        // [AnalyserNode, AnalyserNode] tapping splitter outs 0/1 for the settings CH1/CH2 meters
+let vuLevel = 0;            // smoothed 0..1 output level driving the amp-head VU needle
 let pitchBuf, lastNoteMs = 0;
 let prevBars = null;
 let accentRGB = '240,180,41'; // current theme accent for canvas drawing
@@ -524,8 +526,17 @@ function showStats() {
   $('verdict').textContent = 'Playing — judge the tone by ear';
 }
 
+// Peak of an analyser's time-domain signal, normalised to 0..1.
+function analyserPeak(a, buf) {
+  a.getByteTimeDomainData(buf);
+  let peak = 0;
+  for (let i = 0; i < buf.length; i++) { const v = Math.abs(buf[i] - 128); if (v > peak) peak = v; }
+  return peak / 128;
+}
+
 function startMeter() {
   const timeBuf = new Uint8Array(analyser.fftSize);
+  const chBuf = new Uint8Array(chMeters ? chMeters[0].fftSize : 1024);
   pitchBuf = new Float32Array(analyser.fftSize);
   let lastPitch = 0;
   function loop() {
@@ -544,6 +555,27 @@ function startMeter() {
     const now = performance.now();
     if (now - lastPitch >= 75) {
       lastPitch = now;
+
+      // Amp-head VU needle: smooth the level, map to a −50°…+50° sweep. The
+      // 80ms CSS transition on .amp-vu-needle supplies the ballistics.
+      const lvl = Math.min(1, peak / 128 * 1.5);
+      vuLevel += (lvl - vuLevel) * 0.5;
+      const needle = $('amp')?.querySelector('.amp-vu-needle');
+      if (needle) {
+        needle.style.transform = `rotate(${(-50 + vuLevel * 100).toFixed(1)}deg)`;
+        const vu = needle.closest('.amp-vu');
+        if (vu) vu.classList.toggle('peaking', lvl > 0.85);
+      }
+
+      // CH1/CH2 input meters — only while the settings panel is open (cheap-out
+      // otherwise). Each taps its own splitter output so both are always live.
+      if (chMeters && $('settings-panel')?.classList.contains('open')) {
+        for (let c = 0; c < 2; c++) {
+          const fill = $(`ch${c + 1}-meter`);
+          if (fill) fill.style.width = Math.min(100, analyserPeak(chMeters[c], chBuf) * 100 * 1.6) + '%';
+        }
+      }
+
       analyser.getFloatTimeDomainData(pitchBuf);
       const res = detectPitchMPM(pitchBuf, ctx.sampleRate);
       const circle = $('note-circle');
@@ -683,6 +715,13 @@ async function start() {
     analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
 
+    // Per-hardware-channel meters (CH1/CH2) shown beside the input-channel
+    // selector. They tap BOTH splitter outputs (not the selected one) so the
+    // user can see which physical input their guitar is on. Re-attached in
+    // routeInputChannel() because connectInputChannel() clears the splitter.
+    chMeters = [ctx.createAnalyser(), ctx.createAnalyser()];
+    for (const a of chMeters) a.fftSize = 1024;
+
     gainOut = ctx.createGain();
     gainOut.gain.value = parseFloat($('gain').value);
     gainOut.connect(ctx.destination);
@@ -804,6 +843,8 @@ function stop() {
   if (stream) stream.getTracks().forEach(t => t.stop());
   if (ctx) ctx.close();
   ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = reverbStage = inputSplitter = null;
+  chMeters = null; vuLevel = 0;
+  { const n = $('amp')?.querySelector('.amp-vu-needle'); if (n) n.style.transform = 'rotate(-50deg)'; }
   setPower(false);
   updateTransport(); // disable skip-to-start when powered off
   prevBars = null;
@@ -821,6 +862,8 @@ function routeInputChannel(ch) {
   if (!inputSplitter || !calibrationEq || !analyser) return;
   connectInputChannel(inputSplitter, ch, calibrationEq.input);
   inputSplitter.connect(analyser, ch);
+  // Re-fan the CH1/CH2 meter taps (connectInputChannel's disconnect cleared them).
+  if (chMeters) { inputSplitter.connect(chMeters[0], 0); inputSplitter.connect(chMeters[1], 1); }
 }
 
 // Re-route the live input to a different hardware channel (1 or 2). Persists the

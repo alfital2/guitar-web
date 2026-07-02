@@ -1,7 +1,65 @@
 // src/chain-ui/amp.js
 import { createKnob } from './knob.js';
+import { MODELS } from '../effects/neuralamp.js';
 
 const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+
+// SVG-needle VU output meter shown on the right of the amp strip. The needle is
+// rotated by the ~13 Hz meter loop in main.js (transform: rotate() + an 80ms CSS
+// transition for ballistics — see .amp-vu-needle). Purely a readout; no audio.
+const VU_NS = 'http://www.w3.org/2000/svg';
+function svg(name, attrs) { const e = document.createElementNS(VU_NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+function buildVU() {
+  const wrap = el('div', 'amp-vu');
+  const s = svg('svg', { viewBox: '0 0 120 80', class: 'amp-vu-svg' });
+  // Recessed dial face + scale arc.
+  s.appendChild(svg('rect', { x: '2', y: '2', width: '116', height: '76', rx: '7', class: 'amp-vu-bg' }));
+  s.appendChild(svg('path', { d: 'M 22 62 A 44 44 0 0 1 98 62', class: 'amp-vu-arc' }));
+  // Tick marks across the sweep (−50°…+50°); the last three read "hot".
+  for (let i = 0; i <= 10; i++) {
+    const ang = (-50 + i * 10) * Math.PI / 180;
+    const cx = 60, cy = 66, r0 = 40, r1 = 46;
+    const sx = cx + r0 * Math.sin(ang), sy = cy - r0 * Math.cos(ang);
+    const ex = cx + r1 * Math.sin(ang), ey = cy - r1 * Math.cos(ang);
+    s.appendChild(svg('line', {
+      x1: sx.toFixed(1), y1: sy.toFixed(1), x2: ex.toFixed(1), y2: ey.toFixed(1),
+      class: 'amp-vu-tick' + (i >= 8 ? ' hot' : ''),
+    }));
+  }
+  // Needle — rotated in place about the pivot by the meter loop.
+  const needle = svg('g', { class: 'amp-vu-needle' });
+  needle.appendChild(svg('line', { x1: '60', y1: '66', x2: '60', y2: '22', class: 'amp-vu-hand' }));
+  needle.appendChild(svg('circle', { cx: '60', cy: '66', r: '4', class: 'amp-vu-hub' }));
+  s.appendChild(needle);
+  wrap.appendChild(s);
+  const peak = el('span', 'amp-vu-peak');
+  const label = el('div', 'amp-vu-label');
+  label.textContent = 'VU';
+  wrap.append(peak, label);
+  return wrap;
+}
+
+// One-time window listeners that drive the amp head's tube warm-up state from
+// neuralamp.js CustomEvents. Registered lazily (only once a neural head renders)
+// and query the live .amp-head at event time, so they survive amp re-renders.
+let warmupWired = false;
+function wireWarmup() {
+  if (warmupWired || typeof window === 'undefined') return;
+  warmupWired = true;
+  const head = () => document.querySelector('.amp-head');
+  window.addEventListener('neural-amp-loading', () => {
+    const h = head(); if (!h) return;
+    h.classList.add('amp-warming'); h.classList.remove('amp-ready', 'amp-errored');
+  });
+  window.addEventListener('neural-amp-ready', () => {
+    const h = head(); if (!h) return;
+    h.classList.remove('amp-warming', 'amp-errored'); h.classList.add('amp-ready');
+  });
+  window.addEventListener('neural-amp-error', () => {
+    const h = head(); if (!h) return;
+    h.classList.remove('amp-warming', 'amp-ready'); h.classList.add('amp-errored');
+  });
+}
 
 // Black numbered knobs for the amp panel; arc follows the theme accent (no
 // inline stroke), pointer is white, with an engraved 0..10 number ring.
@@ -61,6 +119,17 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
 
   const head = el('div', 'amp-head');
 
+  // Neural amp head → a per-model faceplate theme (black tolex + gold panel for
+  // the JCM, blackface navy for the Deluxe, brushed silver for the JC, …). The
+  // model index maps to MODELS; switching amps visibly "swaps the amp".
+  const neural = modules.find((m) => m.type === 'neuralamp');
+  if (neural) {
+    const idx = Math.round(Number(neural.params?.model ?? 0));
+    const name = MODELS[idx] || MODELS[0];
+    head.classList.add('amp-face', `amp-face-${name}`);
+    wireWarmup();
+  }
+
   // Leather carry handle on the top edge.
   const handle = el('div', 'amp-handle');
   handle.innerHTML = '<span class="amp-handle-mount"></span><span class="amp-handle-strap"></span><span class="amp-handle-mount"></span>';
@@ -105,6 +174,9 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
     panel.appendChild(group);
   });
 
+  // SVG needle VU output meter, rightmost on the control panel.
+  panel.appendChild(buildVU());
+
   // Dark grille with glowing vacuum tubes behind a woven mesh + brand + power lamp.
   const grille = el('div', 'amp-grille');
   const tubes = el('div', 'amp-tubes');
@@ -125,7 +197,12 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
   collapseBtn.setAttribute('aria-label', 'Collapse amp');
   collapseBtn.innerHTML = '<span>▴</span>';
 
+  // Pre-rendered amber "tube warming up" glow layer (opacity-animated via CSS
+  // when the head carries .amp-warming). Only meaningful for neural heads.
+  const warmGlow = neural ? el('div', 'amp-warm-glow') : null;
+
   head.append(handle, panel, grille, ...corners, collapseBtn);
+  if (warmGlow) head.appendChild(warmGlow);
 
   // Collapsed value strip; tap anywhere (or the "TUNE TO EDIT" affordance) to expand.
   const strip = buildStrip(head);
