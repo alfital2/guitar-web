@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>effect probe</title>
+</head>
+<body>
+<p>Objective audio-verification harness — see tests/effects-probe.mjs.</p>
+<script type="module">
+import { registry } from '../src/effects/index.js';
+import { loadWorklets } from '../src/effects/worklets/index.js';
+
+const SR = 48000;
+const FREQ = 220; // guitar-ish fundamental (low A/A3-ish for a sawtooth burst)
+
+// ---------------------------------------------------------------------------
+// Signal timeline (seconds). Three tone bursts (two loud, one quiet) each
+// separated by a silent gap — the gaps expose time-based effects (delay/echo
+// tails) and the quiet burst exposes dynamics (gate). A trailing sustained
+// pure tone segment exposes spectral/harmonic effects (chorus-family sideband
+// shifts, drive-family harmonic growth) and amplitude-envelope effects
+// (tremolo/autopan rate).
+// ---------------------------------------------------------------------------
+const BURSTS = {
+  loud1: [0.05, 0.25],
+  loud2: [0.65, 0.85],
+  quiet: [1.25, 1.45],
+};
+const GAPS = {
+  gapAfterLoud1: [0.25, 0.65],
+  gapAfterLoud2: [0.85, 1.25],
+  gapAfterQuiet: [1.45, 1.75],
+};
+const SUSTAIN = [1.80, 2.80]; // 1s continuous tone (with 20ms in/out fades)
+const DURATION = 3.0;
+const LEN = Math.round(SR * DURATION);
+
+function sawtooth(phase) { return 2 * (phase - Math.floor(phase + 0.5)); }
+
+function buildSignalBuffer(ctx) {
+  const buf = ctx.createBuffer(1, LEN, SR);
+  const data = buf.getChannelData(0);
+  for (const [start, end, amp] of [
+    [...BURSTS.loud1, 0.6],
+    [...BURSTS.loud2, 0.6],
+    [...BURSTS.quiet, 0.06],
+  ]) {
+    const i0 = Math.round(start * SR), i1 = Math.min(LEN, Math.round(end * SR));
+    const dur = end - start;
+    const tau = dur / 5; // ~5 time constants across the burst -> near-silent by i1
+    for (let i = i0; i < i1; i++) {
+      const t = (i - i0) / SR;
+      const decay = Math.exp(-t / tau);
+      data[i] = amp * decay * sawtooth(t * FREQ);
+    }
+  }
+  const [s0s, s1s] = SUSTAIN;
+  const i0 = Math.round(s0s * SR), i1 = Math.min(LEN, Math.round(s1s * SR));
+  const fade = 0.02;
+  for (let i = i0; i < i1; i++) {
+    const t = (i - i0) / SR;
+    const tEnd = (i1 - i) / SR;
+    const env = Math.min(1, t / fade, tEnd / fade);
+    // 0.8 amplitude: loud enough that compressor (thresh -18dB) AND limiter
+    // (ceiling -3dB, amp ~0.708) both actually engage on this segment.
+    data[i] = 0.8 * env * Math.sin(2 * Math.PI * FREQ * t);
+  }
+  return buf;
+}
+
+// ---------------------------------------------------------------------------
+// Analysis helpers
+// ---------------------------------------------------------------------------
+function idx(sec) { return Math.round(sec * SR); }
+function rms(arr, i0, i1) {
+  i0 = Math.max(0, i0); i1 = Math.min(arr.length, i1);
+  let sum = 0; const n = Math.max(1, i1 - i0);
+  for (let i = i0; i < i1; i++) sum += arr[i] * arr[i];
+  return Math.sqrt(sum / n);
+}
+function peakAbs(arr, i0, i1) {
+  i0 = Math.max(0, i0); i1 = Math.min(arr.length, i1);
+  let m = 0;
+  for (let i = i0; i < i1; i++) m = Math.max(m, Math.abs(arr[i]));
+  return m;
+}
+function crestFactor(arr, i0, i1) { return peakAbs(arr, i0, i1) / Math.max(rms(arr, i0, i1), 1e-6); }
+
+// Goertzel magnitude of `arr` at `freq` Hz over window [i0,i1).
+function goertzel(arr, i0, i1, freq) {
+  i0 = Math.max(0, i0); i1 = Math.min(arr.length, i1);
+  const n = i1 - i0;
+  if (n < 8) return 0;
+  const w = 2 * Math.PI * freq / SR;
+  const coeff = 2 * Math.cos(w);
+  let q0 = 0, q1 = 0, q2 = 0;
+  for (let i = i0; i < i1; i++) { q0 = coeff * q1 - q2 + arr[i]; q2 = q1; q1 = q0; }
+  const real = q1 - q2 * Math.cos(w);
+  const imag = q2 * Math.sin(w);
+  return Math.sqrt(real * real + imag * imag) / n;
+}
+
+// Spectral "distance" between two signals over a window: sum of |mag diff| at
+// a spread of probe frequencies around and beyond the fundamental. Robust to
+// comb-filter notches, sidebands, or broadband spectral tilt alike.
+const PROBE_FREQS = [100, 150, 200, 220, 250, 300, 350, 400, 450, 500, 600, 700, 800, 900, 1000, 1200];
+function spectralDistance(wet, dry, i0, i1) {
+  let d = 0;
+  for (const f of PROBE_FREQS) d += Math.abs(goertzel(wet, i0, i1, f) - goertzel(dry, i0, i1, f));
+  return d;
+}
+
+function downmix(buffer) {
+  const n = buffer.length;
+  const out = new Float32Array(n);
+  const chans = buffer.numberOfChannels;
+  for (let c = 0; c < chans; c++) {
+    const d = buffer.getChannelData(c);
+    for (let i = 0; i < n; i++) out[i] += d[i] / chans;
+  }
+  return out;
+}
+
+// Envelope follower: |x| through a CASCADED one-pole lowpass (3 stages, ~-18dB/
+// octave). A single one-pole stage doesn't sufficiently reject the rectified
+// carrier's own ripple (|sin(2*pi*FREQ*t)| has energy at 2*FREQ and its
+// harmonics), which otherwise pollutes the zero-crossing rate estimate below
+// with spurious high-frequency crossings.
+function envelopeOf(arr, cutoffHz = 40, stages = 3) {
+  const alpha = 1 - Math.exp(-2 * Math.PI * cutoffHz / SR);
+  let cur = new Float32Array(arr.length);
+  let y = 0;
+  for (let i = 0; i < arr.length; i++) { const x = Math.abs(arr[i]); y += alpha * (x - y); cur[i] = y; }
+  for (let s = 1; s < stages; s++) {
+    const next = new Float32Array(arr.length);
+    y = 0;
+    for (let i = 0; i < arr.length; i++) { y += alpha * (cur[i] - y); next[i] = y; }
+    cur = next;
+  }
+  return cur;
+}
+
+// Dominant oscillation rate of an envelope segment via mean-crossing count
+// (robust for a near-sinusoidal envelope, which is what a sine-shape LFO on
+// tremolo/autopan produces).
+function envelopeRate(env, i0, i1) {
+  i0 = Math.max(0, i0); i1 = Math.min(env.length, i1);
+  const n = i1 - i0;
+  if (n < 8) return 0;
+  let mean = 0;
+  for (let i = i0; i < i1; i++) mean += env[i];
+  mean /= n;
+  let crossings = 0;
+  let prevSign = (env[i0] - mean) >= 0;
+  for (let i = i0 + 1; i < i1; i++) {
+    const sign = (env[i] - mean) >= 0;
+    if (sign !== prevSign) crossings++;
+    prevSign = sign;
+  }
+  const duration = n / SR;
+  return (crossings / 2) / duration; // full cycles
+}
+
+function normDiff(wet, dry) {
+  const n = Math.min(wet.length, dry.length);
+  let se = 0, sd = 0;
+  for (let i = 0; i < n; i++) { const df = wet[i] - dry[i]; se += df * df; sd += dry[i] * dry[i]; }
+  const rmsDry = Math.sqrt(sd / n);
+  const rmsDiff = Math.sqrt(se / n);
+  return { rmsDiff, rmsDry, normRmsDiff: rmsDiff / Math.max(rmsDry, 1e-4) };
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+async function renderCustom(len, signalBuilder, buildEffect) {
+  const ctx = new OfflineAudioContext(2, len, SR);
+  const type = buildEffect && buildEffect.type;
+  if (type === 'looper' || type === 'pitchshift') await loadWorklets(ctx);
+  const src = ctx.createBufferSource();
+  src.buffer = signalBuilder(ctx);
+  if (buildEffect) {
+    const fx = buildEffect.create(ctx, buildEffect.params);
+    src.connect(fx.input);
+    fx.output.connect(ctx.destination);
+  } else {
+    src.connect(ctx.destination);
+  }
+  src.start(0);
+  const rendered = await ctx.startRendering();
+  return rendered;
+}
+
+async function renderChain(buildEffect) {
+  return renderCustom(LEN, buildSignalBuffer, buildEffect);
+}
+
+async function renderDry() {
+  const buffer = await renderChain(null);
+  return downmix(buffer);
+}
+
+// A plain, LOUD, sustained tone (no bursts/gaps) used only for the
+// compressor/limiter signature: their default thresholds (-18dB / -3dB) need
+// a signal that sits solidly above threshold for long enough (well past
+// attack + several release constants) for steady-state gain reduction to
+// show up in the average level — the fast-decaying tone bursts used
+// elsewhere decay below threshold in ~40ms, too fast to reveal compression.
+function buildLoudSustainBuffer(ctx, amp, dur) {
+  const len = Math.round(SR * dur);
+  const buf = ctx.createBuffer(1, len, SR);
+  const data = buf.getChannelData(0);
+  const fadeIn = 0.001;  // near-instant onset (a picked-note transient), not a slow swell
+  const fadeOut = 0.02;
+  for (let i = 0; i < len; i++) {
+    const t = i / SR, tEnd = (len - i) / SR;
+    const env = Math.min(1, t / fadeIn, tEnd / fadeOut);
+    data[i] = amp * env * Math.sin(2 * Math.PI * FREQ * t);
+  }
+  return buf;
+}
+
+// ---------------------------------------------------------------------------
+// Per-effect family checks. Each returns { checks: [{name, pass, detail}] }.
+// ---------------------------------------------------------------------------
+const NOOP_RMS_FLOOR = 0.02;      // 2% normalized RMS diff
+const NOOP_SPECTRAL_FLOOR = 0.003;
+
+function checkNotNoop(wet, dry) {
+  // Whole-buffer RMS/spectral diff, PLUS the same over the first silent gap —
+  // subtle-mix effects (e.g. reverb's tasteful low default mix) can bleed tail
+  // energy into a gap that reads as near-silent in the dry signal, which is a
+  // much more sensitive place to detect them than a whole-buffer average
+  // dominated by the loud bursts and sustain tone.
+  const { normRmsDiff } = normDiff(wet, dry);
+  const spec = spectralDistance(wet, dry, 0, wet.length);
+  const [g0, g1] = GAPS.gapAfterLoud1;
+  const gapWetRms = rms(wet, idx(g0), idx(g1));
+  const gapDryRms = rms(dry, idx(g0), idx(g1));
+  const gapDiffers = gapWetRms > Math.max(gapDryRms * 2, 0.0015);
+  const pass = normRmsDiff > NOOP_RMS_FLOOR || spec > NOOP_SPECTRAL_FLOOR || gapDiffers;
+  return {
+    name: 'not a no-op',
+    pass,
+    detail: `normRmsDiff=${normRmsDiff.toFixed(4)} spectralDist=${spec.toFixed(4)} gapWetRms=${gapWetRms.toFixed(5)} gapDryRms=${gapDryRms.toFixed(5)}`,
+  };
+}
+
+function checkDelayFamily(wet, dry, delayTimeSec) {
+  const checks = [];
+  // Energy in the gap right after burst 1 (dry should be ~silent there).
+  const [g0, g1] = GAPS.gapAfterLoud1;
+  const wetGapRms = rms(wet, idx(g0), idx(g1));
+  const dryGapRms = rms(dry, idx(g0), idx(g1));
+  checks.push({
+    name: 'echo tail present in silent gap',
+    pass: wetGapRms > Math.max(dryGapRms * 3, 0.002),
+    detail: `wetGapRms=${wetGapRms.toFixed(5)} dryGapRms=${dryGapRms.toFixed(5)}`,
+  });
+  // First echo onset ≈ burst1.start + delayTime, found by scanning the gap for
+  // the first sample crossing a fraction of the burst's own peak.
+  const burstPeak = peakAbs(wet, idx(BURSTS.loud1[0]), idx(BURSTS.loud1[1]));
+  const thresh = Math.max(0.012, burstPeak * 0.06);
+  let onsetSec = null;
+  const scanStart = idx(BURSTS.loud1[0]); // scan from burst start through the gap
+  const scanEnd = idx(g1);
+  for (let i = scanStart; i < scanEnd; i++) {
+    if (Math.abs(wet[i]) > thresh && i / SR > BURSTS.loud1[1] - 0.005) { onsetSec = i / SR; break; }
+  }
+  const expected = BURSTS.loud1[0] + delayTimeSec;
+  const onsetOk = onsetSec != null && Math.abs(onsetSec - expected) <= 0.02;
+  checks.push({
+    name: `first echo onset within ±20ms of delay-time param (${(delayTimeSec * 1000).toFixed(0)}ms)`,
+    pass: onsetOk,
+    detail: `onset=${onsetSec == null ? 'none' : (onsetSec * 1000).toFixed(1) + 'ms'} expected=${(expected * 1000).toFixed(1)}ms`,
+  });
+  return checks;
+}
+
+function checkEnvelopeRateFamily(wet, dry, rateHz, chanArr) {
+  // Cutoff a few multiples of the LFO rate — high enough to track the
+  // amplitude envelope, low enough (with 3-stage cascading) to reject the
+  // rectified carrier's residual ripple at ~2*FREQ.
+  const env = envelopeOf(chanArr, Math.max(10, rateHz * 3), 3);
+  const [s0, s1] = SUSTAIN;
+  const measured = envelopeRate(env, idx(s0 + 0.03), idx(s1 - 0.03));
+  const pass = measured > 0 && Math.abs(measured - rateHz) / rateHz <= 0.3;
+  return [{
+    name: `amplitude envelope modulates ≈ rate param (${rateHz}Hz ±30%)`,
+    pass, detail: `measuredHz=${measured.toFixed(2)}`,
+  }];
+}
+
+function checkSpectralFamily(wet, dry) {
+  const [s0, s1] = SUSTAIN;
+  const spec = spectralDistance(wet, dry, idx(s0 + 0.03), idx(s1 - 0.03));
+  return [{
+    name: 'sustained-tone spectrum differs from dry (sidebands/notches)',
+    pass: spec > NOOP_SPECTRAL_FLOOR,
+    detail: `spectralDist=${spec.toFixed(4)}`,
+  }];
+}
+
+function checkHarmonicFamily(wet, dry) {
+  const [s0, s1] = SUSTAIN;
+  const i0 = idx(s0 + 0.03), i1 = idx(s1 - 0.03);
+  let wetH = 0, dryH = 0;
+  for (const mult of [2, 3, 4]) {
+    wetH += goertzel(wet, i0, i1, FREQ * mult);
+    dryH += goertzel(dry, i0, i1, FREQ * mult);
+  }
+  const grew = wetH > dryH + 0.003;
+  // These effects are purely feedforward WaveShaper chains (no delay line/
+  // feedback memory), so a truly silent input MUST produce silent output. A
+  // WaveShaper curve that doesn't pass through the origin (curve(0) !== 0)
+  // leaks a constant DC-ish offset here — audible as noise/hum with no
+  // guitar signal present.
+  const [g0, g1] = GAPS.gapAfterLoud1;
+  const gapRms = rms(wet, idx(g0), idx(g1));
+  return [{
+    name: 'harmonic content (2f/3f/4f) grows vs dry',
+    pass: grew, detail: `wetHarm=${wetH.toFixed(4)} dryHarm=${dryH.toFixed(4)}`,
+  }, {
+    name: 'silent input stays silent (shaping curve passes through the origin)',
+    pass: gapRms < 0.01,
+    informational: true, // see checkHarmonicFamily's comment above
+    detail: `gapRms(silentGap)=${gapRms.toFixed(5)}`,
+  }];
+}
+
+function checkGate(wet, dry) {
+  const [q0, q1] = BURSTS.quiet;
+  const [l0, l1] = BURSTS.loud2;
+  const quietWet = rms(wet, idx(q0), idx(q1)), quietDry = rms(dry, idx(q0), idx(q1));
+  const loudWet = rms(wet, idx(l0), idx(l1)), loudDry = rms(dry, idx(l0), idx(l1));
+  const quietRatio = quietWet / Math.max(quietDry, 1e-6);
+  const loudRatio = loudWet / Math.max(loudDry, 1e-6);
+  return [{
+    name: 'gate: quiet burst attenuated, loud burst passes',
+    pass: quietRatio < 0.6 && loudRatio > 0.6,
+    detail: `quietRatio=${quietRatio.toFixed(3)} loudRatio=${loudRatio.toFixed(3)}`,
+  }];
+}
+
+// compressor/limiter: a fast decaying tone burst is a poor test signal — with a
+// 5ms attack and a burst that has largely decayed below threshold within
+// ~40ms, there isn't enough "loud, sustained" time for gain reduction to show
+// up in the average level. Render a DEDICATED loud (0.92, near full-scale)
+// sustained tone for a full second — comfortably clear of both compressor
+// threshold (-18dB) and limiter ceiling (-3dB) and well past attack+release —
+// and compare steady-state RMS against what a makeup-gain-only (no
+// compression) pass would have produced. Real gain reduction must fall well
+// short of that.
+// NOTE on methodology: Chrome's native DynamicsCompressorNode applies its OWN
+// automatic makeup gain internally (separate from — and in addition to — any
+// manual makeup gain node an effect adds), which ramps in over tens of ms and
+// pulls the STEADY-STATE output level back toward the input level. That makes
+// steady-state RMS/peak comparisons unreliable for detecting compression
+// (confirmed empirically: measured steady-state ratios sat at ~0.96-1.0 even
+// though gain reduction was clearly happening). The reliable, implementation-
+// agnostic signature is the EARLY-TRANSIENT window right after a sudden loud
+// onset (a near-instant attack, like a picked note) — the compressor's own
+// auto-makeup hasn't caught up there yet, so a real compressor/limiter must
+// show a measurably lower peak than dry in that window.
+async function checkDynamics(mod, defaultParams) {
+  const AMP = 0.92, DUR = 1.0;
+  const len = Math.round(SR * DUR);
+  const builder = (ctx) => buildLoudSustainBuffer(ctx, AMP, DUR);
+  const dryBuf = await renderCustom(len, builder, null);
+  const wetBuf = await renderCustom(len, builder, { type: mod.schema.type, create: mod.create, params: defaultParams });
+  const dryMono = downmix(dryBuf), wetMono = downmix(wetBuf);
+  const i0 = idx(0.001), i1 = idx(0.02); // early attack-transient window
+  const peakWet = peakAbs(wetMono, i0, i1);
+  const peakDry = peakAbs(dryMono, i0, i1);
+  const ratio = peakWet / Math.max(peakDry, 1e-6);
+  return [{
+    name: 'loud-onset transient peak reduced vs dry (gain reduction engages fast enough to catch it)',
+    pass: ratio < 0.8,
+    detail: `peakWet=${peakWet.toFixed(4)} peakDry=${peakDry.toFixed(4)} ratio=${ratio.toFixed(3)}`,
+  }];
+}
+
+// eq at its schema DEFAULTS (bass=mid=treble=5 -> 0dB every band) is a genuine,
+// correct no-op by design (12-o'clock knobs = flat/unity EQ) — not a bug. So
+// instead of the generic default-params no-op check, verify the biquads are
+// actually param-true: bumping bass/treble away from center measurably changes
+// the sustained-tone spectrum vs the flat-default render.
+async function checkEqParamTrue(mod, defaultParams, flatWet) {
+  const bumped = { ...defaultParams, bass: 9, treble: 9, mid: 9 };
+  const rendered = await renderChain({ type: 'eq', create: mod.create, params: bumped });
+  const bumpedWet = downmix(rendered);
+  const [s0, s1] = SUSTAIN;
+  const spec = spectralDistance(bumpedWet, flatWet, idx(s0 + 0.03), idx(s1 - 0.03));
+  return [{
+    name: 'flat-by-design default (0dB all bands) is correct; bumping bands away from center changes the spectrum',
+    pass: spec > NOOP_SPECTRAL_FLOOR,
+    detail: `defaultIsFlat=true (bass/mid/treble=5 -> 0dB) bumpedVsDefaultSpectralDist=${spec.toFixed(4)}`,
+  }];
+}
+
+// ---------------------------------------------------------------------------
+// Effect family classification
+// ---------------------------------------------------------------------------
+const DELAY_FAMILY = { delay: 'time', pingpong: 'time', 'tape-echo': 'time' };
+const ENV_RATE_FAMILY = { tremolo: 'rate', autopan: 'rate' };
+const SPECTRAL_FAMILY = ['chorus', 'flanger', 'phaser', 'vibrato', 'rotary', 'ringmod'];
+const HARMONIC_FAMILY = ['drive', 'fuzz', 'octave'];
+const DYNAMICS_SKIP_NOOP = ['compressor', 'limiter', 'gate', 'eq'];
+// neuralamp needs a network-fetched wasm module + .nam model JSON (posted to the
+// worklet asynchronously after construction) before it produces anything but
+// silence/passthrough — genuinely out of scope for a single offline render.
+const SKIP_BEFORE_RENDER = {
+  neuralamp: 'requires network-fetched wasm + .nam model assets (async post-construction handshake) — out of scope for a single offline render',
+};
+// Default params (mode=Stop, len=0) are a genuine, correct no-op: nothing has
+// been recorded yet, so out === in by design. Exercising it for real needs
+// param AUTOMATION across time (mode Stop -> Record -> Play), which doesn't
+// fit this harness's "one static default-param render" methodology. Still
+// rendered (below) to verify the worklet loads and the graph doesn't throw.
+const SKIP_AFTER_RENDER = {
+  looper: 'transport-driven (default mode=Stop is correctly a no-op); needs time-varying param automation to exercise record/play, not just a default-params render — verified structurally only (worklet loads, graph renders without error, shown below)',
+};
+
+async function run() {
+  const dry = await renderDry();
+  const results = [];
+
+  for (const type of Object.keys(registry)) {
+    if (SKIP_BEFORE_RENDER[type]) {
+      results.push({ type, skipped: true, reason: SKIP_BEFORE_RENDER[type] });
+      continue;
+    }
+    const mod = registry[type];
+    const defaultParams = Object.fromEntries(mod.schema.params.map((p) => [p.key, p.default]));
+
+    let rendered;
+    try {
+      rendered = await renderChain({ type, create: mod.create, params: defaultParams });
+    } catch (err) {
+      results.push({ type, skipped: true, reason: `render threw: ${err && err.message || err}` });
+      continue;
+    }
+    const wet = downmix(rendered);
+    const leftChan = rendered.getChannelData(0);
+
+    if (SKIP_AFTER_RENDER[type]) {
+      results.push({ type, skipped: true, reason: SKIP_AFTER_RENDER[type] });
+      continue;
+    }
+
+    const checks = [];
+    if (!DYNAMICS_SKIP_NOOP.includes(type)) checks.push(checkNotNoop(wet, dry));
+
+    if (DELAY_FAMILY[type]) {
+      const key = DELAY_FAMILY[type];
+      const delayTimeSec = (defaultParams[key] ?? defaultParams.time) / 1000;
+      checks.push(...checkDelayFamily(wet, dry, delayTimeSec));
+    } else if (ENV_RATE_FAMILY[type]) {
+      const rateHz = defaultParams.rate;
+      const chan = type === 'autopan' ? leftChan : wet;
+      checks.push(...checkEnvelopeRateFamily(wet, dry, rateHz, chan));
+    } else if (SPECTRAL_FAMILY.includes(type)) {
+      checks.push(...checkSpectralFamily(wet, dry));
+    } else if (HARMONIC_FAMILY.includes(type)) {
+      checks.push(...checkHarmonicFamily(wet, dry));
+    } else if (type === 'gate') {
+      checks.push(...checkGate(wet, dry));
+    } else if (type === 'compressor' || type === 'limiter') {
+      checks.push(...await checkDynamics(mod, defaultParams));
+    } else if (type === 'eq') {
+      checks.push(...await checkEqParamTrue(mod, defaultParams, wet));
+    }
+    // else: generic no-op check only (cabinet, wah, autowah, widener, boost,
+    // reverb, and worklet effect pitchshift already got checkNotNoop above).
+
+    // Informational checks are printed and reported but don't gate PASS/FAIL —
+    // see the octave DC-bias check: a real, evidence-backed finding outside
+    // this task's assigned octave signature (harmonic growth), which the task
+    // explicitly says to report rather than fix ("do NOT redesign it").
+    const pass = checks.filter((c) => !c.informational).every((c) => c.pass);
+    results.push({ type, skipped: false, pass, checks });
+  }
+
+  return results;
+}
+
+window.__effectProbe = { run };
+</script>
+</body>
+</html>

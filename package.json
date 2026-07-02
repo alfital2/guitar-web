@@ -6,6 +6,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node tests/neural-e2e.mjs",
+    "test:probe": "node tests/effects-probe.mjs",
     "dev": "python3 -m http.server 8000",
     "neural:build": "bash tools/neural/build.sh",
     "neural:derisk": "node tools/neural/derisk.mjs"
