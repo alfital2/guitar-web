@@ -26,12 +26,19 @@ import * as looper from './looper.js';
 import * as autopan from './autopan.js';
 import * as rotary from './rotary.js';
 import * as neuralamp from './neuralamp.js';
+import * as acousticsim from './acousticsim.js';
+import * as distortion from './distortion.js';
+import * as harmonizer from './harmonizer.js';
+import * as univibe from './univibe.js';
+import * as springverb from './springverb.js';
+import * as whammy from './whammy.js';
 
 const mods = [
   compressor, drive, eq, cabinet, delay, reverb, chorus,
   boost, fuzz, octave, tremolo, vibrato, flanger, phaser, ringmod,
   autowah, gate, wah, tapeEcho, pingpong, widener, limiter,
   pitchshift, looper, autopan, rotary, neuralamp,
+  acousticsim, distortion, harmonizer, univibe, springverb, whammy,
 ];
 
 export const registry = Object.fromEntries(

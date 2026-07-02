@@ -176,7 +176,7 @@ function normDiff(wet, dry) {
 async function renderCustom(len, signalBuilder, buildEffect) {
   const ctx = new OfflineAudioContext(2, len, SR);
   const type = buildEffect && buildEffect.type;
-  if (type === 'looper' || type === 'pitchshift') await loadWorklets(ctx);
+  if (['looper', 'pitchshift', 'harmonizer', 'whammy'].includes(type)) await loadWorklets(ctx);
   const src = ctx.createBufferSource();
   src.buffer = signalBuilder(ctx);
   if (buildEffect) {
@@ -314,18 +314,123 @@ function checkHarmonicFamily(wet, dry) {
   // feedback memory), so a truly silent input MUST produce silent output. A
   // WaveShaper curve that doesn't pass through the origin (curve(0) !== 0)
   // leaks a constant DC-ish offset here — audible as noise/hum with no
-  // guitar signal present.
+  // guitar signal present. Measure from 50ms INTO the gap: a high-gain pedal
+  // (distortion's ~91x default) legitimately amplifies the pre/post filters'
+  // brief ring-out of the burst's abrupt edge into a loud few-ms click tail,
+  // which decays — whereas an origin-offset DC leak is constant and still
+  // dominates the remaining 350ms window (the octave bug read ~0.28 here).
   const [g0, g1] = GAPS.gapAfterLoud1;
-  const gapRms = rms(wet, idx(g0), idx(g1));
+  const gapRms = rms(wet, idx(g0 + 0.05), idx(g1));
   return [{
     name: 'harmonic content (2f/3f/4f) grows vs dry',
     pass: grew, detail: `wetHarm=${wetH.toFixed(4)} dryHarm=${dryH.toFixed(4)}`,
   }, {
+    // GATING since 2026-07-02: makeRectifierCurve's origin bug (octave leaked
+    // ~0.28 RMS DC into silence — see the 2026-07-01 probe report's
+    // "Additional finding") is now fixed in src/dsp.js, so every feedforward
+    // shaper must hold this floor.
     name: 'silent input stays silent (shaping curve passes through the origin)',
     pass: gapRms < 0.01,
-    informational: true, // see checkHarmonicFamily's comment above
     detail: `gapRms(silentGap)=${gapRms.toFixed(5)}`,
   }];
+}
+
+// acousticsim: body-resonance biquads (~105/230Hz) must lift the low harmonic
+// (220Hz, right on the 230Hz "top plate" peak) MORE than an upper harmonic
+// (660Hz, outside both resonances) — measured on the harmonically-rich burst,
+// as a wet/dry ratio per harmonic so overall level cancels out.
+function checkAcousticSim(wet, dry) {
+  const [b0, b1] = BURSTS.loud1;
+  const i0 = idx(b0), i1 = idx(b1);
+  const r220 = goertzel(wet, i0, i1, 220) / Math.max(goertzel(dry, i0, i1, 220), 1e-6);
+  const r660 = goertzel(wet, i0, i1, 660) / Math.max(goertzel(dry, i0, i1, 660), 1e-6);
+  const [s0, s1] = SUSTAIN;
+  const spec = spectralDistance(wet, dry, idx(s0 + 0.03), idx(s1 - 0.03));
+  return [{
+    name: 'body resonance: 220Hz harmonic (at the ~230Hz body peak) boosted more than 660Hz',
+    pass: r220 > 1.1 && r220 > r660 * 1.1,
+    detail: `boost220=${r220.toFixed(3)} boost660=${r660.toFixed(3)}`,
+  }, {
+    name: 'spectral difference vs dry (body/air EQ shape)',
+    pass: spec > NOOP_SPECTRAL_FLOOR,
+    detail: `spectralDist=${spec.toFixed(4)}`,
+  }];
+}
+
+// harmonizer: the wet signal must carry a spectral peak at the shifted
+// interval (default +7st: 220Hz -> ~329.6Hz) that the dry signal lacks.
+function checkHarmonizer(wet, dry, semitones) {
+  const f = FREQ * Math.pow(2, semitones / 12);
+  const [s0, s1] = SUSTAIN;
+  const i0 = idx(s0 + 0.05), i1 = idx(s1 - 0.05);
+  const wetMag = goertzel(wet, i0, i1, f);
+  const dryMag = goertzel(dry, i0, i1, f);
+  return [{
+    name: `harmony voice peak at +${semitones}st (${f.toFixed(1)}Hz) present in wet, absent in dry`,
+    pass: wetMag > Math.max(dryMag * 4, 0.01),
+    detail: `wetMag=${wetMag.toFixed(4)} dryMag=${dryMag.toFixed(4)}`,
+  }];
+}
+
+// univibe: modulation-family spectral change PLUS the photocell amplitude
+// throb — the envelope of the sustained tone must visibly pulse at ~speed.
+function checkUnivibe(wet, dry, speedHz) {
+  const checks = checkSpectralFamily(wet, dry);
+  const env = envelopeOf(wet, Math.max(10, speedHz * 3), 3);
+  const [s0, s1] = SUSTAIN;
+  const i0 = idx(s0 + 0.1), i1 = idx(s1 - 0.05);
+  let mn = Infinity, mx = 0;
+  for (let i = i0; i < i1; i++) { mn = Math.min(mn, env[i]); mx = Math.max(mx, env[i]); }
+  const depth = (mx - mn) / Math.max(mx, 1e-6);
+  const rate = envelopeRate(env, i0, i1);
+  checks.push({
+    name: `amplitude throb pulses near speed param (${speedHz}Hz)`,
+    pass: depth > 0.02 && rate > speedHz * 0.35 && rate < speedHz * 3.5,
+    detail: `envDepth=${depth.toFixed(3)} measuredHz=${rate.toFixed(2)}`,
+  });
+  return checks;
+}
+
+// springverb: the dispersive drip tail must ring in the silent inter-burst gap
+// (like the delay-family tail check, but with no single onset to time — the
+// drip train + noise wash is continuous).
+function checkSpringTail(wet, dry) {
+  const [g0, g1] = GAPS.gapAfterLoud1;
+  const wetGapRms = rms(wet, idx(g0 + 0.02), idx(g1));
+  const dryGapRms = rms(dry, idx(g0 + 0.02), idx(g1));
+  return [{
+    name: 'spring tail energy rings in the inter-burst gap',
+    pass: wetGapRms > Math.max(dryGapRms * 3, 0.002),
+    detail: `wetGapRms=${wetGapRms.toFixed(5)} dryGapRms=${dryGapRms.toFixed(5)}`,
+  }];
+}
+
+// whammy: at the default full bend the output must carry a peak at the bent
+// pitch that dry lacks; re-rendered with bend=0 it must sit near-dry (no bent
+// peak, spectral distance collapsing vs the engaged render).
+async function checkWhammy(mod, defaultParams, wet, dry) {
+  const semis = (defaultParams.bend / 10) * defaultParams.range;
+  const f = FREQ * Math.pow(2, semis / 12);
+  const [s0, s1] = SUSTAIN;
+  const i0 = idx(s0 + 0.05), i1 = idx(s1 - 0.05);
+  const wetMag = goertzel(wet, i0, i1, f);
+  const dryMag = goertzel(dry, i0, i1, f);
+  const checks = [{
+    name: `bend>0: bent-pitch peak at +${semis}st (${f.toFixed(1)}Hz) present in wet, absent in dry`,
+    pass: wetMag > Math.max(dryMag * 4, 0.01),
+    detail: `wetMag=${wetMag.toFixed(4)} dryMag=${dryMag.toFixed(4)}`,
+  }];
+  const zeroBuf = await renderChain({ type: 'whammy', create: mod.create, params: { ...defaultParams, bend: 0 } });
+  const zero = downmix(zeroBuf);
+  const zeroMag = goertzel(zero, i0, i1, f);
+  const specZero = spectralDistance(zero, dry, i0, i1);
+  const specBent = spectralDistance(wet, dry, i0, i1);
+  checks.push({
+    name: 'bend=0 is near-dry (no bent peak; spectrum collapses toward dry vs the engaged render)',
+    pass: zeroMag < wetMag * 0.25 && specZero < specBent * 0.6,
+    detail: `zeroMag=${zeroMag.toFixed(4)} vs bentMag=${wetMag.toFixed(4)}; specZero=${specZero.toFixed(4)} specBent=${specBent.toFixed(4)}`,
+  });
+  return checks;
 }
 
 function checkGate(wet, dry) {
@@ -404,7 +509,7 @@ async function checkEqParamTrue(mod, defaultParams, flatWet) {
 const DELAY_FAMILY = { delay: 'time', pingpong: 'time', 'tape-echo': 'time' };
 const ENV_RATE_FAMILY = { tremolo: 'rate', autopan: 'rate' };
 const SPECTRAL_FAMILY = ['chorus', 'flanger', 'phaser', 'vibrato', 'rotary', 'ringmod'];
-const HARMONIC_FAMILY = ['drive', 'fuzz', 'octave'];
+const HARMONIC_FAMILY = ['drive', 'fuzz', 'octave', 'distortion'];
 const DYNAMICS_SKIP_NOOP = ['compressor', 'limiter', 'gate', 'eq'];
 // neuralamp needs a network-fetched wasm module + .nam model JSON (posted to the
 // worklet asynchronously after construction) before it produces anything but
@@ -469,14 +574,22 @@ async function run() {
       checks.push(...await checkDynamics(mod, defaultParams));
     } else if (type === 'eq') {
       checks.push(...await checkEqParamTrue(mod, defaultParams, wet));
+    } else if (type === 'acousticsim') {
+      checks.push(...checkAcousticSim(wet, dry));
+    } else if (type === 'harmonizer') {
+      checks.push(...checkHarmonizer(wet, dry, defaultParams.interval));
+    } else if (type === 'univibe') {
+      checks.push(...checkUnivibe(wet, dry, defaultParams.speed));
+    } else if (type === 'springverb') {
+      checks.push(...checkSpringTail(wet, dry));
+    } else if (type === 'whammy') {
+      checks.push(...await checkWhammy(mod, defaultParams, wet, dry));
     }
     // else: generic no-op check only (cabinet, wah, autowah, widener, boost,
     // reverb, and worklet effect pitchshift already got checkNotNoop above).
 
-    // Informational checks are printed and reported but don't gate PASS/FAIL —
-    // see the octave DC-bias check: a real, evidence-backed finding outside
-    // this task's assigned octave signature (harmonic growth), which the task
-    // explicitly says to report rather than fix ("do NOT redesign it").
+    // Informational checks (checks flagged `informational: true`) are printed
+    // and reported but don't gate PASS/FAIL.
     const pass = checks.filter((c) => !c.informational).every((c) => c.pass);
     results.push({ type, skipped: false, pass, checks });
   }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { mapRange, dbToGain, makeSoftClipCurve, makeReverbImpulse,
-  makeRectifierCurve } from '../src/dsp.js';
+  makeRectifierCurve, makeDistortionCurve, makeSpringImpulse } from '../src/dsp.js';
 import { FakeAudioContext } from './fake-audio-context.js';
 
 describe('mapRange', () => {
@@ -54,5 +54,42 @@ describe('makeRectifierCurve', () => {
     const c = makeRectifierCurve(0);
     expect(c[0]).toBeCloseTo(-1, 5);
     expect(c[c.length - 1]).toBeCloseTo(1, 5);
+  });
+});
+
+describe('makeDistortionCurve', () => {
+  const c = makeDistortionCurve(6, 2048);
+  it('has requested length and stays in [-1,1]', () => {
+    expect(c.length).toBe(2048);
+    expect(Math.max(...c)).toBeLessThanOrEqual(1);
+    expect(Math.min(...c)).toBeGreaterThanOrEqual(-1);
+  });
+  it('is monotonic non-decreasing and passes through the origin', () => {
+    for (let i = 1; i < c.length; i++) expect(c[i]).toBeGreaterThanOrEqual(c[i - 1]);
+    expect(Math.abs((c[1023] + c[1024]) / 2)).toBeLessThan(1e-3);
+  });
+  it('more dist = steeper near the zero crossing', () => {
+    const lo = makeDistortionCurve(1), hi = makeDistortionCurve(9);
+    expect(hi[1024 + 20]).toBeGreaterThan(lo[1024 + 20]);
+  });
+});
+
+describe('makeSpringImpulse', () => {
+  const ctx = new FakeAudioContext(48000);
+  const buf = makeSpringImpulse(ctx, 1.0, 0.06, 2);
+  it('builds a stereo buffer of the right length', () => {
+    expect(buf.length).toBe(48000);
+    expect(buf.numberOfChannels).toBe(2);
+  });
+  it('drip train: energy peaks at the drip spacing, quieter between drips', () => {
+    const d = buf.getChannelData(0);
+    const rms = (t0, t1) => {
+      const i0 = Math.round(t0 * 48000), i1 = Math.round(t1 * 48000);
+      let s = 0; for (let i = i0; i < i1; i++) s += d[i] * d[i];
+      return Math.sqrt(s / (i1 - i0));
+    };
+    // 2nd drip fires at t=0.06 and chirps for ~25ms; between-drip window
+    // [0.095, 0.115] holds only the noise bed.
+    expect(rms(0.06, 0.085)).toBeGreaterThan(rms(0.095, 0.115) * 1.5);
   });
 });
