@@ -1003,6 +1003,173 @@
   html.liquid .fx-tile:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.22); }
   /* glassy tint on the dim backdrops */
   html.liquid .settings-backdrop { background: rgba(10,10,12,0.4); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+
+  /* ── Top-tier UI pass (2026-07-02 spec) ─────────────────────────────────
+     GarageBand-grade dimensionality: neural amp faceplates, tube warm-up,
+     VU output meter, CH1/CH2 input meters, footswitch stomp, pedal glint.
+     All motion is transform/opacity on pre-rendered layers. */
+
+  /* SVG-needle VU meter (ivory dial in a machined bezel, on the amp panel). */
+  .amp-vu {
+    flex: 0 0 auto; align-self: center; position: relative; z-index: 1;
+    width: 92px; margin: 0 4px 0 8px; padding: 3px; border-radius: 9px;
+    background: linear-gradient(180deg, #9aa0a6, #55595f);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.5), inset 0 -1px 2px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.45);
+  }
+  .amp-vu-svg { display: block; width: 100%; height: auto; border-radius: 6px; }
+  .amp-vu-bg { fill: #f3ead2; stroke: #5c5f66; stroke-width: 1.5; }
+  .amp-vu-arc { stroke: #3a3b40; stroke-width: 1.6; fill: none; opacity: .7; }
+  .amp-vu-tick { stroke: #3a3b40; stroke-width: 1.4; }
+  .amp-vu-tick.hot { stroke: #c92e1f; stroke-width: 2; }
+  .amp-vu-needle { transform-box: view-box; transform-origin: 60px 66px; transform: rotate(-50deg); transition: transform 80ms linear; }
+  .amp-vu-hand { stroke: #16171a; stroke-width: 2.2; }
+  .amp-vu-hub { fill: #26282d; stroke: #0c0d10; stroke-width: 1; }
+  .amp-vu-peak {
+    position: absolute; top: 8px; right: 9px; width: 7px; height: 7px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffd9c9, #e0301b 60%, #6e130a);
+    opacity: .18; transition: opacity .1s, box-shadow .1s;
+  }
+  .amp-vu.peaking .amp-vu-peak { opacity: 1; box-shadow: 0 0 8px 3px rgba(224,48,27,0.7); }
+  .amp-vu-label { position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); font: 800 8px var(--font); letter-spacing: .18em; color: #55575d; }
+  .amp-vu::after { content: ''; position: absolute; inset: 3px; border-radius: 6px; pointer-events: none;
+    background: linear-gradient(160deg, rgba(255,255,255,0.45), transparent 44%); }
+
+  /* Tube warm-up: amber glow layer + jewel lamp states driven by neuralamp events. */
+  .amp-warm-glow {
+    position: absolute; inset: 0; z-index: 4; border-radius: inherit; pointer-events: none; opacity: 0;
+    background: radial-gradient(58% 42% at 50% 64%, rgba(255,158,64,0.35), rgba(255,120,30,0.12) 55%, transparent 78%);
+  }
+  .amp-head.amp-warming .amp-warm-glow { animation: amp-warm 1.2s ease-in-out infinite; }
+  @keyframes amp-warm { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+  .amp-head.amp-warming .amp-led { animation: led-amber .9s ease-in-out infinite; }
+  .amp-head.amp-ready .amp-led {
+    background: radial-gradient(circle at 38% 32%, #fff, #9df09a 34%, #1fae3c 70%, #0a5a1c);
+    box-shadow: 0 0 12px 4px rgba(60,220,110,0.75), inset 0 -1px 2px rgba(0,0,0,0.5); animation: none;
+  }
+  .amp-head.amp-errored .amp-led {
+    background: radial-gradient(circle at 38% 32%, #fff, #ffb3a6 34%, #d3341f 70%, #6e130a);
+    box-shadow: 0 0 12px 4px rgba(224,58,32,0.75), inset 0 -1px 2px rgba(0,0,0,0.5); animation: none;
+  }
+
+  /* ── Neural amp faceplates: per-model identity (abstracted, CSS-only). ── */
+  /* JCM — black tolex, gold brushed control panel. */
+  .amp-head.amp-face-jcm .amp-panel {
+    background:
+      linear-gradient(118deg, transparent 15%, rgba(255,246,214,0.9) 18.5%, transparent 22%,
+        transparent 50%, rgba(255,240,196,0.66) 53.5%, transparent 57%,
+        transparent 74%, rgba(255,236,186,0.5) 77%, transparent 80%),
+      linear-gradient(180deg, #f4df9a 0%, #ffedb0 10%, #d9ab4e 32%, #b8862e 50%, #dcae54 66%, #f6e2a0 80%, #b9924a 100%);
+    border-color: #6b5217;
+    box-shadow: inset 0 1px 0 rgba(255,252,230,0.95), inset 0 -2px 6px rgba(80,52,6,0.35), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .amp-face-jcm .amp-group-head { color: #2a2109; background: linear-gradient(180deg, #ecd28c, #d9b25c); text-shadow: 0 1px 0 rgba(255,248,220,0.6); }
+  .amp-face-jcm .amp-knob-label { color: #33280c; text-shadow: 0 1px 0 rgba(255,248,220,0.55); }
+  .amp-face-jcm .amp-group::before { border-color: rgba(58,44,10,0.5); box-shadow: 0 1px 1px rgba(255,244,200,0.35), inset 0 1px 1px rgba(70,52,12,0.25); }
+  .amp-face-jcm .amp-model-select { color: #2a2109; border-color: #7c6120; background: linear-gradient(180deg, #f3e2ac, #d8b45f); }
+
+  /* 5153 — near-black panel, faint ivory diagonal stripes, blue top pinline. */
+  .amp-head.amp-face-5153 .amp-panel {
+    background:
+      repeating-linear-gradient(-58deg, transparent 0 26px, rgba(238,240,255,0.055) 26px 34px, transparent 34px 44px, rgba(160,190,255,0.05) 44px 48px),
+      linear-gradient(180deg, #262931 0%, #30333b 12%, #17181d 46%, #202229 70%, #101114 100%);
+    border-color: #05060a;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), inset 0 3px 0 -1px rgba(122,168,255,0.55), inset 0 -2px 6px rgba(0,0,0,0.6), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .amp-face-5153 .amp-group-head { color: #e6e9f2; background: linear-gradient(180deg, #2e313a, #1e2027); text-shadow: 0 1px 1px rgba(0,0,0,0.7); }
+  .amp-face-5153 .amp-knob-label { color: #c9cfdd; text-shadow: 0 1px 1px rgba(0,0,0,0.65); }
+  .amp-face-5153 .amp-group::before { border-color: rgba(255,255,255,0.16); box-shadow: 0 1px 1px rgba(0,0,0,0.5), inset 0 1px 1px rgba(0,0,0,0.35); }
+  .amp-face-5153 .amp-model-select { color: #dde2ee; border-color: #0a0b10; background: linear-gradient(180deg, #343842, #1c1e25); box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 1px 2px rgba(0,0,0,0.5); }
+
+  /* Deluxe — blackface navy panel, cream pinstripe + labels, sparkle grille. */
+  .amp-head.amp-face-deluxe .amp-panel {
+    background: linear-gradient(180deg, #1b1e28 0%, #232734 14%, #141722 52%, #1b1f2b 78%, #0e1018 100%);
+    border-color: #06070c;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), inset 0 2px 0 -1px rgba(232,223,192,0.5), inset 0 -2px 6px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .amp-face-deluxe .amp-group-head { color: #e8dfc0; background: linear-gradient(180deg, #262b39, #191d29); text-shadow: 0 1px 1px rgba(0,0,0,0.7); }
+  .amp-face-deluxe .amp-knob-label { color: #d6cdb0; text-shadow: 0 1px 1px rgba(0,0,0,0.6); }
+  .amp-face-deluxe .amp-group::before { border-color: rgba(232,223,192,0.35); box-shadow: 0 1px 1px rgba(0,0,0,0.5), inset 0 1px 1px rgba(0,0,0,0.3); }
+  .amp-face-deluxe .amp-model-select { color: #e8dfc0; border-color: #0a0c13; background: linear-gradient(180deg, #2b3040, #181c28); box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 2px rgba(0,0,0,0.5); }
+  .amp-face-deluxe .amp-grille { background: linear-gradient(180deg, #3c3f45, #26282d); }
+  .amp-face-deluxe .amp-mesh {
+    background:
+      radial-gradient(circle at 50% 50%, rgba(255,255,255,0.5) 0.5px, transparent 1px) 1px 2px / 6px 6px,
+      radial-gradient(circle at 50% 50%, rgba(0,0,0,0.6) 0.9px, transparent 1.4px) 0 0 / 5px 5px,
+      radial-gradient(circle at 50% 50%, rgba(0,0,0,0.6) 0.9px, transparent 1.4px) 2.5px 2.5px / 5px 5px,
+      linear-gradient(180deg, rgba(255,255,255,0.07), transparent 40%);
+  }
+
+  /* AC10 — chocolate tolex tint, gold piping, diamond-lattice grille. */
+  .amp-head.amp-face-ac10 {
+    background:
+      linear-gradient(180deg, rgba(96,58,26,0.5), rgba(52,32,14,0.55)),
+      linear-gradient(180deg, rgba(255,255,255,0.05), transparent 14%, rgba(0,0,0,0.3)),
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='200'%20height='200'%3E%3Cfilter%20id='tx'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.55'%20numOctaves='2'%20seed='6'%20stitchTiles='stitch'%20result='n'/%3E%3CfeDiffuseLighting%20in='n'%20surfaceScale='2.6'%20diffuseConstant='0.9'%20lighting-color='%23202024'%3E%3CfeDistantLight%20azimuth='235'%20elevation='52'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect%20width='200'%20height='200'%20filter='url(%23tx)'/%3E%3C/svg%3E") 0 0 / 200px 200px;
+  }
+  .amp-head.amp-face-ac10::before { border-color: rgba(206,168,86,0.7); box-shadow: inset 0 0 0 1px rgba(255,232,170,0.12); }
+  .amp-head.amp-face-ac10 .amp-panel {
+    background: linear-gradient(180deg, #52391a 0%, #5e4523 12%, #3a2810 48%, #4a3417 72%, #2c1e0c 100%);
+    border-color: #1c1206;
+    box-shadow: inset 0 1px 0 rgba(255,226,160,0.22), inset 0 -2px 6px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .amp-face-ac10 .amp-group-head { color: #ecd9a8; background: linear-gradient(180deg, #55401e, #3c2c12); text-shadow: 0 1px 1px rgba(0,0,0,0.65); }
+  .amp-face-ac10 .amp-knob-label { color: #dfcb96; text-shadow: 0 1px 1px rgba(0,0,0,0.6); }
+  .amp-face-ac10 .amp-group::before { border-color: rgba(212,175,90,0.4); box-shadow: 0 1px 1px rgba(0,0,0,0.5), inset 0 1px 1px rgba(0,0,0,0.3); }
+  .amp-face-ac10 .amp-model-select { color: #ecd9a8; border-color: #241808; background: linear-gradient(180deg, #5a431f, #362610); box-shadow: inset 0 1px 0 rgba(255,232,170,0.18), 0 1px 2px rgba(0,0,0,0.5); }
+  .amp-face-ac10 .amp-grille { background: linear-gradient(180deg, #241a10, #150f08); }
+  .amp-face-ac10 .amp-mesh {
+    background:
+      repeating-linear-gradient(45deg, rgba(0,0,0,0.5) 0 1.5px, transparent 1.5px 9px),
+      repeating-linear-gradient(-45deg, rgba(0,0,0,0.5) 0 1.5px, transparent 1.5px 9px),
+      linear-gradient(180deg, rgba(224,196,138,0.16), rgba(140,110,60,0.1) 60%);
+  }
+
+  /* JC — cool brushed silver, thin blue accent line (solid-state clean). */
+  .amp-head.amp-face-jc .amp-panel {
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.12) 0 1px, transparent 1px 3px),
+      linear-gradient(180deg, #eef2f6 0%, #c8d2da 30%, #aeb9c2 46%, #d4dde4 62%, #f2f6f9 80%, #b4bfc8 100%);
+    border-color: #4c545c;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -3px 0 -1px rgba(58,122,254,0.7), inset 0 -5px 8px -4px rgba(0,0,0,0.3), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .amp-face-jc .amp-group-head { color: #1e2a3a; background: linear-gradient(180deg, #d3dbe2, #bcc6cf); }
+  .amp-face-jc .amp-knob-label { color: #24303e; }
+  .amp-face-jc .amp-model-select { color: #1e2a3a; border-color: #5c6670; background: linear-gradient(180deg, #e9eef3, #c3ccd4); }
+
+  /* ── CH1/CH2 input meters beside the input-channel selector. ── */
+  .ch-row { display: flex; align-items: center; gap: 10px; }
+  .ch-meters { display: flex; flex-direction: column; gap: 4px; }
+  .ch-meter { display: flex; align-items: center; gap: 5px; }
+  .ch-tag { font: 700 8px var(--mono); color: var(--muted); width: 7px; text-align: center; }
+  .ch-bar {
+    position: relative; width: 58px; height: 6px; border-radius: 3px; overflow: hidden; display: block; font-style: normal;
+    background: linear-gradient(180deg, #0c0d10, #17181c);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.7), inset 0 -1px 0 rgba(255,255,255,0.04);
+  }
+  .ch-bar b {
+    display: block; height: 100%; width: 0; border-radius: inherit;
+    background: linear-gradient(90deg, #2fae4e, #b3d24a 62%, #f0b429 85%, #e0562b);
+    transition: width 70ms linear;
+  }
+
+  /* ── Footswitch stomp + autonomous pedal glint. ── */
+  @keyframes fs-press { 0% { transform: translateX(-50%) scale(1); } 45% { transform: translateX(-50%) scale(0.95); } 100% { transform: translateX(-50%) scale(1); } }
+  .pedal-power.fs-press { animation: fs-press 90ms ease-out; }
+  .pedal-body-gloss::after {
+    content: ''; position: absolute; top: -12%; bottom: -12%; left: 0; width: 34%;
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,0.12) 48%, transparent);
+    transform: translateX(-160%) skewX(-16deg);
+    animation: pedal-glint 9s linear infinite; animation-delay: calc(var(--gi, 0) * 1.35s);
+  }
+  @keyframes pedal-glint { 0%, 86% { transform: translateX(-160%) skewX(-16deg); } 100% { transform: translateX(420%) skewX(-16deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pedal-body-gloss::after { display: none; }
+    .pedal-power.fs-press { animation: none; }
+    .amp-head.amp-warming .amp-warm-glow { animation: none; opacity: .6; }
+    .amp-vu-needle { transition: none; }
+    .ch-bar b { transition: none; }
+  }
 </style>
 </head>
 <body>
@@ -1064,10 +1231,16 @@
       <label for="output">Output</label>
       <select id="output"></select>
       <label for="input-channel">Input channel</label>
-      <select id="input-channel">
-        <option value="0">Channel 1</option>
-        <option value="1">Channel 2</option>
-      </select>
+      <div class="ch-row">
+        <select id="input-channel">
+          <option value="0">Channel 1</option>
+          <option value="1">Channel 2</option>
+        </select>
+        <div class="ch-meters" aria-hidden="true">
+          <div class="ch-meter"><span class="ch-tag">1</span><i class="ch-bar"><b id="ch1-meter"></b></i></div>
+          <div class="ch-meter"><span class="ch-tag">2</span><i class="ch-bar"><b id="ch2-meter"></b></i></div>
+        </div>
+      </div>
       <div class="hint"><b>Focusrite:</b> turn <b class="off">Direct Monitor</b> off so you only hear the processed signal.</div>
       <div id="safari-warn" class="hint" style="display:none">
         <b>Safari:</b> can't choose the output device — set the Focusrite as your Mac's system default output.
