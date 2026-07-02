@@ -14,6 +14,13 @@ export const schema = {
   ],
 };
 
+// Base delay floor: delayTime must NEVER be modulated to <= 0 (Web Audio silently
+// clamps negative values to 0, which used to produce an asymmetric, distorted
+// sweep at high Depth — see docs/code-review-2026-07-01.md finding #9). The LFO
+// is driven UNIPOLAR via an offset + amplitude pair (same pattern as phaser.js's
+// lfoOffset) so delayTime always stays in [BASE_DELAY, BASE_DELAY + swing].
+const BASE_DELAY = 0.001; // 1ms floor
+
 export function create(ctx, params) {
   const input = ctx.createGain();
   const output = ctx.createGain();
@@ -23,19 +30,26 @@ export function create(ctx, params) {
   const wet = ctx.createGain();
   const osc = ctx.createOscillator();
   const lfoGain = ctx.createGain();
+  const lfoOffset = ctx.createConstantSource(); // keeps delayTime's center positive
 
-  delay.delayTime.value = 0.002;          // ~2ms base (flanger range)
   osc.type = 'sine';
   input.connect(dry); dry.connect(output);
   input.connect(delay);
   delay.connect(fb); fb.connect(delay);   // feedback loop
   delay.connect(wet); wet.connect(output);
   osc.connect(lfoGain); lfoGain.connect(delay.delayTime);
+  lfoOffset.connect(delay.delayTime);
   osc.start();
+  lfoOffset.start();
 
   const apply = (p) => {
     osc.frequency.value = p.rate;
-    lfoGain.gain.value = mapRange(p.depth, 0, 10, 0, 0.003); // up to ~3ms sweep
+    // Peak-to-peak sweep width up to ~6ms at Depth=10 (matches the old ~3ms
+    // width at the default Depth=5). Unipolar: delayTime ranges
+    // [BASE_DELAY, BASE_DELAY + swing], always positive.
+    const swing = mapRange(p.depth, 0, 10, 0, 0.006);
+    lfoGain.gain.value = swing / 2;
+    lfoOffset.offset.value = BASE_DELAY + swing / 2;
     fb.gain.value = p.feedback;
     wet.gain.value = p.mix;
     dry.gain.value = 1;
@@ -44,7 +58,8 @@ export function create(ctx, params) {
 
   const destroy = () => {
     try { osc.stop(); } catch {}
-    for (const n of [input, output, dry, delay, fb, wet, osc, lfoGain]) { try { n.disconnect(); } catch {} }
+    try { lfoOffset.stop(); } catch {}
+    for (const n of [input, output, dry, delay, fb, wet, osc, lfoGain, lfoOffset]) { try { n.disconnect(); } catch {} }
   };
 
   return { input, output, apply, destroy };
