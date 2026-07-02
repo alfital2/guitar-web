@@ -1,9 +1,18 @@
-// src/chain-ui/fx-viz.js — live, param-driven pedal-screen visualizations.
+// src/chain-ui/fx-viz.js — tune-to-animate pedal-screen visualizations.
 //
 // Every pedal's screen (the .pedal-plate lens area) shows a tiny honest diagram
-// of what the effect does to sound, animated with the CURRENT knob settings.
-// One shared ~12fps ticker (a single setInterval, no per-pedal rAF) iterates
-// the registered canvases and calls the effect type's draw(g, t, params, w, h).
+// of what the effect does to sound at the CURRENT knob settings. At rest the
+// screen is a STILL, param-true frame (like the wah's response curve). While
+// the user is TUNING a knob the animation plays — it explains what the param
+// does (echoes replay, the comb sweeps, the horn spins) — and once tuning
+// stops the motion decelerates smoothly to a stop (user direction 2026-07-02:
+// "animation playing only when tuning; once user stopped, it stops slowly").
+//
+// Mechanism: one shared low-rate poller compares each pedal's live params
+// against the last-drawn signature. A change kicks that pedal's animation
+// clock to full speed; after a short hold the clock's velocity decays each
+// tick until the screen freezes at its final pose (no snap-back). Idle screens
+// cost one string compare per poll; nothing runs while the tab is hidden.
 //
 // Truth requirements (design spec 2026-07-02 §3): the drive family evaluates
 // the SAME WaveShaper curves the audio path uses (imported from dsp.js), and
@@ -48,8 +57,8 @@ function shape(curve, x) {
   return curve[i];
 }
 
-// Cache built curves by maker + amount so a 12fps redraw doesn't rebuild the
-// Float32Array every frame. Values key the cache, so any knob move rebuilds.
+// Cache built curves by maker + amount so redraws don't rebuild the
+// Float32Array. Values key the cache, so any knob move rebuilds.
 const curveCache = new Map();
 function curveOf(name, amount) {
   const key = name + ':' + amount;
@@ -121,10 +130,12 @@ export function eqResponseDb(p, freqs, fs = 48000) {
 
 // ---------------------------------------------------------------------------
 // per-effect draw functions — VIZ[type](g, t, params, w, h)
+// All draws are STATIC: `t` is accepted for API stability but ignored; every
+// visual feature is a function of the params only.
 // ---------------------------------------------------------------------------
 
 // delay family: dry pulse + decaying echo bars. Spacing tracks Time, bar count
-// and decay track Feedback; a travelling highlight replays the echo train.
+// and decay track Feedback; tape flutter jitters the bars.
 function echoViz(type, { alternate = false, wobble = false, tMin = 0, tMax = 1000 } = {}) {
   const c = col(type);
   return (g, t, p, w, h) => {
@@ -138,12 +149,11 @@ function echoViz(type, { alternate = false, wobble = false, tMin = 0, tMax = 100
     const bars = [];
     let x = 9, amp = 1;
     while (x < w - 6 && amp > 0.05 && bars.length < 14) { bars.push({ x, amp }); x += dx; amp *= decay; }
-    const hot = Math.floor(((t * 1.3) % 1) * bars.length);
     bars.forEach((b, i) => {
-      const wob = flut ? Math.sin(t * (1.5 + flut * 0.9) + i * 1.9) * flut * 0.55 : 0;
+      const wob = flut ? Math.sin(i * 1.9) * flut * 0.55 : 0;
       const hgt = b.amp * h * 0.5;
       const up = !(alternate && i % 2);
-      g.fillStyle = hexA(c, (i === 0 ? 0.95 : 0.4 + 0.45 * b.amp) + (i === hot ? 0.2 : 0));
+      g.fillStyle = hexA(c, i === 0 ? 0.95 : 0.45 + 0.45 * b.amp);
       if (up) g.fillRect(b.x - 1.5, base - hgt + wob, 3, hgt);
       else g.fillRect(b.x - 1.5, base + wob - h * 0.06, 3, hgt * 0.55);
     });
@@ -151,19 +161,23 @@ function echoViz(type, { alternate = false, wobble = false, tMin = 0, tMax = 100
 }
 
 // spectrum-hump family (wah / autowah): a bandpass peak on a baseline.
-function humpViz(type, centerFn) {
+function humpViz(type, centerFn, ghostsFn = null) {
   const c = col(type);
   return (g, t, p, w, h) => {
     const mid = h * 0.68;
-    const cx = centerFn(p, t);                     // 0..1
     const q = (p.resonance ?? 8) / 20;             // 0..1
     const peak = h * (0.2 + 0.34 * q);
     const width = 0.05 + 0.22 * (1 - q);
-    g.strokeStyle = hexA(c, 0.9); g.lineWidth = 1.8;
-    plot(g, (u) => {
-      const d = (u - cx) / width;
-      return mid - peak * Math.exp(-d * d);
-    }, 6, w - 6);
+    const hump = (cx, alpha, lw) => {
+      g.strokeStyle = hexA(c, alpha); g.lineWidth = lw;
+      plot(g, (u) => {
+        const d = (u - cx) / width;
+        return mid - peak * Math.exp(-d * d);
+      }, 6, w - 6);
+    };
+    // sweep-extent ghosts first (autowah), then the main hump on top
+    if (ghostsFn) for (const [cx, a] of ghostsFn(p)) hump(cx, a, 1.2);
+    hump(centerFn(p), 0.9, 1.8);
     g.strokeStyle = hexA(c, 0.3); g.lineWidth = 1;
     g.beginPath(); g.moveTo(6, mid); g.lineTo(w - 6, mid); g.stroke();
   };
@@ -175,18 +189,18 @@ function clipViz(type, curveName, amountKey) {
   const c = col(type);
   return (g, t, p, w, h) => {
     const curve = curveOf(curveName, p[amountKey] ?? 5);
-    const mid = h / 2, amp = h * 0.34, ph = t * 1.2;
+    const mid = h / 2, amp = h * 0.34;
     g.strokeStyle = hexA(c, 0.28); g.lineWidth = 1.2;
-    plot(g, (u) => mid - Math.sin(TAU * (u * 2) + ph) * amp, 6, w - 6, 64);
+    plot(g, (u) => mid - Math.sin(TAU * u * 2) * amp, 6, w - 6, 64);
     g.strokeStyle = hexA(c, 0.95); g.lineWidth = 1.9;
-    plot(g, (u) => mid - shape(curve, Math.sin(TAU * (u * 2) + ph)) * amp, 6, w - 6, 96);
+    plot(g, (u) => mid - shape(curve, Math.sin(TAU * u * 2)) * amp, 6, w - 6, 96);
   };
 }
 
 // pitch family: reference wave + shifted wave at the true frequency ratio.
-function pitchWave(g, c, w, h, yC, cycles, alpha, t, ampScale = 1) {
+function pitchWave(g, c, w, h, yC, cycles, alpha) {
   g.strokeStyle = hexA(c, alpha); g.lineWidth = 1.7;
-  plot(g, (u) => yC - Math.sin(TAU * (u * cycles + t * 0.35)) * h * 0.13 * ampScale, 6, w - 6, 72);
+  plot(g, (u) => yC - Math.sin(TAU * u * cycles) * h * 0.13, 6, w - 6, 72);
 }
 
 export const VIZ = {};
@@ -206,8 +220,8 @@ VIZ.reverb = (g, t, p, w, h) => {
     const u = i / n, x = 12 + span * u;
     if (x > w - 6) break;
     const env = Math.pow(1 - u, 1.7);
-    const shimmer = 0.75 + 0.25 * Math.sin(t * 2.2 + i * 2.6);
-    g.fillStyle = hexA(c, (0.14 + 0.72 * mix) * env * shimmer + 0.06);
+    const grain = 0.8 + 0.2 * Math.sin(i * 2.6); // static tail texture
+    g.fillStyle = hexA(c, (0.14 + 0.72 * mix) * env * grain + 0.06);
     const hgt = h * 0.42 * env;
     g.fillRect(x - 1, base - hgt, 2, hgt);
   }
@@ -215,16 +229,17 @@ VIZ.reverb = (g, t, p, w, h) => {
 
 VIZ.springverb = (g, t, p, w, h) => {
   const c = col('springverb');
-  const mid = h * 0.52, coils = 11;
-  const speed = 0.4 + ((p.tension ?? 5) / 10) * 1.6;
-  const tail = 0.15 + ((p.decay ?? 5) / 10) * 0.5; // ripple trail length (0..1 of coil)
-  const head = (t * speed) % 1;
+  const mid = h * 0.52;
+  const coils = Math.round(7 + ((p.tension ?? 5) / 10) * 8); // tension = tighter spring
+  const tail = 0.15 + ((p.decay ?? 5) / 10) * 0.5;           // ripple trail length
+  const head = 0.38;                                          // fixed chirp position
   g.lineWidth = 1.7;
   g.beginPath();
-  for (let i = 0; i <= coils * 8; i++) {
-    const u = i / (coils * 8), x = 8 + (w - 16) * u;
+  const N = coils * 8;
+  for (let i = 0; i <= N; i++) {
+    const u = i / N, x = 8 + (w - 16) * u;
     let d = head - u; if (d < 0) d += 1;
-    const ring = d < tail ? (1 - d / tail) : 0;       // travelling chirp ripple
+    const ring = d < tail ? (1 - d / tail) : 0; // dispersive chirp ripple
     const y = mid + Math.sin(u * TAU * coils) * (h * 0.1 + h * 0.16 * ring);
     if (i) g.lineTo(x, y); else g.moveTo(x, y);
   }
@@ -234,25 +249,26 @@ VIZ.springverb = (g, t, p, w, h) => {
 
 VIZ.chorus = (g, t, p, w, h) => {
   const c = col('chorus');
-  const mid = h / 2, rate = Math.min(p.rate ?? 1.5, 6) * 0.7, depth = (p.depth ?? 4) / 10;
+  const mid = h / 2, depth = (p.depth ?? 4) / 10;
+  const spread = 0.5 + Math.min(p.rate ?? 1.5, 10) * 0.16; // rate widens voice offsets
   for (let k = 0; k < 3; k++) {
     const det = (k - 1) * depth * 0.5;
-    const drift = Math.sin(t * rate + k * 2.1) * depth * 1.4;
+    const off = (k - 1) * depth * spread;
     g.strokeStyle = hexA(c, k === 1 ? 0.95 : 0.25 + 0.55 * (p.mix ?? 0.4));
     g.lineWidth = k === 1 ? 1.8 : 1.3;
-    plot(g, (u) => mid - Math.sin(TAU * (u * (2.4 + det * 0.4)) + t * rate * 0.8 + drift) * h * 0.27, 6, w - 6, 64);
+    plot(g, (u) => mid - Math.sin(TAU * u * (2.4 + det * 0.4) + off) * h * 0.27, 6, w - 6, 64);
   }
 };
 
 VIZ.flanger = (g, t, p, w, h) => {
   const c = col('flanger');
-  const mid = h * 0.32, teeth = 5.5;
-  const sweep = Math.sin(t * Math.min(p.rate ?? 0.4, 4) * TAU * 0.35) * TAU * 0.5;
+  const mid = h * 0.32;
+  const teeth = 3 + Math.min(p.rate ?? 0.4, 8);   // rate = comb density
   const depth = h * 0.42 * ((p.depth ?? 5) / 10);
-  const sharp = 1 + (p.feedback ?? 0.5) * 3; // feedback sharpens the comb teeth
+  const sharp = 1 + (p.feedback ?? 0.5) * 3;      // feedback sharpens the teeth
   g.strokeStyle = hexA(c, 0.92); g.lineWidth = 1.8;
   plot(g, (u) => {
-    const comb = 0.5 + 0.5 * Math.cos(u * TAU * teeth + sweep);
+    const comb = 0.5 + 0.5 * Math.cos(u * TAU * teeth);
     return mid + depth * Math.pow(comb, 1 / sharp);
   }, 6, w - 6, 96);
 };
@@ -261,9 +277,9 @@ VIZ.phaser = (g, t, p, w, h) => {
   const c = col('phaser');
   const mid = h * 0.5, notches = 3;
   const depth = h * 0.3 * ((p.depth ?? 6) / 10);
-  const drift = Math.sin(t * Math.min(p.rate ?? 0.5, 4) * TAU * 0.3) * 0.16;
+  const spacing = 0.17 + 0.13 * (Math.min(p.rate ?? 0.5, 8) / 8); // rate spreads notches
   const centers = [];
-  for (let k = 0; k < notches; k++) centers.push(0.22 + k * 0.28 + drift);
+  for (let k = 0; k < notches; k++) centers.push(0.5 + (k - 1) * spacing);
   const yAt = (u) => {
     let y = mid;
     for (const cx of centers) { const d = (u - cx) / 0.06; y += depth * Math.exp(-d * d); }
@@ -281,19 +297,18 @@ VIZ.phaser = (g, t, p, w, h) => {
 VIZ.vibrato = (g, t, p, w, h) => {
   const c = col('vibrato');
   const mid = h / 2;
-  const m = ((p.depth ?? 4) / 10) * 0.4 * Math.sin(t * Math.min(p.rate ?? 5, 6) * 1.1);
+  const m = ((p.depth ?? 4) / 10) * 0.35;                      // depth = breath amount
+  const cycles = 0.5 + (Math.min(p.rate ?? 5, 10) / 10) * 2;   // rate = breaths across screen
   g.strokeStyle = hexA(c, 0.95); g.lineWidth = 1.9;
-  plot(g, (u) => mid - Math.sin(TAU * u * 3 * (1 + m * u)) * h * 0.3, 6, w - 6, 96);
+  plot(g, (u) => mid - Math.sin(TAU * u * 3 * (1 + m * Math.sin(TAU * u * cycles))) * h * 0.3, 6, w - 6, 96);
 };
 
 VIZ.tremolo = (g, t, p, w, h) => {
   const c = col('tremolo');
   const mid = h / 2, depth = p.depth ?? 0.6, square = (p.shape ?? 0) >= 0.5;
-  const lfo = (x) => {
-    const s = Math.sin(x);
-    return square ? Math.sign(s) : s;
-  };
-  const env = (u) => 1 - depth * (0.5 + 0.5 * lfo(TAU * u * 1.6 - t * Math.min(p.rate ?? 5, 7) * 0.9));
+  const cycles = 1 + (Math.min(p.rate ?? 5, 12) / 12) * 3;     // rate = LFO cycles shown
+  const lfo = (x) => { const s = Math.sin(x); return square ? (Math.sign(s) || 1) : s; };
+  const env = (u) => 1 - depth * (0.5 + 0.5 * lfo(TAU * u * cycles));
   g.strokeStyle = hexA(c, 0.35); g.lineWidth = 1.1;
   plot(g, (u) => mid - env(u) * h * 0.34, 6, w - 6, 72);
   plot(g, (u) => mid + env(u) * h * 0.34, 6, w - 6, 72);
@@ -304,26 +319,34 @@ VIZ.tremolo = (g, t, p, w, h) => {
 VIZ.rotary = (g, t, p, w, h) => {
   const c = col('rotary');
   const cx = w / 2, cy = h / 2;
-  const rx = w * 0.3, ry = h * 0.16 * (0.4 + 0.6 * ((p.depth ?? 6) / 10));
-  const a = t * mapRange(p.speed ?? 6, 0, 10, 0.25, 3.6) * TAU * 0.5;
+  const rx = w * 0.3, ry = Math.max(h * 0.16 * (0.4 + 0.6 * ((p.depth ?? 6) / 10)), 1);
+  const a = 0.6; // fixed horn pose
   g.strokeStyle = hexA(c, 0.35); g.lineWidth = 1.2;
-  g.beginPath(); g.ellipse ? g.ellipse(cx, cy, rx, Math.max(ry, 1), 0, 0, TAU) : g.arc(cx, cy, rx, 0, TAU); g.stroke();
+  g.beginPath();
+  if (g.ellipse) g.ellipse(cx, cy, rx, ry, 0, 0, TAU); else g.arc(cx, cy, rx, 0, TAU);
+  g.stroke();
+  // speed = length of the motion-trail dots behind each horn
+  const trail = mapRange(p.speed ?? 6, 0, 10, 0.06, 1.5);
+  for (const flip of [0, Math.PI]) {
+    for (let s = 1; s <= 3; s++) {
+      const aa = a + flip - (trail * s) / 3;
+      g.fillStyle = hexA(c, 0.55 * (1 - s / 4));
+      g.beginPath(); g.arc(cx + Math.cos(aa) * rx, cy + Math.sin(aa) * ry, 2, 0, TAU); g.fill();
+    }
+  }
   const x1 = cx + Math.cos(a) * rx, y1 = cy + Math.sin(a) * ry;
   const x2 = cx - Math.cos(a) * rx, y2 = cy - Math.sin(a) * ry;
   g.strokeStyle = hexA(c, 0.85); g.lineWidth = 1.8;
   g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
-  const front = Math.sin(a) > 0;
-  g.fillStyle = hexA(c, front ? 0.95 : 0.5);
-  g.beginPath(); g.arc(x1, y1, front ? 3.4 : 2.4, 0, TAU); g.fill();
-  g.fillStyle = hexA(c, front ? 0.5 : 0.95);
-  g.beginPath(); g.arc(x2, y2, front ? 2.4 : 3.4, 0, TAU); g.fill();
+  g.fillStyle = hexA(c, 0.95);
+  g.beginPath(); g.arc(x1, y1, 3.4, 0, TAU); g.fill();
+  g.beginPath(); g.arc(x2, y2, 2.6, 0, TAU); g.fill();
 };
 
 VIZ.autopan = (g, t, p, w, h) => {
   const c = col('autopan');
   const mid = h * 0.52, depth = p.depth ?? 0.8, square = (p.shape ?? 0) >= 0.5;
-  const s = Math.sin(t * Math.min(p.rate ?? 2, 5) * 1.6);
-  const x = w / 2 + (square ? Math.sign(s) : s) * (w * 0.3) * depth;
+  const span = Math.max(w * 0.3 * depth, 2); // depth = sweep extent
   // L / R speaker glyphs
   for (const [sx, dir] of [[10, 1], [w - 10, -1]]) {
     g.strokeStyle = hexA(c, 0.6); g.lineWidth = 1.4;
@@ -331,10 +354,23 @@ VIZ.autopan = (g, t, p, w, h) => {
     g.moveTo(sx, mid - 8); g.lineTo(sx + 5 * dir, mid - 3); g.lineTo(sx + 5 * dir, mid + 3); g.lineTo(sx, mid + 8);
     g.closePath(); g.stroke();
   }
-  g.strokeStyle = hexA(c, 0.28); g.lineWidth = 1;
-  g.beginPath(); g.moveTo(18, mid); g.lineTo(w - 18, mid); g.stroke();
-  g.fillStyle = hexA(c, 0.95);
-  g.beginPath(); g.arc(x, mid, 4, 0, TAU); g.fill();
+  // travel line spans the sweep; rate = tick marks along it
+  g.strokeStyle = hexA(c, 0.4); g.lineWidth = 1;
+  g.beginPath(); g.moveTo(w / 2 - span, mid); g.lineTo(w / 2 + span, mid); g.stroke();
+  const ticks = 1 + Math.round(mapRange(Math.min(p.rate ?? 2, 12), 0, 12, 0, 5));
+  g.fillStyle = hexA(c, 0.45);
+  for (let i = 0; i < ticks; i++) {
+    const x = w / 2 - span + (2 * span) * (ticks === 1 ? 0.5 : i / (ticks - 1));
+    g.fillRect(x - 0.75, mid - 3, 1.5, 6);
+  }
+  // pan poles at the sweep extremes; square LFO = square markers
+  const mark = (x, alpha) => {
+    g.fillStyle = hexA(c, alpha);
+    if (square) g.fillRect(x - 3.5, mid - 3.5, 7, 7);
+    else { g.beginPath(); g.arc(x, mid, 4, 0, TAU); g.fill(); }
+  };
+  mark(w / 2 + span, 0.95);
+  mark(w / 2 - span, 0.35);
 };
 
 VIZ.ringmod = (g, t, p, w, h) => {
@@ -343,8 +379,8 @@ VIZ.ringmod = (g, t, p, w, h) => {
   const n = mapRange(Math.log10(Math.max(p.freq ?? 220, 20)), Math.log10(20), Math.log10(2000), 3, 15);
   g.strokeStyle = hexA(c, 0.95); g.lineWidth = 1.7;
   plot(g, (u) => {
-    const carrier = Math.sin(TAU * (u * 2.2) + t);
-    const prod = carrier * Math.sin(TAU * u * n + t * 2.4);
+    const carrier = Math.sin(TAU * u * 2.2);
+    const prod = carrier * Math.sin(TAU * u * n);
     return mid - ((1 - mix) * carrier + mix * prod) * h * 0.32;
   }, 6, w - 6, 128);
 };
@@ -357,14 +393,13 @@ VIZ.octave = (g, t, p, w, h) => {
   const c = col('octave');
   const curve = curveOf('makeRectifierCurve', p.octave ?? 0.7); // the REAL rectifier
   const clip = curveOf('makeHardClipCurve', p.fuzz ?? 6);
-  const ph = t * 1.1;
   g.strokeStyle = hexA(c, 0.3); g.lineWidth = 1.2;
-  plot(g, (u) => h * 0.3 - Math.sin(TAU * u * 2 + ph) * h * 0.16, 6, w - 6, 72);
+  plot(g, (u) => h * 0.3 - Math.sin(TAU * u * 2) * h * 0.16, 6, w - 6, 72);
   g.strokeStyle = hexA(c, 0.95); g.lineWidth = 1.8;
-  plot(g, (u) => h * 0.68 - shape(clip, shape(curve, Math.sin(TAU * u * 2 + ph))) * h * 0.18, 6, w - 6, 96);
+  plot(g, (u) => h * 0.68 - shape(clip, shape(curve, Math.sin(TAU * u * 2))) * h * 0.18, 6, w - 6, 96);
 };
 
-// compressor/limiter: the true gain-computer knee + a bouncing IN level dot.
+// compressor/limiter: the true gain-computer knee + a probe dot riding it.
 function kneeViz(type, ratioOf) {
   const c = col(type);
   return (g, t, p, w, h) => {
@@ -378,12 +413,12 @@ function kneeViz(type, ratioOf) {
     g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, Y(0)); g.stroke(); // unity ref
     g.strokeStyle = hexA(c, 0.95); g.lineWidth = 1.9;
     plot(g, (u) => Y(outDb(-60 + 60 * u)), x0, x1, 48);
-    // animated input level + its compressed output
-    const inDb = -44 + 40 * (0.5 + 0.5 * Math.sin(t * 1.7) * Math.sin(t * 0.61 + 1));
+    // probe: a signal 10dB past the threshold — shows the actual gain reduction
+    const inDb = Math.min(thr + 10, 0);
     const oDb = outDb(inDb);
     g.fillStyle = hexA(c, 0.95);
     g.beginPath(); g.arc(X(inDb), Y(oDb), 2.6, 0, TAU); g.fill();
-    // IN / OUT meter bars at left
+    // IN / OUT meter bars at left — their gap IS the gain reduction
     const bx = 8, bw = 5;
     g.fillStyle = hexA(c, 0.4);
     g.fillRect(bx, y0 - (y0 - y1) * ((inDb + 60) / 60), bw, (y0 - y1) * ((inDb + 60) / 60));
@@ -404,13 +439,17 @@ VIZ.gate = (g, t, p, w, h) => {
   g.beginPath(); g.moveTo(6, yT); g.lineTo(w - 6, yT); g.stroke();
   if (g.setLineDash) g.setLineDash([]);
   // signal: a loud burst over a noise floor; the envelope below the threshold
-  // is chopped (drawn faint) — exactly what the gate does to the sound.
+  // is chopped (drawn faint) — exactly what the gate does to the sound. The
+  // release knob widens the burst's decaying skirt (slower gate close).
+  const rel = 0.06 + ((p.release ?? 4) / 10) * 0.2;
   const env = (u) => {
-    const burst = Math.exp(-Math.pow((u - 0.3 - 0.1 * Math.sin(t * 0.7)) / 0.14, 2));
-    const noise = 0.16 + 0.1 * Math.abs(Math.sin(u * 91 + t * 9) * Math.sin(u * 53 - t * 6));
+    const burst = u < 0.3
+      ? Math.exp(-Math.pow((0.3 - u) / 0.05, 2))
+      : Math.exp(-(u - 0.3) / rel);
+    const noise = 0.16 + 0.1 * Math.abs(Math.sin(u * 91) * Math.sin(u * 53));
     return Math.max(burst, noise);
   };
-  const sig = (u) => env(u) * Math.sin(u * TAU * 9 + t * 3);
+  const sig = (u) => env(u) * Math.sin(u * TAU * 9);
   g.lineWidth = 1.6;
   const N = 96;
   let px = 6, py = mid - sig(0) * h * 0.4, pOpen = env(0) > thr;
@@ -440,7 +479,7 @@ VIZ.eq = (g, t, p, w, h) => {
   const mid = h * 0.52, scale = (h * 0.36) / 15; // ±15dB window
   g.strokeStyle = hexA(c, 0.3); g.lineWidth = 1;
   g.beginPath(); g.moveTo(6, mid); g.lineTo(w - 6, mid); g.stroke();
-  g.strokeStyle = hexA(c, 0.92 + 0.06 * Math.sin(t * 2)); g.lineWidth = 1.9;
+  g.strokeStyle = hexA(c, 0.95); g.lineWidth = 1.9;
   g.beginPath();
   resp.forEach((dB, i) => {
     const x = 6 + (w - 12) * (i / n);
@@ -454,29 +493,37 @@ VIZ.cabinet = (g, t, p, w, h) => {
   const c = col('cabinet') || '#32d74b';
   const cx = w / 2, cy = h * 0.52;
   const base = h * 0.3 * (0.7 + 0.3 * ((p.body ?? 6) / 10));
-  const exc = 1 + 0.05 * Math.sin(t * 7) * (0.4 + 0.6 * ((p.presence ?? 5) / 10));
   const rings = [[1, 0.9], [0.62, 0.35 + 0.5 * ((p.brightness ?? 4) / 10)], [0.26, 0.8]];
   for (const [k, a] of rings) {
     g.strokeStyle = hexA(c, a); g.lineWidth = k === 1 ? 2 : 1.4;
-    g.beginPath(); g.arc(cx, cy, base * k * (k === 1 ? 1 : exc), 0, TAU); g.stroke();
+    g.beginPath(); g.arc(cx, cy, base * k, 0, TAU); g.stroke();
+  }
+  // presence = excursion marks fanned off the dust cap
+  const marks = 1 + Math.round(((p.presence ?? 5) / 10) * 3);
+  g.strokeStyle = hexA(c, 0.5); g.lineWidth = 1;
+  for (let i = 1; i <= marks; i++) {
+    g.beginPath(); g.arc(cx, cy, base * 0.26 + i * 3, -0.5, 0.5); g.stroke();
   }
   g.fillStyle = hexA(c, 0.9);
-  g.beginPath(); g.arc(cx, cy, 2.2 * exc, 0, TAU); g.fill();
+  g.beginPath(); g.arc(cx, cy, 2.2, 0, TAU); g.fill();
 };
 
 VIZ.wah = humpViz('wah', (p) => 0.12 + 0.76 * ((p.position ?? 5) / 10));
-VIZ.autowah = humpViz('autowah', (p, t) => {
-  const speed = 0.6 + ((p.sensitivity ?? 6) / 10) * 2;
-  const span = 0.1 + 0.35 * ((p.range ?? 5) / 10);
-  return 0.5 + Math.sin(t * speed) * span;
-});
+VIZ.autowah = humpViz('autowah',
+  () => 0.5,
+  // envelope sweep extents as ghost humps: Range sets how far, Sens their weight
+  (p) => {
+    const span = 0.1 + 0.35 * ((p.range ?? 5) / 10);
+    const a = 0.15 + 0.35 * ((p.sensitivity ?? 6) / 10);
+    return [[0.5 - span, a], [0.5 + span, a]];
+  });
 
 VIZ.boost = (g, t, p, w, h) => {
   const c = col('boost');
   const mid = h * 0.55, gain = (p.gain ?? 6) / 24;
-  const amp = h * (0.1 + 0.32 * gain) * (1 + 0.03 * Math.sin(t * 3));
+  const amp = h * (0.1 + 0.32 * gain);
   g.strokeStyle = hexA(c, 0.95); g.lineWidth = 1.8;
-  plot(g, (u) => mid - Math.sin(TAU * (u * 2.4) + t) * amp, 6, w * 0.7, 72);
+  plot(g, (u) => mid - Math.sin(TAU * u * 2.4) * amp, 6, w * 0.7, 72);
   // level arrow, length tracks gain
   const ax = w * 0.84, ay0 = mid + h * 0.16, ay1 = ay0 - h * (0.14 + 0.42 * gain);
   g.strokeStyle = hexA(c, 0.9); g.lineWidth = 2;
@@ -487,7 +534,7 @@ VIZ.boost = (g, t, p, w, h) => {
 VIZ.widener = (g, t, p, w, h) => {
   const c = col('widener');
   const cx = w / 2, top = h * 0.2, bot = h * 0.84;
-  const spread = mapRange(p.width ?? 5, 0, 10, 2, w * 0.32) * (1 + 0.05 * Math.sin(t * 1.4));
+  const spread = mapRange(p.width ?? 5, 0, 10, 2, w * 0.32);
   g.strokeStyle = hexA(c, 0.35); g.lineWidth = 1.4;
   g.beginPath(); g.moveTo(cx, top); g.lineTo(cx, bot); g.stroke();
   g.strokeStyle = hexA(c, 0.92); g.lineWidth = 1.8;
@@ -501,22 +548,21 @@ VIZ.widener = (g, t, p, w, h) => {
 VIZ.pitchshift = (g, t, p, w, h) => {
   const c = col('pitchshift');
   const st = p.semitones ?? -12, ratio = Math.pow(2, st / 12);
-  pitchWave(g, c, w, h, h * 0.3, 2.2, 0.4, t);
-  pitchWave(g, c, w, h, h * 0.68, 2.2 * ratio, 0.5 + 0.45 * (p.mix ?? 0.6), t);
+  pitchWave(g, c, w, h, h * 0.3, 2.2, 0.4);
+  pitchWave(g, c, w, h, h * 0.68, 2.2 * ratio, 0.5 + 0.45 * (p.mix ?? 0.6));
 };
 
 VIZ.harmonizer = (g, t, p, w, h) => {
   const c = col('harmonizer');
   const st = p.interval ?? 7, ratio = Math.pow(2, st / 12);
-  pitchWave(g, c, w, h, h * 0.3, 2.2, 0.9, t);
-  pitchWave(g, c, w, h, h * 0.68, 2.2 * ratio, 0.25 + 0.7 * (p.mix ?? 0.5), t);
+  pitchWave(g, c, w, h, h * 0.3, 2.2, 0.9);
+  pitchWave(g, c, w, h, h * 0.68, 2.2 * ratio, 0.25 + 0.7 * (p.mix ?? 0.5));
 };
 
 VIZ.whammy = (g, t, p, w, h) => {
   const c = col('whammy');
   const bend = (p.bend ?? 10) / 10, range = p.range ?? 12;
-  const glide = 0.5 + 0.5 * Math.sin(t * 1.3);             // the treadle ride
-  const ratio = Math.pow(2, (range * bend * glide) / 12);
+  const ratio = Math.pow(2, (range * bend) / 12); // treadle position = Bend knob
   const mid = h * 0.52;
   g.strokeStyle = hexA(c, 0.3); g.lineWidth = 1.2;
   plot(g, (u) => mid - Math.sin(TAU * u * 2.2) * h * 0.18, 6, w - 6, 64);
@@ -530,7 +576,7 @@ VIZ.looper = (g, t, p, w, h) => {
   const cx = w / 2, cy = h * 0.52, r = Math.min(w, h) * 0.3;
   g.strokeStyle = hexA(c, 0.3); g.lineWidth = 2.4;
   g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke();
-  const a0 = -Math.PI / 2, prog = (t * 0.35) % 1;
+  const a0 = -Math.PI / 2, prog = 0.72; // fixed loop-progress pose
   g.strokeStyle = hexA(c, 0.4 + 0.55 * (p.level ?? 0.9)); g.lineWidth = 2.6;
   g.beginPath(); g.arc(cx, cy, r, a0, a0 + prog * TAU); g.stroke();
   g.fillStyle = hexA(c, 0.95);
@@ -557,53 +603,53 @@ VIZ.acousticsim = (g, t, p, w, h) => {
     return mid - (hump + shelf) * h * 0.42;
   }, 6, w - 6, 96);
   // soundhole glyph
-  g.strokeStyle = hexA(c, 0.5 + 0.1 * Math.sin(t * 2)); g.lineWidth = 1.3;
+  g.strokeStyle = hexA(c, 0.55); g.lineWidth = 1.3;
   g.beginPath(); g.arc(w * 0.24, mid - body * h * 0.42 - 7, 3.2, 0, TAU); g.stroke();
 };
 
 VIZ.univibe = (g, t, p, w, h) => {
   const c = col('univibe');
   const mid = h / 2;
-  const speed = Math.min(p.speed ?? 3, 6) * 1.1, depth = ((p.intensity ?? 6) / 10);
+  const depth = (p.intensity ?? 6) / 10;
+  const cycles = 1.5 + (Math.min(p.speed ?? 3, 8) / 8) * 2.5; // speed = wave density
   g.strokeStyle = hexA(c, 0.85); g.lineWidth = 1.7;
-  plot(g, (u) => mid - Math.sin(TAU * u * 2.4 + t * speed * 0.5) * h * 0.2 * (1 - 0.4 * depth * (0.5 + 0.5 * Math.sin(t * speed))), 6, w - 6, 72);
-  // 4 staggered all-pass stages throbbing in sequence
+  plot(g, (u) => mid - Math.sin(TAU * u * cycles) * h * 0.2 * (1 - 0.4 * depth * (0.5 + 0.5 * Math.sin(TAU * u))), 6, w - 6, 72);
+  // 4 staggered all-pass stages, phase-offset throb frozen mid-cycle
   for (let k = 0; k < 4; k++) {
     const u = 0.2 + k * 0.2;
-    const throb = 0.5 + 0.5 * Math.sin(t * speed - k * (Math.PI / 2));
+    const throb = 0.5 + 0.5 * Math.sin(-k * (Math.PI / 2));
     g.fillStyle = hexA(c, 0.25 + 0.7 * throb * (0.3 + 0.7 * depth) * (0.3 + 0.7 * (p.mix ?? 0.5)));
     g.beginPath(); g.arc(6 + (w - 12) * u, h * 0.82, 2.6 + 1.6 * throb * depth, 0, TAU); g.fill();
   }
 };
 
 // ---------------------------------------------------------------------------
-// registration + the single shared ticker
+// registration + the single shared change-poller
 // ---------------------------------------------------------------------------
-const FRAME_MS = 83; // ~12 fps
+const POLL_MS = 120; // ~8Hz param polling — cheap compares; draws only on change
 let entries = [];
 let timer = null;
-const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
-function now() { return ((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0) / 1000; }
-
-function reducedMotion() {
-  try {
-    return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch { return false; }
+// Cheap value signature of a params object; a knob move changes it.
+function sigOf(p) {
+  let s = '';
+  for (const k in p) s += k + '=' + p[k] + ';';
+  return s;
 }
 
 // Register a pedal-screen canvas. getParams() must return the LIVE params
-// object for the unit (read from the chain model at each tick, so knob turns
-// show on the next frame with no extra wiring). Returns false when the type
-// has no viz (caller falls back to the static motif).
+// object for the unit (read from the chain model on each poll, so knob turns
+// repaint the screen with no extra wiring). Returns false when the type has
+// no viz (caller falls back to the static motif).
 export function registerViz(canvas, type, getParams, opts = {}) {
   if (typeof VIZ[type] !== 'function') return false;
   entries.push({
     canvas, type, getParams, g: null,
-    static: !!opts.bypassed || reducedMotion(),
+    frozen: !!opts.bypassed, // bypassed: one dimmed static frame, then no updates
     drawn: false,
+    sig: null, cw: 0, ch: 0,
   });
-  if (!timer && typeof setInterval === 'function') timer = setInterval(tickViz, FRAME_MS);
+  if (!timer && typeof setInterval === 'function') timer = setInterval(tickViz, POLL_MS);
   return true;
 }
 
@@ -614,10 +660,16 @@ export function resetViz() {
   if (timer) { clearInterval(timer); timer = null; }
 }
 
-function drawEntry(e, t) {
+function liveSig(e) {
+  let params;
+  try { params = e.getParams(); } catch { params = null; }
+  return params ? sigOf(params) : null;
+}
+
+function drawEntry(e) {
   const c = e.canvas;
   const cw = c.clientWidth, ch = c.clientHeight;
-  if (!cw || !ch) return false; // not laid out yet — try next tick
+  if (!cw || !ch) return false; // not laid out yet — retry on a later poll
   const dpr = Math.min((typeof devicePixelRatio === 'number' && devicePixelRatio) || 1, 2);
   const pw = Math.round(cw * dpr), phh = Math.round(ch * dpr);
   if (c.width !== pw || c.height !== phh) { c.width = pw; c.height = phh; }
@@ -631,27 +683,32 @@ function drawEntry(e, t) {
   let params;
   try { params = e.getParams(); } catch { params = null; }
   if (!params) return false;
-  try { VIZ[e.type](g, t, params, cw, ch); } catch { return null; }
+  try { VIZ[e.type](g, 0, params, cw, ch); } catch { return null; }
+  e.cw = cw; e.ch = ch;
+  e.sig = sigOf(params);
   return true;
 }
 
-// One shared tick: no canvas work at all while the tab is hidden; bypassed /
-// reduced-motion entries freeze after their single static frame. Returns the
-// number of canvases drawn (used by tests).
-export function tickViz(t = now()) {
+// One shared poll: no canvas work while the tab is hidden; a screen repaints
+// ONLY when its live params changed since the last draw (or on first layout /
+// resize). Bypassed screens freeze after their single dimmed frame. Returns
+// the number of canvases drawn (used by tests).
+export function tickViz() {
   if (typeof document !== 'undefined' && document.hidden) return 0;
   let count = 0;
-  let live = 0;
   entries = entries.filter((e) => {
     if (!e.canvas.isConnected) return false;
-    if (e.static && e.drawn) return true; // frozen frame stays, no redraw
-    const ok = drawEntry(e, e.static ? 0 : t);
+    if (e.frozen && e.drawn) return true; // bypassed: keep the frozen frame
+    if (e.drawn) {
+      const resized = e.canvas.clientWidth !== e.cw || e.canvas.clientHeight !== e.ch;
+      if (!resized && liveSig(e) === e.sig) return true; // nothing moved — no work
+    }
+    const ok = drawEntry(e);
     if (ok === null) return false; // broken entry — drop it
-    if (ok) { count++; if (e.static) e.drawn = true; }
-    if (!e.static || !e.drawn) live++;
+    if (ok) { count++; e.drawn = true; }
     return true;
   });
-  if (timer && (entries.length === 0 || live === 0)) { clearInterval(timer); timer = null; }
+  if (timer && entries.length === 0) { clearInterval(timer); timer = null; }
   return count;
 }
 
