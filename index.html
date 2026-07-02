@@ -650,6 +650,33 @@
   }
   .pedalboard-empty { color: #242428; font-size: 12px; padding: 16px 0; text-align: center; letter-spacing: 0.04em; font-style: italic; }
 
+  /* ── Collapsed pedalboard: slim strip of mini pedals in chain order (like
+     the amp's value strip) — frees the vertical real estate after tuning. ── */
+  .board-wrap.collapsed .pedalboard { display: none; }
+  .board-wrap:not(.collapsed) .board-strip { display: none; }
+  .pedalboard { position: relative; }
+  .board-collapse-btn { position: absolute; top: 9px; right: 9px; z-index: 6; width: 22px; height: 22px; padding: 0;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    border-radius: 6px; border: 1px solid #000; color: #c8cace;
+    background: linear-gradient(180deg, #45454a, #232327);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.22), 0 2px 4px rgba(0,0,0,0.55); font-size: 11px; line-height: 1; }
+  .board-collapse-btn:hover { color: #fff; filter: brightness(1.12); }
+  .board-strip { display: flex; align-items: center; gap: 9px; width: fit-content; max-width: 100%; margin: 0 auto;
+    padding: 8px 14px; border-radius: 12px; cursor: pointer; overflow-x: auto;
+    background: var(--recessed, rgba(0,0,0,0.35));
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.7), 0 1px 6px rgba(0,0,0,0.35); }
+  .board-strip:hover { filter: brightness(1.06); }
+  .board-strip-mini { pointer-events: none; }
+  .board-strip-mini.off { filter: saturate(0.4) brightness(0.6); }
+  .board-strip-amp { flex: 0 0 auto; padding: 5px 8px; border-radius: 7px; font: 800 9px/1 var(--font, 'Inter'); letter-spacing: 0.14em;
+    color: #d9b06a; border: 1px dashed rgba(217,176,106,0.5); background: rgba(217,176,106,0.08); }
+  .board-strip-none { color: #55565c; font-size: 11px; font-style: italic; }
+  .board-strip-exp { display: flex; align-items: center; gap: 6px; margin-left: 6px; padding-left: 10px;
+    border-left: 1px solid rgba(255,255,255,0.08);
+    font: 800 8.5px/1 var(--font, 'Inter'); letter-spacing: 0.14em; color: #8e9096; white-space: nowrap; }
+  .board-strip-chev { font-size: 10px; }
+
   /* AMP anchor chip in the pedal row */
   .amp-anchor {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;

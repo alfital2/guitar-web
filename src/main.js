@@ -35,6 +35,7 @@ let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
 const REVERB_ID = '__amp_reverb__';
 let ampReverb = { size: 0.4, mix: 0 }; // amp reverb params (size, wet mix)
 let ampCollapsed = chainStore.loadAmpCollapsed(); // amp folded to value strip
+let boardCollapsed = chainStore.loadBoardCollapsed(); // pedalboard folded to mini strip
 let reverbStage = null;                // audio node: engine.output -> reverbStage -> normGain
 let calibrationEq, calibRAF, calibState, calibCountdown;
 let inputSplitter = null;   // ChannelSplitterNode after source; picks a hardware input channel
@@ -254,6 +255,9 @@ function rebuildGraph() {
       // model so knob turns show on the next viz tick (chain-state replaces
       // params objects immutably, so the viz must look them up fresh).
       getLiveParams: (id) => currentChain.find((u) => u.instanceId === id)?.params,
+    }, {
+      collapsed: boardCollapsed,
+      onCollapse: (c) => { boardCollapsed = c; chainStore.saveBoardCollapsed(c); },
     });
   } catch (e) {
     $('error').textContent = 'render: ' + e.message;

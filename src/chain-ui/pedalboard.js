@@ -449,9 +449,50 @@ export function openEffectsModal(handlers) {
   return close;
 }
 
-export function renderPedalboard(container, units, handlers) {
+// Collapsed board strip: the whole chain as a slim row of mini pedals (same
+// art as the palette tiles) + the AMP chip, in signal order — like the amp's
+// collapsed value strip. Click anywhere to expand back to the full board.
+function buildBoardStrip(units) {
+  const strip = document.createElement('div');
+  strip.className = 'board-strip';
+  strip.setAttribute('role', 'button');
+  strip.title = 'Effects chain — click to edit';
+  let placedAmp = false;
+  units.forEach((u) => {
+    if (u.locked) {
+      if (!placedAmp) {
+        const chip = document.createElement('div');
+        chip.className = 'board-strip-amp';
+        chip.textContent = 'AMP';
+        strip.appendChild(chip);
+        placedAmp = true;
+      }
+      return;
+    }
+    const mini = pedalIcon(u.type, COLORS[u.type] ?? '#8a8a90');
+    mini.classList.add('board-strip-mini');
+    if (u.bypassed) mini.classList.add('off');
+    mini.title = u.schema.label + (u.bypassed ? ' — off' : '');
+    strip.appendChild(mini);
+  });
+  if (!units.some((u) => !u.locked)) {
+    const none = document.createElement('span');
+    none.className = 'board-strip-none';
+    none.textContent = 'No effects';
+    strip.appendChild(none);
+  }
+  const exp = document.createElement('div');
+  exp.className = 'board-strip-exp';
+  exp.innerHTML = '<span>TAP TO EDIT</span><span class="board-strip-chev">▾</span>';
+  strip.appendChild(exp);
+  return strip;
+}
+
+export function renderPedalboard(container, units, handlers, opts = {}) {
   resetViz(); // the board fully re-renders — drop every stale viz canvas first
   container.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'board-wrap' + (opts.collapsed ? ' collapsed' : '');
   const board = document.createElement('div');
   board.className = 'pedalboard';
 
@@ -488,5 +529,24 @@ export function renderPedalboard(container, units, handlers) {
     board.insertBefore(empty, board.firstChild);
   }
 
-  container.appendChild(board);
+  // Collapse chevron (top-right of the board) — folds the chain to the strip,
+  // freeing the vertical real estate once tuning is done (mirrors the amp).
+  const collapseBtn = document.createElement('button');
+  collapseBtn.type = 'button';
+  collapseBtn.className = 'board-collapse-btn';
+  collapseBtn.title = 'Collapse pedalboard';
+  collapseBtn.setAttribute('aria-label', 'Collapse pedalboard');
+  collapseBtn.innerHTML = '<span>▴</span>';
+  board.appendChild(collapseBtn);
+
+  const strip = buildBoardStrip(units);
+  const setCollapsed = (c) => {
+    wrap.classList.toggle('collapsed', c);
+    opts.onCollapse?.(c);
+  };
+  strip.addEventListener('click', () => setCollapsed(false));
+  collapseBtn.addEventListener('click', (e) => { e.stopPropagation(); setCollapsed(true); });
+
+  wrap.append(strip, board);
+  container.appendChild(wrap);
 }

@@ -104,6 +104,48 @@ describe('renderPedalboard', () => {
   });
 });
 
+describe('collapsed board strip', () => {
+  it('renders the mini strip in chain order (minis + AMP chip) when collapsed', () => {
+    const el = document.createElement('div');
+    renderPedalboard(el, units, noop, { collapsed: true });
+    expect(el.querySelector('.board-wrap').classList.contains('collapsed')).toBe(true);
+    const strip = el.querySelector('.board-strip');
+    expect(strip.querySelectorAll('.board-strip-mini')).toHaveLength(2); // compressor + delay
+    expect(strip.querySelector('.board-strip-amp')).toBeTruthy();
+    // order: compressor mini, AMP chip, delay mini
+    const kinds = [...strip.children]
+      .filter((n) => n.className.includes('board-strip-mini') || n.className.includes('board-strip-amp'))
+      .map((n) => (n.className.includes('amp') ? 'amp' : 'fx'));
+    expect(kinds).toEqual(['fx', 'amp', 'fx']);
+  });
+
+  it('clicking the strip expands the board and reports onCollapse(false)', () => {
+    const el = document.createElement('div');
+    const onCollapse = vi.fn();
+    renderPedalboard(el, units, noop, { collapsed: true, onCollapse });
+    el.querySelector('.board-strip').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(onCollapse).toHaveBeenCalledWith(false);
+    expect(el.querySelector('.board-wrap').classList.contains('collapsed')).toBe(false);
+  });
+
+  it('the board collapse chevron folds it back and reports onCollapse(true)', () => {
+    const el = document.createElement('div');
+    const onCollapse = vi.fn();
+    renderPedalboard(el, units, noop, { onCollapse });
+    expect(el.querySelector('.board-wrap').classList.contains('collapsed')).toBe(false);
+    el.querySelector('.board-collapse-btn').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(onCollapse).toHaveBeenCalledWith(true);
+    expect(el.querySelector('.board-wrap').classList.contains('collapsed')).toBe(true);
+  });
+
+  it('bypassed pedals render dimmed minis', () => {
+    const el = document.createElement('div');
+    const withOff = units.map((u) => (u.instanceId === 4 ? { ...u, bypassed: true } : u));
+    renderPedalboard(el, withOff, noop, { collapsed: true });
+    expect(el.querySelectorAll('.board-strip-mini.off')).toHaveLength(1);
+  });
+});
+
 describe('computeDrop', () => {
   function boardWith(ids) {
     const board = document.createElement('div');

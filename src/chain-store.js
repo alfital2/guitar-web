@@ -5,6 +5,7 @@ const KEY = 'gs-chain';
 const REVERB_KEY = 'gs-amp-reverb';
 const PRESETS_HIDDEN_KEY = 'gs-presets-hidden';
 const AMP_COLLAPSED_KEY = 'gs-amp-collapsed';
+const BOARD_COLLAPSED_KEY = 'gs-board-collapsed';
 
 export function save(chain) {
   try {
@@ -61,4 +62,14 @@ export function loadAmpCollapsed() {
     const v = localStorage.getItem(AMP_COLLAPSED_KEY);
     return v === null ? true : v === '1';
   } catch { return true; }
+}
+
+// Pedalboard collapsed-to-mini-strip state. Defaults to expanded (false) so
+// the full board is visible until the user folds it after tuning.
+export function saveBoardCollapsed(collapsed) {
+  try { localStorage.setItem(BOARD_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch {}
+}
+
+export function loadBoardCollapsed() {
+  try { return localStorage.getItem(BOARD_COLLAPSED_KEY) === '1'; } catch { return false; }
 }
