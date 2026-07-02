@@ -597,6 +597,9 @@
     filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)) drop-shadow(0 0 5px color-mix(in srgb, var(--c) 60%, transparent)); }
   .pedal-motif svg { width: 86px; height: 58px; stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; }
   .pedal-motif .fill { fill: currentColor; stroke: none; }
+  /* Live effect-viz screen: sits where the motif did, behind the lens gloss. */
+  .pedal-viz { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; border-radius: inherit; }
+  .pedal.bypassed .pedal-viz { opacity: .5; }
   .pedal-lens { position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit;
     background: radial-gradient(130% 82% at 30% 8%, rgba(255,255,255,0.4), rgba(255,255,255,0.06) 26%, transparent 48%),
       radial-gradient(100% 66% at 50% 112%, rgba(255,255,255,0.1), transparent 56%);

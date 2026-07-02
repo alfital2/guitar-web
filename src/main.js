@@ -250,6 +250,10 @@ function rebuildGraph() {
       onRemove: removeEffect,
       onMove: moveEffect,
       onToggleBypass: toggleBypass,
+      // Live params for the pedal-screen viz: read straight from the chain
+      // model so knob turns show on the next viz tick (chain-state replaces
+      // params objects immutably, so the viz must look them up fresh).
+      getLiveParams: (id) => currentChain.find((u) => u.instanceId === id)?.params,
     });
   } catch (e) {
     $('error').textContent = 'render: ' + e.message;
@@ -821,6 +825,13 @@ function installE2EBridge() {
       return { rms: Math.sqrt(sum / t.length), finite, hf: hi / (lo + hi + 1e-12) };
     },
     addPedalBefore: (type) => { const amp = neuralUnit(); addEffect(type, amp ? amp.instanceId : null); },
+    // Set a param on the first pedal of `type` (drives the effect-viz shots).
+    setPedalParam: (type, key, value) => {
+      const u = currentChain.find((x) => x.type === type && !x.locked);
+      if (!u) throw new Error('no pedal of type ' + type);
+      setParamLive(u.instanceId, key, value);
+      return true;
+    },
     addPedalAfter: (type) => {
       const amp = neuralUnit();
       const i = currentChain.findIndex((u) => u.instanceId === amp.instanceId);

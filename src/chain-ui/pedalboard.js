@@ -1,6 +1,7 @@
 // src/chain-ui/pedalboard.js
 import { createKnob } from './knob.js';
 import { fxArtSvg, FX_FONTS, fxWidth, FX_KNOB_STYLE, FX_KNOB_LAYOUT, FX_MOTIFS } from './fx-art.js';
+import { registerViz, resetViz } from './fx-viz.js';
 
 // Chrome cap for the CSS-pedal knobs (light → mid → dark), amber-ish arc per effect.
 const PEDAL_CAP = ['#eef2f5', '#aeb4ba', '#40454a'];
@@ -236,15 +237,26 @@ function buildPedal(unit, handlers) {
   pedal.style.width = `${Math.max(126, 44 + n * 34)}px`;
   if (unit.bypassed) pedal.classList.add('bypassed');
 
-  // Recessed faceplate: rotating sunburst (fuzz only) + glow + motif + glass lens.
+  // Recessed faceplate: rotating sunburst (fuzz only) + glow + screen + glass lens.
   const plate = document.createElement('div');
   plate.className = 'pedal-plate';
   if (type === 'fuzz') { const rays = document.createElement('div'); rays.className = 'pedal-rays'; plate.appendChild(rays); }
   const glow = document.createElement('div'); glow.className = 'pedal-glow';
-  const motif = document.createElement('div'); motif.className = 'pedal-motif';
-  motif.innerHTML = `<svg viewBox="0 0 102 80" fill="none">${FX_MOTIFS[type] || ''}</svg>`;
+  // On the BOARD the screen is a live effect-viz canvas (param-driven animation
+  // of what the effect does to sound); palette tiles keep the static motif SVG.
+  // The params getter reads the LIVE chain model, so knob turns show on the
+  // next viz tick. Falls back to the motif when a type has no viz.
+  let art = document.createElement('canvas');
+  art.className = 'pedal-viz';
+  const hasViz = registerViz(art, type,
+    () => handlers.getLiveParams?.(unit.instanceId) ?? unit.params,
+    { bypassed: unit.bypassed });
+  if (!hasViz) {
+    art = document.createElement('div'); art.className = 'pedal-motif';
+    art.innerHTML = `<svg viewBox="0 0 102 80" fill="none">${FX_MOTIFS[type] || ''}</svg>`;
+  }
   const lens = document.createElement('div'); lens.className = 'pedal-lens';
-  plate.append(glow, motif, lens);
+  plate.append(glow, art, lens);
 
   // The whole face is the drag handle; knobs/footswitch sit above (higher z).
   const grip = document.createElement('div');
@@ -438,6 +450,7 @@ export function openEffectsModal(handlers) {
 }
 
 export function renderPedalboard(container, units, handlers) {
+  resetViz(); // the board fully re-renders — drop every stale viz canvas first
   container.innerHTML = '';
   const board = document.createElement('div');
   board.className = 'pedalboard';

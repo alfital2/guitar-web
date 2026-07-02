@@ -85,8 +85,9 @@ describe('renderPedalboard', () => {
     const el = document.createElement('div');
     renderPedalboard(el, units, noop);
     const pedal = el.querySelector('.pedal');
-    // WOW UI: bespoke art renders as a plate with a per-effect motif + lens.
-    expect(pedal.querySelector('.pedal-plate .pedal-motif')).toBeTruthy();
+    // Effect-viz: on the board the screen is a live canvas (replaces the
+    // static motif, which the palette tiles keep).
+    expect(pedal.querySelector('.pedal-plate canvas.pedal-viz')).toBeTruthy();
     expect(pedal.querySelector('.pedal-plate .pedal-lens')).toBeTruthy();
     expect(pedal.querySelector('.pedal-grip[data-drag-handle]')).toBeTruthy();
     expect(pedal.querySelector('.pedal-knobs .knob')).toBeTruthy();
