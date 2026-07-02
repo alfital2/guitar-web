@@ -291,7 +291,10 @@
   .amp-corner-bl { bottom: 7px; left: 7px; border-radius: 0 9px 0 11px; } .amp-corner-bl::after { right: 6px; top: 6px; }
   .amp-corner-br { bottom: 7px; right: 7px; border-radius: 9px 0 11px 0; } .amp-corner-br::after { left: 6px; top: 6px; }
   .amp-panel {
-    position: relative; display: flex; flex-wrap: nowrap; align-items: stretch; justify-content: center; gap: 8px 2px;
+    /* wrap: when the head hits max-width the knob groups flow to a second row
+       INSIDE the silver panel instead of spilling past its edges (the 8px
+       row-gap below exists for exactly this) */
+    position: relative; display: flex; flex-wrap: wrap; align-items: stretch; justify-content: center; gap: 8px 2px;
     margin: 10px 16px 14px; padding: 8px 12px; border-radius: 8px;
     background:
       linear-gradient(118deg, transparent 15%, rgba(255,255,255,0.95) 18.5%, transparent 22%,
