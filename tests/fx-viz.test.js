@@ -145,11 +145,40 @@ describe('ticker gates and lifecycle', () => {
     expect(cv.__ctx.__calls.length).toBeGreaterThan(0);
   });
 
-  it('freezes a bypassed pedal after one static frame', () => {
+  it('is STILL at rest: no redraws while params are unchanged', () => {
     const cv = fakeCanvas();
-    registerViz(cv, 'delay', () => defaults, { bypassed: true });
+    registerViz(cv, 'delay', () => defaults);
+    expect(tickViz(0)).toBe(1);    // first frame
+    expect(tickViz(0.1)).toBe(0);  // idle — only a signature compare
+    expect(tickViz(0.2)).toBe(0);
+    expect(tickViz(9.9)).toBe(0);
+  });
+
+  it('tuning kicks the animation; it keeps running briefly, then eases out and parks', () => {
+    const cv = fakeCanvas();
+    const params = { ...defaults };
+    registerViz(cv, 'delay', () => params);
+    expect(tickViz(0)).toBe(1);   // first frame
+    expect(tickViz(0.1)).toBe(0); // at rest
+    params.time = 800;            // knob move → kick
+    expect(tickViz(0.2)).toBe(1); // redraw with the new params
+    expect(tickViz(0.3)).toBe(1); // still animating with NO further change (hold)
+    expect(tickViz(0.7)).toBe(1);
+    // after the hold the velocity decays each tick until the screen parks
+    let now = 0.9, last = 1;
+    for (let i = 0; i < 80 && last > 0; i++) { now += 0.1; last = tickViz(now); }
+    expect(last).toBe(0);                 // parked
+    expect(tickViz(now + 0.1)).toBe(0);   // and stays still
+    expect(tickViz(now + 0.2)).toBe(0);
+  });
+
+  it('freezes a bypassed pedal after one static frame (even if params change)', () => {
+    const cv = fakeCanvas();
+    const params = { ...defaults };
+    registerViz(cv, 'delay', () => params, { bypassed: true });
     expect(tickViz(1)).toBe(1);  // the single frozen frame
     expect(tickViz(2)).toBe(0);  // never redrawn
+    params.time = 900;
     expect(tickViz(3)).toBe(0);
   });
 

@@ -1,10 +1,13 @@
-// tools/viz-shots.mjs — prove the pedal-screen effect-viz reacts to knob values.
+// tools/viz-shots.mjs — prove the tune-to-animate pedal screens behave.
 //
 // Boots the app (same server + fake-audio flags as tools/ui-shots.mjs), adds a
-// delay, a distortion and a compressor pedal, then screenshots each pedal's
-// screen TWICE with different knob values (via the __neuralE2E.setPedalParam
-// bridge). The two frames must differ structurally (echo spacing spreads, clip
-// shape squares, knee bends) — a mean-pixel-diff is printed for each pair.
+// delay, a distortion and a compressor pedal, then per pedal proves three
+// things via the __neuralE2E.setPedalParam bridge and mean-pixel diffs:
+//   1. params a→b changes the settled frame structurally (echo spacing
+//      spreads, clip shape squares, knee bends),
+//   2. at rest the screen is STILL (two shots 1s apart are identical),
+//   3. right after a knob move the screen is animating (differs from settled).
+// Also folds the pedalboard to its mini strip and screenshots it.
 //
 // Usage:  node tools/viz-shots.mjs            → writes shots/viz/*.png
 import { spawn } from 'node:child_process';
@@ -102,6 +105,11 @@ async function run() {
       await sleep(250);
     }
 
+    // Tune-to-animate timing: a param change kicks the animation, which runs
+    // ~0.6s at full speed then eases out and parks (~3.5s total). SETTLE waits
+    // for the parked, param-true still; TUNING samples mid-animation.
+    const SETTLE = 4500, TUNING = 250;
+
     // [type, nameplate word, [key, valueA, valueB][], what should change]
     const cases = [
       ['delay', 'DELAY', [['time', 150, 850], ['feedback', 0.7, 0.7]], 'echo bar spacing spreads'],
@@ -109,23 +117,45 @@ async function run() {
       ['compressor', 'COMPRESSOR', [['threshold', -6, -50], ['ratio', 1.2, 20]], 'knee bends down hard'],
     ];
 
+    const setAll = (type, sets, which) => Promise.all(sets.map(([key, va, vb]) =>
+      page.evaluate(([t, k, v]) => window.__neuralE2E.setPedalParam(t, k, v),
+        [type, key, which === 'a' ? va : vb])));
+
     for (const [type, word, sets, expectWhat] of cases) {
-      for (const [suffix, idx] of [['a', 1], ['b', 2]]) {
-        for (const [key, va, vb] of sets) {
-          await page.evaluate(([t, k, v]) => window.__neuralE2E.setPedalParam(t, k, v),
-            [type, key, suffix === 'a' ? va : vb]);
-        }
-        await sleep(450); // let a few viz ticks land
-        await shootPlate(page, word, `${type}-${suffix}.png`);
-      }
-      const d = await meanDiff(page, join(OUT, `${type}-a.png`), join(OUT, `${type}-b.png`));
-      const pass = d > 1.0; // animated frames differ slightly anyway; require real change
-      if (!pass) failures++;
-      console.log(`  ${pass ? 'DIFF' : 'SAME'} ${type}: mean pixel diff ${d.toFixed(2)} (${expectWhat})`);
+      await setAll(type, sets, 'a');
+      await sleep(SETTLE);
+      await shootPlate(page, word, `${type}-a.png`);
+      // stillness proof: same params 1s later → identical frame (no idle anim)
+      await sleep(1000);
+      await shootPlate(page, word, `${type}-a2.png`);
+      await setAll(type, sets, 'b');
+      await sleep(TUNING); // mid-animation (the knob just moved)
+      await shootPlate(page, word, `${type}-tuning.png`);
+      await sleep(SETTLE);
+      await shootPlate(page, word, `${type}-b.png`);
+
+      const dAB = await meanDiff(page, join(OUT, `${type}-a.png`), join(OUT, `${type}-b.png`));
+      const dStill = await meanDiff(page, join(OUT, `${type}-a.png`), join(OUT, `${type}-a2.png`));
+      const dTune = await meanDiff(page, join(OUT, `${type}-tuning.png`), join(OUT, `${type}-b.png`));
+      const okAB = dAB > 1.0, okStill = dStill < 0.4, okTune = dTune > 0.3;
+      if (!okAB || !okStill) failures++;
+      console.log(`  ${okAB ? 'DIFF' : 'SAME'} ${type}: params a→b diff ${dAB.toFixed(2)} (${expectWhat})`);
+      console.log(`  ${okStill ? 'STILL' : 'MOVING'} ${type}: at-rest diff ${dStill.toFixed(2)} (must be ~0 — no idle animation)`);
+      console.log(`  ${okTune ? 'ANIM ' : 'FLAT '} ${type}: tuning vs settled diff ${dTune.toFixed(2)} (animation while tuning)`);
     }
 
+    // Collapsed-board strip: fold the chain to the mini strip and shoot it.
+    await page.locator('.board-collapse-btn').click();
+    await sleep(400);
+    const strip = page.locator('.board-strip');
+    await strip.waitFor({ state: 'visible', timeout: 5000 });
+    await strip.screenshot({ path: join(OUT, 'board-strip.png') });
+    console.log('  OK   board-strip.png (collapsed pedalboard)');
+    await strip.click(); // expand back
+    await sleep(300);
+
     console.log(`\nShots written to ${OUT}/`);
-    if (failures) { console.error(`${failures} viz pair(s) did not visibly change with params`); process.exitCode = 1; }
+    if (failures) { console.error(`${failures} viz check(s) failed`); process.exitCode = 1; }
   } finally {
     await context.close();
     await browser.close();
