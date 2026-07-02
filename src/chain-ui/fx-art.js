@@ -29,6 +29,12 @@ export const FX_FONTS = {
   pitchshift: { family: "'Major Mono Display', monospace", ls: '.02em' },
   looper:     { family: "'Major Mono Display', monospace", ls: '.02em' },
   ringmod:    { family: "'Major Mono Display', monospace", ls: '.02em' },
+  acousticsim: { family: "'Special Elite', monospace", ls: '.06em' },
+  distortion:  { family: "'Bungee', sans-serif", ls: '.02em' },
+  harmonizer:  { family: "'Major Mono Display', monospace", ls: '.02em' },
+  univibe:     { family: "'Audiowide', sans-serif", ls: '.04em' },
+  springverb:  { family: "'Orbitron', sans-serif", ls: '.08em' },
+  whammy:      { family: "'Bungee Inline', sans-serif", ls: '.02em' },
 };
 
 export const FX_COLORS = {
@@ -37,6 +43,8 @@ export const FX_COLORS = {
   tremolo: '#e8c07a', vibrato: '#ffa64d', autopan: '#ffcf5a', rotary: '#caa06a', ringmod: '#e8b84b',
   delay: '#39d98a', 'tape-echo': '#7fd8c6', pingpong: '#ff8a3d', reverb: '#8f7dff', widener: '#39d3ff',
   limiter: '#9aa6ad', pitchshift: '#33e0c8', looper: '#39d98a',
+  acousticsim: '#c98a4a', distortion: '#ff7a1a', harmonizer: '#4a7dff',
+  univibe: '#6fa8ff', springverb: '#49c9a4', whammy: '#ff3b30',
 };
 
 // Knob count per effect (from the effect schemas) → drives pedal width.
@@ -45,6 +53,7 @@ export const FX_KNOBS = {
   chorus: 3, flanger: 4, phaser: 4, tremolo: 3, vibrato: 2, autopan: 3, rotary: 3, ringmod: 2,
   delay: 4, 'tape-echo': 5, pingpong: 4, reverb: 2, widener: 1,
   limiter: 2, pitchshift: 2, looper: 2,
+  acousticsim: 3, distortion: 3, harmonizer: 3, univibe: 3, springverb: 3, whammy: 3,
 };
 // Per-effect motif: inline SVG (viewBox 0 0 102 80), stroke = currentColor,
 // `.fill` elements paint solid. Used by the CSS pedal recreation.
@@ -72,6 +81,18 @@ export const FX_MOTIFS = {
   limiter: `<line stroke-width="4" x1="10" y1="20" x2="92" y2="20"/><path stroke-width="5" fill="none" d="M10 54 q11 -30 22 0 t22 0 t22 0 t22 0"/>`,
   pitchshift: `<g stroke-width="5" fill="none"><path d="M34 46 V16 M26 24 L34 16 L42 24"/><path d="M68 22 V52 M60 44 L68 52 L76 44"/></g>`,
   looper: `<path stroke-width="5" fill="none" d="M30 50 A24 24 0 1 1 55 58"/><path class="fill" d="M50 46 L60 60 L44 62 Z"/>`,
+  // Acoustic sim: soundhole + rosette rings with strings running across.
+  acousticsim: `<circle stroke-width="4" fill="none" cx="51" cy="42" r="15"/><circle stroke-width="2" fill="none" cx="51" cy="42" r="21"/><g stroke-width="2"><line x1="8" y1="34" x2="94" y2="34"/><line x1="8" y1="42" x2="94" y2="42"/><line x1="8" y1="50" x2="94" y2="50"/></g>`,
+  // Distortion: hard-clipped lightning bolt.
+  distortion: `<path class="fill" d="M58 6 L28 44 H46 L38 74 L74 32 H54 Z"/>`,
+  // Harmonizer: a note plus its ghost voice a fifth up.
+  harmonizer: `<g stroke-width="4" fill="none"><path d="M32 58 V24 L48 20 V54"/></g><ellipse class="fill" cx="27" cy="58" rx="6" ry="4.5"/><ellipse class="fill" cx="43" cy="54" rx="6" ry="4.5"/><g opacity=".55"><path stroke-width="4" fill="none" d="M64 44 V12 L80 8 V40"/><ellipse class="fill" cx="59" cy="44" rx="6" ry="4.5"/><ellipse class="fill" cx="75" cy="40" rx="6" ry="4.5"/></g>`,
+  // Uni-Vibe: one wave, four staggered photocell dots riding it.
+  univibe: `<path stroke-width="4" fill="none" d="M8 44 q11 -20 22 0 t22 0 t22 0 t22 0"/><g class="fill"><circle cx="19" cy="34" r="4.5"/><circle cx="41" cy="52" r="4.5"/><circle cx="63" cy="34" r="4.5"/><circle cx="85" cy="52" r="4.5"/></g><circle stroke-width="2" fill="none" cx="51" cy="18" r="6"/>`,
+  // Spring reverb: a coil spring stretched between two anchors.
+  springverb: `<circle class="fill" cx="12" cy="40" r="4"/><circle class="fill" cx="90" cy="40" r="4"/><path stroke-width="4" fill="none" d="M12 40 H20 L28 26 L36 54 L44 26 L52 54 L60 26 L68 54 L76 26 L82 40 H90"/>`,
+  // Whammy: pitch soaring up along a treadle sweep.
+  whammy: `<path stroke-width="5" fill="none" d="M12 62 Q51 62 74 28"/><path class="fill" d="M84 12 L80 34 L64 22 Z"/><g stroke-width="3"><line x1="16" y1="70" x2="52" y2="70"/></g>`,
 };
 
 const WIDTHS = { 1: 108, 2: 128, 3: 152, 4: 190, 5: 228 };
@@ -107,6 +128,12 @@ export const FX_KNOB_STYLE = {
   pitchshift: { cap: BLACK, accent: '#33e0c8', pointer: '#fff' },
   looper: { cap: BLACK, accent: '#8af0b8', pointer: '#fff' },
   ringmod: { cap: BLACK, accent: '#ffe18a', pointer: '#fff' },
+  acousticsim: { cap: CREAM, accent: '#8a5a24', pointer: '#5e360c' },
+  distortion: { cap: BLACK, accent: '#ff7a1a', pointer: '#fff' },
+  harmonizer: { cap: BLACK, accent: '#9db9ff', pointer: '#fff' },
+  univibe: { cap: CREAM, accent: '#6fa8ff', pointer: '#2a3a5e', shape: 'chicken' },
+  springverb: { cap: CHROME, accent: '#49c9a4', pointer: '#222' },
+  whammy: { cap: BLACK, accent: '#ff6b62', pointer: '#fff' },
 };
 
 // Per-pedal knob positions {x, y[, r]} in art coords (0..width, 0..248),
@@ -137,6 +164,12 @@ export const FX_KNOB_LAYOUT = {
   pitchshift: row(64, 150, 2, 46),
   looper: row(64, 128, 2, 46),
   ringmod: row(64, 128, 2, 46),
+  acousticsim: row(76, 128, 3, 38),
+  distortion: row(76, 130, 3, 38),
+  harmonizer: row(76, 132, 3, 38),
+  univibe: [{ x: 76, y: 122, r: 44 }, { x: 42, y: 168, r: 28 }, { x: 110, y: 168, r: 28 }],
+  springverb: row(76, 128, 3, 38),
+  whammy: row(76, 130, 3, 38),
 };
 
 // ---- shared texture filters (neutral: alpha from noise; tints any solid rect) --
@@ -421,11 +454,74 @@ const COMPRESSOR = plate('compressor', {
   word: (cx, f) => wm(cx, f, 'COMP', 26, '#2b2f33', '#f4f6f7', 200, 1) + tag(cx, 'THRESH · RATIO · GAIN', '#5b6168', 218),
 });
 
+const ACOUSTICSIM = plate('acousticsim', {
+  defs: `<linearGradient id="as-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b97f3e"/><stop offset="1" stop-color="#6e4416"/></linearGradient><radialGradient id="as-hole" cx="50%" cy="50%" r="55%"><stop offset="0" stop-color="#1a0e04"/><stop offset=".8" stop-color="#2b1806"/><stop offset="1" stop-color="#3a2410"/></radialGradient>`,
+  body: 'url(#as-b)', screw: '#3a2208',
+  bg: (w) => texW(w, '#2e1a07', 'nz-brushH', .35) + texW(w, '#ffd9a8', 'nz-fine', .05),
+  motif: `<circle cx="88" cy="96" r="34" fill="url(#as-hole)"/>
+    <circle cx="88" cy="96" r="34" fill="none" stroke="#e8c07a" stroke-width="2.5"/>
+    <circle cx="88" cy="96" r="42" fill="none" stroke="#e8c07a" stroke-opacity=".55" stroke-width="1.5" stroke-dasharray="2 3"/>
+    <circle cx="88" cy="96" r="48" fill="none" stroke="#5e360c" stroke-width="3"/>
+    <g stroke="#f6ecd2" stroke-width="1.6" opacity=".85">${[0, 1, 2, 3, 4, 5].map((i) => `<line x1="24" y1="${76 + i * 8}" x2="152" y2="${76 + i * 8}"/>`).join('')}</g>`,
+  word: (cx, f) => wm(cx, f, 'ACOUSTIC', 19, '#2b1806', '#ffe9c4', 200, .5) + tag(cx, 'BODY · AIR · LEVEL', '#e8c07a', 218),
+});
+
+const DISTORTION = plate('distortion', {
+  defs: `<linearGradient id="di-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8b2e"/><stop offset="1" stop-color="#b34706"/></linearGradient><linearGradient id="di-bolt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6e6"/><stop offset="1" stop-color="#ffd28a"/></linearGradient>`,
+  body: 'url(#di-b)', grain: .1, screw: '#5e2404',
+  bg: (w) => `<rect x="10" y="38" width="${w - 20}" height="128" rx="9" fill="#2b1000" opacity=".8"/><rect x="11.5" y="39.5" width="${w - 23}" height="125" rx="8" fill="none" stroke="#ffb066" stroke-opacity=".35"/>`,
+  motif: `<path d="M100 46 L58 106 H84 L72 156 L124 92 H96 L112 46 Z" fill="url(#di-bolt)" stroke="#5e2404" stroke-width="2" stroke-linejoin="miter"/>
+    <path d="M40 142 H52 V118 H62 V150 H72" fill="none" stroke="#ff8b2e" stroke-opacity=".5" stroke-width="4" stroke-linejoin="miter"/>`,
+  word: (cx, f) => wm(cx, f, 'DIST', 34, '#5e2404', '#fff0d6', 208) + tag(cx, 'DIST · TONE · LEVEL', '#ffcf9e', 226, 1.5),
+});
+
+const HARMONIZER = plate('harmonizer', {
+  defs: `<linearGradient id="ha-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a4ba8"/><stop offset="1" stop-color="#101f4e"/></linearGradient><radialGradient id="ha-g" cx="50%" cy="38%" r="62%"><stop offset="0" stop-color="#7d9dff" stop-opacity=".35"/><stop offset="1" stop-color="#7d9dff" stop-opacity="0"/></radialGradient>`,
+  body: 'url(#ha-b)', grain: .1, screw: '#0a1638',
+  bg: (w) => `<rect x="0" y="0" width="${w}" height="${HEIGHT}" rx="14" fill="url(#ha-g)"/><g stroke="#9db9ff" stroke-opacity=".28" stroke-width="1.5">${[0, 1, 2, 3, 4].map((i) => `<line x1="20" y1="${58 + i * 13}" x2="156" y2="${58 + i * 13}"/>`).join('')}</g>`,
+  motif: `<g stroke="#e6edff" stroke-width="5" fill="none"><path d="M58 132 V70 L86 62 V124"/></g><ellipse cx="49" cy="132" rx="10" ry="7" fill="#e6edff"/><ellipse cx="77" cy="124" rx="10" ry="7" fill="#e6edff"/>
+    <g opacity=".55"><path d="M112 110 V48 L140 40 V102" stroke="#9db9ff" stroke-width="5" fill="none"/><ellipse cx="103" cy="110" rx="10" ry="7" fill="#9db9ff"/><ellipse cx="131" cy="102" rx="10" ry="7" fill="#9db9ff"/></g>`,
+  word: (cx, f) => wm(cx, f, 'HARMONY', 19, '#0a1638', '#dbe6ff', 200, 1) + tag(cx, 'INTERVAL · MIX', '#9db9ff', 218),
+});
+
+const UNIVIBE = plate('univibe', {
+  defs: `<linearGradient id="uv-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3ead2"/><stop offset=".5" stop-color="#e3d4ae"/><stop offset="1" stop-color="#bfa678"/></linearGradient><radialGradient id="uv-lamp" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff8dc"/><stop offset=".55" stop-color="#ffd76e"/><stop offset="1" stop-color="#b8862a" stop-opacity="0"/></radialGradient>`,
+  body: 'url(#uv-b)', grain: .07, screw: '#6e5a32',
+  bg: (w) => `<rect x="10" y="36" width="${w - 20}" height="120" rx="10" fill="#274a86"/><rect x="11.5" y="37.5" width="${w - 23}" height="117" rx="9" fill="none" stroke="#9db9ff" stroke-opacity=".4"/>`,
+  motif: `<circle cx="88" cy="66" r="15" fill="url(#uv-lamp)"/>
+    <path d="M30 112 q 14 -24 28 0 t 28 0 t 28 0 t 28 0" fill="none" stroke="#8fb4ff" stroke-width="5" stroke-linecap="round"/>
+    <g fill="#f3ead2" stroke="#274a86" stroke-width="1.5"><circle cx="44" cy="100" r="6"/><circle cx="72" cy="124" r="6"/><circle cx="100" cy="100" r="6"/><circle cx="128" cy="124" r="6"/></g>`,
+  word: (cx, f) => wm(cx, f, 'UNI-VIBE', 21, '#6e5a32', '#274a86', 200, .5) + tag(cx, 'SPEED · INTENSITY · MIX', '#6e5a32', 218, 1),
+});
+
+const SPRINGVERB = plate('springverb', {
+  defs: `<linearGradient id="sp-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f8f78"/><stop offset="1" stop-color="#1a4a3c"/></linearGradient><linearGradient id="sp-coil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2f4f6"/><stop offset=".5" stop-color="#9aa7a4"/><stop offset="1" stop-color="#5d6a66"/></linearGradient>`,
+  body: 'url(#sp-b)', screw: '#0c2a22',
+  bg: (w) => texW(w, '#0c2a22', 'nz-fur', .22) + `<rect x="12" y="52" width="${w - 24}" height="88" rx="8" fill="#0c2a22" opacity=".75"/><rect x="13.5" y="53.5" width="${w - 27}" height="85" rx="7" fill="none" stroke="#7fe0c2" stroke-opacity=".35"/>`,
+  motif: `<circle cx="30" cy="96" r="6" fill="url(#sp-coil)" stroke="#0c2a22"/><circle cx="146" cy="96" r="6" fill="url(#sp-coil)" stroke="#0c2a22"/>
+    <path d="M36 96 H44 ${Array.from({ length: 8 }, (_, i) => `L${52 + i * 11} ${i % 2 ? 116 : 76}`).join(' ')} L136 96 H140" fill="none" stroke="url(#sp-coil)" stroke-width="4.5" stroke-linejoin="round"/>
+    <g fill="none" stroke="#7fe0c2" stroke-linecap="round"><path d="M60 152 q6 8 0 16" stroke-width="3" opacity=".8"/><path d="M78 152 q6 8 0 16" stroke-width="3" opacity=".55"/><path d="M96 152 q6 8 0 16" stroke-width="3" opacity=".35"/></g>`,
+  word: (cx, f) => wm(cx, f, 'SPRING', 23, '#0c2a22', '#d6fff1', 200, 1) + tag(cx, 'TENSION · DECAY · MIX', '#7fe0c2', 218),
+});
+
+const WHAMMY = plate('whammy', {
+  defs: `<linearGradient id="wh-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff4a40"/><stop offset="1" stop-color="#8e0e08"/></linearGradient><linearGradient id="wh-tread" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b2f33"/><stop offset="1" stop-color="#101214"/></linearGradient>`,
+  body: 'url(#wh-b)', grain: .08, screw: '#4a0703',
+  bg: (w) => texW(w, '#000', 'nz-fine', .07),
+  motif: `<path d="M34 148 L130 108 L136 128 L44 166 Z" fill="url(#wh-tread)" stroke="#000" stroke-opacity=".5"/>
+    <g stroke="#ff8a80" stroke-width="2" opacity=".8">${[0, 1, 2, 3].map((i) => `<line x1="${52 + i * 20}" y1="${142 - i * 8}" x2="${58 + i * 20}" y2="${156 - i * 8}"/>`).join('')}</g>
+    <path d="M40 96 Q88 96 116 52" fill="none" stroke="#ffe1de" stroke-width="6" stroke-linecap="round"/>
+    <path d="M128 30 L124 58 L102 42 Z" fill="#ffe1de"/>
+    <text x="46" y="66" font-family="'Helvetica Neue',Arial,sans-serif" font-weight="800" font-size="15" fill="#ffd2cd">+12</text>`,
+  word: (cx, f) => wm(cx, f, 'WHAMMY', 24, '#4a0703', '#ffe9e6', 206) + tag(cx, 'BEND · RANGE · MIX', '#ff9d94', 224, 1.5),
+});
+
 const SYMBOLS = [
   FUZZ, BOOST, GATE, OCTAVE, WAH, AUTOWAH,
   CHORUS, FLANGER, PHASER, TREMOLO, VIBRATO, ROTARY, AUTOPAN,
   DELAY, TAPE, PINGPONG, REVERB, WIDENER,
   LIMITER, PITCHSHIFT, LOOPER, RINGMOD, COMPRESSOR,
+  ACOUSTICSIM, DISTORTION, HARMONIZER, UNIVIBE, SPRINGVERB, WHAMMY,
 ];
 
 export const FX_ART_SHEET =

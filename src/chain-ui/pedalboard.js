@@ -32,6 +32,12 @@ const COLORS = {
   looper: '#34c759',
   autopan: '#00c7be',
   rotary: '#a2845e',
+  acousticsim: '#c98a4a',
+  distortion: '#ff7a1a',
+  harmonizer: '#4a7dff',
+  univibe: '#6fa8ff',
+  springverb: '#49c9a4',
+  whammy: '#ff3b30',
 };
 
 // Pedal (addable) types and their display labels. Amp types (drive/eq/cabinet)
@@ -40,14 +46,18 @@ const COLORS = {
 // only list types that have a registered effect.
 const PEDAL_TYPES = [
   ['compressor', 'Compressor'], ['boost', 'Boost'], ['gate', 'Noise Gate'],
-  ['fuzz', 'Fuzz'], ['octave', 'Octave Fuzz'],
+  ['distortion', 'Distortion'], ['fuzz', 'Fuzz'], ['octave', 'Octave Fuzz'],
+  ['acousticsim', 'Acoustic Sim'],
   ['wah', 'Wah'], ['autowah', 'Auto-Wah'],
   ['chorus', 'Chorus'], ['flanger', 'Flanger'], ['phaser', 'Phaser'],
+  ['univibe', 'Uni-Vibe'],
   ['tremolo', 'Tremolo'], ['vibrato', 'Vibrato'], ['autopan', 'Auto-Pan'],
   ['rotary', 'Rotary'], ['ringmod', 'Ring Mod'],
   ['delay', 'Delay'], ['tape-echo', 'Tape Echo'], ['pingpong', 'Ping-Pong'],
+  ['springverb', 'Spring Reverb'],
   ['widener', 'Widener'], ['limiter', 'Limiter'],
-  ['pitchshift', 'Pitch Shift'], ['looper', 'Looper'],
+  ['pitchshift', 'Pitch Shift'], ['harmonizer', 'Harmonizer'], ['whammy', 'Whammy'],
+  ['looper', 'Looper'],
 ];
 
 function connector() {

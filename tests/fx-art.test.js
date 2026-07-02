@@ -4,7 +4,8 @@ import { FX_FONTS, ensureFxArtSheet, fxArtSvg, FX_ART_SHEET } from '../src/chain
 // Mirror of PEDAL_TYPES (kept in sync by the test below).
 const TYPES = ['compressor','boost','gate','fuzz','octave','wah','autowah','chorus','flanger',
   'phaser','tremolo','vibrato','autopan','rotary','ringmod','delay','tape-echo','pingpong',
-  'reverb','widener','limiter','pitchshift','looper'];
+  'reverb','widener','limiter','pitchshift','looper',
+  'acousticsim','distortion','harmonizer','univibe','springverb','whammy'];
 
 beforeEach(() => { document.body.innerHTML = ''; });
 
