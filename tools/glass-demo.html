@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Liquid glass demo — panel + glass pedal</title>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: #0c0c0e; color: #f2f2f7; font: 14px/1.4 'Inter', system-ui, sans-serif; overflow: hidden; }
+  #bg { position: fixed; inset: 0; z-index: 0; }
+  #bg canvas { width: 100%; height: 100%; display: block; }
+  .vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 40%, transparent 40%, rgba(0,0,0,0.6)); }
+  .stage { position: relative; z-index: 2; height: 100%; display: flex; align-items: center; justify-content: center; gap: 80px; flex-wrap: wrap; }
+  .cap { position: fixed; top: 20px; left: 24px; z-index: 3; font-weight: 800; font-size: 15px; }
+  .cap span { color: #f0b429; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .tag { font-size: 11px; font-weight: 800; letter-spacing: .1em; color: #f0b429; }
+
+  /* Glass Surface panel (react-bits port) */
+  .glass { position: relative; overflow: hidden;
+    box-shadow:
+      0 0 2px 1px rgba(255,255,255,0.35) inset, 0 0 10px 4px rgba(255,255,255,0.15) inset,
+      0 30px 60px -12px rgba(0,0,0,0.6); }
+  .glass-card { width: 320px; height: 200px; border-radius: 28px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px; text-align: center; }
+  .glass-card h2 { margin: 0; font-size: 22px; font-weight: 800; }
+  .glass-card p { margin: 0; font-size: 13px; color: rgba(255,255,255,0.75); }
+
+  /* ── Glass Fuzz pedal: frosted glass enclosure over the moving bg ── */
+  .fx { position: relative; width: 232px; height: 396px; border-radius: 24px; isolation: isolate;
+    box-shadow:
+      0 40px 60px -18px rgba(0,0,0,0.7),
+      inset 0 2px 0 rgba(255,255,255,0.5), inset 0 -16px 30px rgba(0,0,0,0.35),
+      inset 0 0 0 1px rgba(255,255,255,0.18); }
+  .fx .tint { position: absolute; inset: 0; border-radius: inherit; z-index: 0; pointer-events: none;
+    background: linear-gradient(160deg, rgba(240,180,60,0.14), rgba(120,70,20,0.10) 60%, rgba(0,0,0,0.12));
+    mix-blend-mode: overlay; }
+  .fx .gloss { position: absolute; inset: 0; border-radius: inherit; z-index: 5; pointer-events: none;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.4), rgba(255,255,255,0.06) 16%, transparent 34%),
+      linear-gradient(120deg, transparent 42%, rgba(255,255,255,0.12) 49%, transparent 57%);
+    mix-blend-mode: screen; }
+  .fx .glint { position: absolute; top: -20%; bottom: -20%; left: -70%; width: 44%; z-index: 6; pointer-events: none;
+    background: linear-gradient(105deg, transparent, rgba(255,255,255,0.5), transparent); transform: skewX(-16deg);
+    mix-blend-mode: screen; animation: glint 4.5s ease-in-out infinite; }
+  @keyframes glint { 0%, 82% { left: -70%; opacity: 0; } 86% { opacity: 1; } 100% { left: 140%; opacity: 0; } }
+
+  .screw { position: absolute; width: 15px; height: 15px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 36% 30%, #fdfdfd, #c2c7cc 26%, #6f757b 62%, #2b2f33);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.6), inset 0 0 2px rgba(0,0,0,0.5); }
+  .screw.tl { top: 12px; left: 12px; } .screw.tr { top: 12px; right: 12px; }
+  .screw.bl { bottom: 12px; left: 12px; } .screw.br { bottom: 12px; right: 12px; }
+
+  .plate { position: absolute; left: 20px; right: 20px; top: 30px; height: 150px; border-radius: 14px; z-index: 1; overflow: hidden;
+    background: rgba(20,12,4,0.34);
+    box-shadow: inset 0 4px 10px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.12), 0 1px 0 rgba(255,255,255,0.14); }
+  .plate::before { content: ''; position: absolute; inset: -20%;
+    background: repeating-conic-gradient(from -8deg at 50% 44%, rgba(255,222,150,0.22) 0deg 7deg, transparent 7deg 22deg); }
+  .wave { position: absolute; left: 0; right: 0; top: 52px; height: 46px;
+    background: rgba(255,235,190,0.85);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 92 46'%3E%3Cpath d='M6 32 H22 V12 H40 V44 H58 V12 H74 V32 H86' fill='none' stroke='%23000' stroke-width='7'/%3E%3C/svg%3E") no-repeat center/86px 46px;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 92 46'%3E%3Cpath d='M6 32 H22 V12 H40 V44 H58 V12 H74 V32 H86' fill='none' stroke='%23000' stroke-width='7'/%3E%3C/svg%3E") no-repeat center/86px 46px; }
+
+  .led { position: absolute; top: 196px; right: 26px; width: 11px; height: 11px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 38% 32%, #fff, #ff6a45 42%, #b21500);
+    box-shadow: 0 0 12px 3px rgba(255,80,40,0.85), 0 0 4px #ff5a3c; }
+  .knobs { position: absolute; left: 0; right: 0; top: 214px; display: flex; justify-content: center; gap: 26px; z-index: 3; }
+  .knob { position: relative; width: 42px; height: 42px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 28%, #fff, #c6ccd2 34%, #7b8188 64%, #303438 92%);
+    box-shadow: 0 5px 9px rgba(0,0,0,0.6), inset 0 -3px 5px rgba(0,0,0,0.55), inset 0 3px 4px rgba(255,255,255,0.85); }
+  .knob::after { content: ''; position: absolute; top: 5px; left: 50%; width: 3px; height: 13px; margin-left: -1.5px; background: #16181b; border-radius: 2px; }
+  .knob b { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 8px; font-weight: 800; letter-spacing: .08em; color: #ffe6b0; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+  .word { position: absolute; left: 0; right: 0; top: 286px; text-align: center; z-index: 3;
+    font-family: 'Bungee', sans-serif; font-size: 30px; color: #fff3d6;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6), 0 -1px 0 rgba(255,255,255,0.3); }
+  .stomp { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); width: 66px; height: 66px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 42% 30%, #fbfbfd, #c3c8cd 42%, #767c82 72%, #383c40 100%);
+    box-shadow: 0 8px 14px rgba(0,0,0,0.7), inset 0 -4px 7px rgba(0,0,0,0.5), inset 0 4px 6px rgba(255,255,255,0.85), 0 0 0 6px rgba(0,0,0,0.28), 0 0 0 7px rgba(255,255,255,0.12); }
+</style>
+</head>
+<body>
+<div class="cap">Liquid glass over the live <span>Liquid Chrome</span> background — panel + glass pedal</div>
+<div id="bg"></div>
+<div class="vignette"></div>
+<div class="stage">
+  <div class="col">
+    <div class="tag">GLASS SURFACE (react-bits)</div>
+    <div class="glass glass-card" data-glass>
+      <h2>Liquid Glass</h2><p>Refracts + blurs the moving background<br>with chromatic edges.</p>
+    </div>
+  </div>
+  <div class="col">
+    <div class="tag">GLASS FUZZ PEDAL</div>
+    <div class="fx glass" data-glass data-r="24">
+      <div class="tint"></div>
+      <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+      <div class="plate"><div class="wave"></div></div>
+      <div class="led"></div>
+      <div class="knobs"><div class="knob"><b>SUSTAIN</b></div><div class="knob"><b>TONE</b></div><div class="knob"><b>VOL</b></div></div>
+      <div class="word">FUZZ</div>
+      <div class="stomp"></div>
+      <div class="gloss"></div><div class="glint"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { createLiquidChrome } from '../src/fx/liquidChrome.js';
+  createLiquidChrome(document.getElementById('bg'), { accent: [0.94, 0.71, 0.16] });
+
+  // ── Glass Surface (react-bits port to vanilla): a backdrop-filter using a
+  // generated chromatic displacement map. Chrome; graceful blur fallback else. ──
+  let uid = 0;
+  function glassSurface(el, opts = {}) {
+    const o = { borderRadius: parseFloat(el.dataset.r) || 28, borderWidth: 0.07, brightness: 60, opacity: 0.9,
+      blur: 12, displace: 0.4, saturation: 1.5, distortionScale: -160, redOffset: 0, greenOffset: 10, blueOffset: 20, ...opts };
+    const id = `glass-f-${++uid}`;
+    const isChrome = /Chrome/.test(navigator.userAgent) && !/Edge/.test(navigator.userAgent);
+
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+    holder.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg"><defs>
+      <filter id="${id}" color-interpolation-filters="sRGB" x="0%" y="0%" width="100%" height="100%">
+        <feImage x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="map"/>
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="${o.distortionScale + o.redOffset}" xChannelSelector="R" yChannelSelector="G" result="dr"/>
+        <feColorMatrix in="dr" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="${o.distortionScale + o.greenOffset}" xChannelSelector="R" yChannelSelector="G" result="dg"/>
+        <feColorMatrix in="dg" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
+        <feDisplacementMap in="SourceGraphic" in2="map" scale="${o.distortionScale + o.blueOffset}" xChannelSelector="R" yChannelSelector="G" result="db"/>
+        <feColorMatrix in="db" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
+        <feBlend in="r" in2="g" mode="screen" result="rg"/>
+        <feBlend in="rg" in2="b" mode="screen" result="out"/>
+        <feGaussianBlur in="out" stdDeviation="${o.displace}"/>
+      </filter></defs></svg>`;
+    document.body.appendChild(holder);
+    const feImage = holder.querySelector('feImage');
+
+    function genMap() {
+      const r = el.getBoundingClientRect();
+      const w = Math.max(1, r.width), h = Math.max(1, r.height);
+      const edge = Math.min(w, h) * (o.borderWidth * 0.5);
+      const svg = `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg"><defs>
+        <linearGradient id="rg" x1="100%" y1="0%" x2="0%" y2="0%"><stop offset="0%" stop-color="#0000"/><stop offset="100%" stop-color="red"/></linearGradient>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#0000"/><stop offset="100%" stop-color="blue"/></linearGradient></defs>
+        <rect width="${w}" height="${h}" fill="black"/>
+        <rect width="${w}" height="${h}" rx="${o.borderRadius}" fill="url(#rg)"/>
+        <rect width="${w}" height="${h}" rx="${o.borderRadius}" fill="url(#bg)" style="mix-blend-mode:difference"/>
+        <rect x="${edge}" y="${edge}" width="${w - edge * 2}" height="${h - edge * 2}" rx="${o.borderRadius}" fill="hsl(0 0% ${o.brightness}% / ${o.opacity})" style="filter:blur(${o.blur}px)"/></svg>`;
+      feImage.setAttribute('href', 'data:image/svg+xml,' + encodeURIComponent(svg));
+    }
+    genMap();
+    new ResizeObserver(genMap).observe(el);
+
+    el.style.background = 'rgba(255,255,255,0.04)';
+    if (isChrome) el.style.backdropFilter = `url(#${id}) saturate(${o.saturation})`;
+    else { el.style.backdropFilter = `blur(${o.blur}px) saturate(${o.saturation}) brightness(1.1)`; el.style.webkitBackdropFilter = el.style.backdropFilter; }
+  }
+
+  document.querySelectorAll('[data-glass]').forEach(el => glassSurface(el));
+</script>
+</body>
+</html>

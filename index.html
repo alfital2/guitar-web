@@ -446,10 +446,13 @@
   /* ── Track lane (recording) ─────────────────────────── */
   /* Track lane flex-grows so the amp + pedalboard are pinned to the bottom of
      the viewport instead of stacking right under the tracks. Overflows scroll. */
-  .track-lane { padding: 14px 20px; background: rgba(0,0,0,0.18); border-bottom: 1px solid rgba(255,255,255,0.04); flex: 1 1 0; min-height: 0; overflow-y: auto; }
+  /* Edge-to-edge, DAW-style: zero horizontal padding so the lane butts flush
+     against the preset browser on the left and the screen edge on the right,
+     with no gap in either preset-open or preset-closed layout. */
+  .track-lane { padding: 0; background: rgba(0,0,0,0.18); border-bottom: 1px solid rgba(255,255,255,0.04); flex: 1 1 0; min-height: 0; overflow-y: auto; }
   .track-lane-row {
-    display: flex; align-items: stretch; border-radius: 10px; overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.06); box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    display: flex; align-items: stretch; overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
   }
   .track-headers { flex: 0 0 190px; width: 190px; background: var(--surface); border-right: 1px solid rgba(0,0,0,0.4); display: flex; flex-direction: column; }
   .track-add-row { display: flex; align-items: center; gap: 6px; padding: 0 8px; border-bottom: 1px solid rgba(0,0,0,0.4); background: rgba(0,0,0,0.15); }
@@ -508,6 +511,26 @@
 
   .track-timeline { flex: 1; min-width: 0; background: var(--recessed); overflow-x: auto; overflow-y: hidden; }
   .track-scroll { position: relative; min-width: 100%; width: max-content; }
+  /* Themed timeline scrollbar — dark recessed trough + amber-accent thumb,
+     replacing the OS default light-gray bar. Defining ::-webkit-scrollbar forces
+     a classic always-visible bar over the macOS overlay. NOTE: don't set the
+     standard scrollbar-width/color here — in Chrome 121+ they take over the
+     styling path and disable these ::-webkit rules; the Firefox fallback below
+     is scoped so it only applies where ::-webkit-scrollbar is unsupported. */
+  .track-timeline::-webkit-scrollbar { height: 11px; }
+  .track-timeline::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.34); box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+  }
+  .track-timeline::-webkit-scrollbar-thumb {
+    border-radius: 7px; border: 2px solid transparent; background-clip: padding-box;
+    background-color: rgba(var(--accent-rgb),0.5);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .track-timeline::-webkit-scrollbar-thumb:hover { background-color: rgba(var(--accent-rgb),0.78); }
+  .track-timeline::-webkit-scrollbar-thumb:active { background-color: rgba(var(--accent-rgb),0.95); }
+  @supports not selector(::-webkit-scrollbar) {
+    .track-timeline { scrollbar-width: thin; scrollbar-color: rgba(var(--accent-rgb),0.55) rgba(0,0,0,0.35); }
+  }
   .track-strip { position: relative; border-bottom: 1px solid rgba(255,255,255,0.04); }
   .track-strip.removing { outline: 1px dashed var(--red); outline-offset: -2px; }
   .track-ruler {
@@ -981,24 +1004,29 @@
      backgrounds on a single element, so the GPU keeps ONE texture (not four)
      and just slides it. NO blur, NO blend-mode, NO scale — translate only, so
      the layer never re-rasters. This is the whole aurora, cheaply. */
-  /* Cover only the top band — the lower half is black (::after fade), so there's
-     no point compositing aurora pixels down there. Halving the layer area ~halves
-     the idle GPU cost of the compositor animation. */
+  /* Full-viewport aurora: top-bright ribbons plus softer ambient glows lower
+     down, so colour lives across the WHOLE background (not just a top band).
+     Still ONE composited layer, translate-only (no blur/blend/scale) — the GPU
+     slides one static texture, so it stays cheap on the idle compositor. */
   html.perf-lite .css-aurora .aur-layer {
-    position: absolute; inset: -25% -25% auto -25%; height: 70%;
+    position: absolute; inset: -25%;
     will-change: transform; transform: translateZ(0);
     background:
-      radial-gradient(46% 55% at 34% 2%,  rgba(158,205,74,0.65), transparent 60%),   /* lime hotspot */
-      radial-gradient(52% 62% at 66% 4%,  rgba(150,104,214,0.72), rgba(120,90,210,0.28) 48%, transparent 74%), /* purple bridge */
-      radial-gradient(60% 72% at 6% 0%,   rgba(78,196,96,0.95), rgba(60,170,90,0.32) 45%, transparent 70%),   /* green TL */
-      radial-gradient(60% 72% at 98% 0%,  rgba(74,66,228,0.95), rgba(60,54,190,0.38) 46%, transparent 72%);   /* indigo TR */
+      radial-gradient(46% 40% at 34% 4%,  rgba(158,205,74,0.6), transparent 60%),    /* lime hotspot (top) */
+      radial-gradient(52% 46% at 66% 5%,  rgba(150,104,214,0.66), rgba(120,90,210,0.26) 48%, transparent 74%), /* purple bridge (top) */
+      radial-gradient(58% 54% at 6% 2%,   rgba(78,196,96,0.9), rgba(60,170,90,0.3) 45%, transparent 70%),      /* green TL */
+      radial-gradient(58% 54% at 98% 2%,  rgba(74,66,228,0.9), rgba(60,54,190,0.36) 46%, transparent 72%),     /* indigo TR */
+      radial-gradient(70% 60% at 18% 62%, rgba(70,180,110,0.22), transparent 68%),   /* ambient green (lower-left) */
+      radial-gradient(72% 62% at 84% 70%, rgba(96,84,214,0.24), transparent 70%),    /* ambient indigo (lower-right) */
+      radial-gradient(90% 70% at 50% 100%, rgba(120,90,200,0.12), transparent 72%);  /* faint floor glow */
     animation: aur-drift 18s ease-in-out infinite alternate !important;
   }
-  /* Baked bottom fade to black — static, so free. Gives the reference's dark
-     lower half; the single drifting layer carries the motion. */
+  /* Gentle top→bottom darkening (static, free) — keeps the reference's darker
+     lower half for readability WITHOUT hard-cutting the aurora to solid black,
+     so the glow now carries all the way down the stage. */
   html.perf-lite .css-aurora::after {
     content: ''; position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(180deg, transparent 0%, transparent 34%, rgba(6,7,12,0.72) 66%, #06070c 100%);
+    background: linear-gradient(180deg, transparent 0%, transparent 46%, rgba(6,7,12,0.42) 74%, rgba(6,7,12,0.72) 100%);
   }
   @keyframes aur-drift { from { transform: translate3d(-7%, -4%, 0) rotate(-2.5deg); }
                          to   { transform: translate3d(8%, 5%, 0)  rotate(2.5deg); } }

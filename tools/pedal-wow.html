@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fuzz pedal — WOW (CSS render) · before / after</title>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(120% 100% at 50% 0%, #23242a, #101012 70%); color: #f2f2f7;
+    font: 14px/1.4 'Inter', system-ui, sans-serif; min-height: 100vh; padding: 34px; }
+  h1 { font-size: 20px; font-weight: 800; margin: 0 0 22px; }
+  .stage { display: flex; gap: 70px; align-items: flex-start; justify-content: center; flex-wrap: wrap; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .tag { font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+  .tag.before { color: #8a8a92; }
+  .tag.after { color: #f0b429; }
+
+  /* ── The WOW pedal: a rendered CSS object (no SVG art) ───────────────── */
+  .fx {
+    --w: 232px; --h: 396px;
+    position: relative; width: var(--w); height: var(--h); border-radius: 20px;
+    /* anodized metal body, lit from top-left */
+    background:
+      linear-gradient(148deg, #ffe6ac 0%, #e3b163 20%, #c1893a 46%, #9a6529 70%, #5e3c17 100%);
+    box-shadow:
+      0 40px 60px -18px rgba(0,0,0,0.75),
+      0 8px 22px -8px rgba(0,0,0,0.6),
+      inset 0 2px 0 rgba(255,255,255,0.55),
+      inset 0 -20px 34px rgba(0,0,0,0.42),
+      inset 0 0 0 1px rgba(0,0,0,0.45);
+    isolation: isolate;
+  }
+  /* brushed-metal micro texture + a broad directional sheen */
+  .fx::before {
+    content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 4;
+    background:
+      repeating-linear-gradient(118deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 3px),
+      linear-gradient(150deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.06) 16%, transparent 38%);
+    mix-blend-mode: screen; opacity: .9;
+  }
+
+  /* Phillips screw sunk in a washer recess. */
+  .screw { position: absolute; width: 16px; height: 16px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 36% 30%, #f6f8fa, #c2c7cc 30%, #757b81 66%, #34383c);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.6), inset 0 -1px 2px rgba(0,0,0,0.55), inset 0 1px 1px rgba(255,255,255,0.7),
+      0 0 0 2px rgba(0,0,0,0.16); }
+  .screw::after { content: ''; position: absolute; inset: 3px; border-radius: 50%;
+    background:
+      linear-gradient(90deg, transparent 41%, rgba(0,0,0,0.5) 41% 59%, transparent 59%),
+      linear-gradient(0deg, transparent 41%, rgba(0,0,0,0.5) 41% 59%, transparent 59%); }
+  .screw.tl { top: 12px; left: 12px; } .screw.tr { top: 12px; right: 12px; }
+  .screw.bl { bottom: 12px; left: 12px; } .screw.br { bottom: 12px; right: 12px; }
+
+  /* recessed enamel faceplate */
+  .plate {
+    position: absolute; left: 20px; right: 20px; top: 30px; height: 168px; border-radius: 14px; z-index: 1; overflow: hidden;
+    background: radial-gradient(130% 96% at 50% 16%, #52341a, #2c1a0b 70%, #1c1006);
+    box-shadow: inset 0 4px 10px rgba(0,0,0,0.85), inset 0 -1px 0 rgba(255,255,255,0.08),
+      0 1px 0 rgba(255,255,255,0.18), 0 -1px 2px rgba(0,0,0,0.5);
+  }
+  /* sunburst rays — slowly rotating (WOW: a living face under glass) */
+  .plate::before { content: ''; position: absolute; inset: -40%;
+    background: repeating-conic-gradient(from -8deg at 50% 50%, rgba(255,222,150,0.3) 0deg 7deg, transparent 7deg 22deg);
+    -webkit-mask: radial-gradient(46% 46% at 50% 42%, #000 40%, transparent 82%);
+    mask: radial-gradient(46% 46% at 50% 42%, #000 40%, transparent 82%);
+    animation: rays 44s linear infinite; }
+  @keyframes rays { to { transform: rotate(360deg); } }
+  .plate::after { content: ''; position: absolute; inset: 0;
+    background: radial-gradient(56% 50% at 50% 40%, rgba(255,214,140,0.45), transparent 60%),
+      radial-gradient(120% 100% at 50% 46%, transparent 55%, rgba(0,0,0,0.5)); }
+  @media (prefers-reduced-motion: reduce) { .plate::before { animation: none; } }
+  /* Convex glass lens over the whole face: curved top highlight + edge refraction. */
+  .lens { position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit;
+    background:
+      radial-gradient(130% 82% at 30% 8%, rgba(255,255,255,0.42), rgba(255,255,255,0.06) 26%, transparent 48%),
+      radial-gradient(100% 66% at 50% 112%, rgba(255,255,255,0.12), transparent 56%);
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.55), inset 0 2px 3px rgba(255,255,255,0.28), inset 0 -3px 6px rgba(0,0,0,0.4); }
+  /* CSS "metallic paint": an animated liquid gold-chrome gradient, masked to the
+     symbol silhouette. Perf-free (no WebGL) — this technique scales to every
+     pedal's motif. */
+  .square-wave { position: absolute; left: 0; right: 0; top: 60px; height: 48px; z-index: 2;
+    background: linear-gradient(120deg, #d7b46e, #f4e6bd 45%, #caa96a);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 48'%3E%3Cpath d='M6 33 H23 V13 H42 V45 H60 V13 H78 V33 H90' fill='none' stroke='%23000' stroke-width='8' stroke-linejoin='miter' stroke-linecap='butt'/%3E%3C/svg%3E") no-repeat center/92px 48px;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 48'%3E%3Cpath d='M6 33 H23 V13 H42 V45 H60 V13 H78 V33 H90' fill='none' stroke='%23000' stroke-width='8' stroke-linejoin='miter' stroke-linecap='butt'/%3E%3C/svg%3E") no-repeat center/92px 48px;
+    filter: drop-shadow(0 1.5px 0 rgba(0,0,0,0.55)); }
+
+  /* knob row */
+  .knobs { position: absolute; left: 0; right: 0; top: 214px; display: flex; justify-content: center; gap: 24px; z-index: 3; }
+  /* Aluminium amp knob: knurled skirt + domed brushed cap + specular + pointer. */
+  .knob { position: relative; width: 48px; height: 48px; }
+  .knob .skirt { position: absolute; inset: 0; border-radius: 50%;
+    background: repeating-conic-gradient(from 0deg, #d3d8dd 0deg 2.1deg, #6d7379 2.1deg 4.2deg);
+    box-shadow: 0 5px 10px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.45), inset 0 2px 2px rgba(255,255,255,0.35);
+    filter: brightness(0.96); }
+  .knob .cap { position: absolute; inset: 6px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 30%, #ffffff 0%, #e6eaee 20%, #aeb4ba 52%, #767c82 78%, #40454a 100%);
+    box-shadow: inset 0 2px 3px rgba(255,255,255,0.95), inset 0 -3px 6px rgba(0,0,0,0.5), 0 1px 1px rgba(0,0,0,0.4); }
+  .knob .cap::after { content: ''; position: absolute; top: 15%; left: 21%; width: 44%; height: 32%; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.95), transparent 72%); filter: blur(0.6px); }
+  .knob .ptr { position: absolute; top: 4px; left: 50%; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px; z-index: 2;
+    background: linear-gradient(#ffffff, #d0d4d8); box-shadow: 0 1px 1px rgba(0,0,0,0.5), 0 0 2px rgba(0,0,0,0.3); }
+  .knob b { position: absolute; top: 54px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+    font-size: 8px; font-weight: 800; letter-spacing: .08em; color: #3a2208; text-shadow: 0 1px 0 rgba(255,255,255,0.35); }
+
+  /* embossed wordmark */
+  .word { position: absolute; left: 0; right: 0; top: 278px; text-align: center; z-index: 4;
+    font-family: 'Bungee', sans-serif; font-size: 28px; color: #ffe7b3;
+    text-shadow: 0 2px 0 #2a1806, 0 -1px 0 rgba(255,255,255,0.4), 0 3px 5px rgba(0,0,0,0.4); }
+
+  /* LED */
+  .led { position: absolute; top: 196px; right: 26px; width: 11px; height: 11px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 38% 32%, #fff, #ff6a45 42%, #b21500);
+    box-shadow: 0 0 12px 3px rgba(255,80,40,0.85), 0 0 4px #ff5a3c, inset 0 -1px 2px rgba(0,0,0,0.4);
+    animation: led 2.6s ease-in-out infinite; }
+  @keyframes led { 0%,100% { box-shadow: 0 0 12px 3px rgba(255,80,40,0.85), 0 0 4px #ff5a3c, inset 0 -1px 2px rgba(0,0,0,0.4); }
+    50% { box-shadow: 0 0 7px 2px rgba(255,80,40,0.55), 0 0 3px #ff5a3c, inset 0 -1px 2px rgba(0,0,0,0.4); } }
+
+  /* chrome footswitch */
+  /* Brushed footswitch: a matte-satin dome on a faceted nut (soft highlight, no glare). */
+  .stomp { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); width: 52px; height: 52px; border-radius: 50%; z-index: 3;
+    background: conic-gradient(#46494d, #26292d, #4f5357, #26292d, #4f5357, #26292d, #4f5357, #26292d, #46494d);
+    box-shadow: 0 8px 14px rgba(0,0,0,0.65), inset 0 1px 1px rgba(255,255,255,0.24), inset 0 -2px 5px rgba(0,0,0,0.7); }
+  .stomp::after { content: ''; position: absolute; inset: 5px; border-radius: 50%;
+    background:
+      radial-gradient(circle at 48% 26%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 38%),
+      linear-gradient(180deg, #d6dade 0%, #aab0b6 34%, #868c92 56%, #a6acb2 76%, #cfd4d8 96%);
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.55), inset 0 -4px 7px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.4); }
+
+  @media (prefers-reduced-motion: reduce) { .fx::after, .led { animation: none; } }
+</style>
+</head>
+<body>
+<h1>Fuzz — CSS render (no SVG). Before / After.</h1>
+<div class="stage">
+  <div class="col"><div class="tag before">BEFORE (current SVG art)</div><div id="before"></div></div>
+  <div class="col">
+    <div class="tag after">AFTER (CSS-rendered pedal)</div>
+    <div class="fx">
+      <span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+      <div class="plate"><div class="square-wave"></div><div class="lens"></div></div>
+      <div class="led"></div>
+      <div class="knobs">
+        <div class="knob"><i class="skirt"></i><i class="cap"></i><i class="ptr"></i><b>SUSTAIN</b></div>
+        <div class="knob"><i class="skirt"></i><i class="cap"></i><i class="ptr"></i><b>TONE</b></div>
+        <div class="knob"><i class="skirt"></i><i class="cap"></i><i class="ptr"></i><b>VOL</b></div>
+      </div>
+      <div class="word">FUZZ</div>
+      <div class="stomp"></div>
+    </div>
+  </div>
+</div>
+<script type="module">
+  import { fxArtSvg as oldSvg, ensureFxArtSheet as oldSheet } from './fx-art-baseline.js';
+  oldSheet();
+  const b = oldSvg('fuzz'); b.style.width = '232px'; b.style.height = 'auto';
+  b.style.borderRadius = '14px'; b.style.boxShadow = '0 40px 60px -18px rgba(0,0,0,0.7)';
+  document.getElementById('before').appendChild(b);
+</script>
+</body>
+</html>

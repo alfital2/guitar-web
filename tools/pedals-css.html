@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>All effects — CSS pedal recreation</title>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Bungee+Inline&family=Audiowide&family=Orbitron:wght@600;800&family=Special+Elite&family=Major+Mono+Display&family=Inter:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(120% 100% at 50% 0%, #1c1d22, #101012 70%); color: #f2f2f7;
+    font: 14px/1.4 'Inter', system-ui, sans-serif; padding: 30px; }
+  h1 { font-size: 20px; font-weight: 800; margin: 0 0 4px; }
+  .sub { color: #9a9aa2; font-size: 13px; margin: 0 0 26px; }
+  .sub b { color: #f0b429; }
+  .grid { display: flex; flex-wrap: wrap; gap: 30px 26px; align-items: flex-start; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .cap { font-size: 12px; font-weight: 700; color: #c8c8cd; }
+  .cap small { color: #82828a; font-weight: 500; }
+
+  /* ── CSS pedal framework (one base, driven by --c per effect) ───────── */
+  .fx { position: relative; width: 210px; height: 356px; border-radius: 20px; isolation: isolate;
+    background: linear-gradient(148deg,
+      color-mix(in srgb, var(--c) 46%, #fff) 0%, color-mix(in srgb, var(--c) 82%, #fff) 20%,
+      var(--c) 48%, color-mix(in srgb, var(--c) 70%, #000) 74%, color-mix(in srgb, var(--c) 44%, #000) 100%);
+    box-shadow: 0 36px 54px -18px rgba(0,0,0,0.72), inset 0 2px 0 rgba(255,255,255,0.5),
+      inset 0 -16px 30px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(0,0,0,0.45); }
+  .fx .body-gloss { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 4;
+    background: repeating-linear-gradient(118deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 3px),
+      linear-gradient(150deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.05) 16%, transparent 38%);
+    mix-blend-mode: screen; }
+
+  .screw { position: absolute; width: 15px; height: 15px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 36% 30%, #f6f8fa, #c2c7cc 30%, #757b81 66%, #34383c);
+    box-shadow: 0 2px 3px rgba(0,0,0,0.6), inset 0 -1px 2px rgba(0,0,0,0.55), inset 0 1px 1px rgba(255,255,255,0.7), 0 0 0 2px rgba(0,0,0,0.16); }
+  .screw::after { content: ''; position: absolute; inset: 3px; border-radius: 50%;
+    background: linear-gradient(90deg, transparent 41%, rgba(0,0,0,0.5) 41% 59%, transparent 59%),
+      linear-gradient(0deg, transparent 41%, rgba(0,0,0,0.5) 41% 59%, transparent 59%); }
+  .screw.tl { top: 11px; left: 11px; } .screw.tr { top: 11px; right: 11px; }
+  .screw.bl { bottom: 11px; left: 11px; } .screw.br { bottom: 11px; right: 11px; }
+
+  .plate { position: absolute; left: 18px; right: 18px; top: 28px; height: 150px; border-radius: 13px; z-index: 1; overflow: hidden;
+    background: radial-gradient(130% 96% at 50% 16%, color-mix(in srgb, var(--c) 24%, #17110a), color-mix(in srgb, var(--c) 9%, #0d0906) 74%);
+    box-shadow: inset 0 4px 10px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.08), 0 1px 0 rgba(255,255,255,0.16); }
+  .plate .glow { position: absolute; inset: 0;
+    background: radial-gradient(56% 52% at 50% 40%, color-mix(in srgb, var(--c) 40%, transparent), transparent 62%),
+      radial-gradient(122% 100% at 50% 46%, transparent 54%, rgba(0,0,0,0.5)); }
+  .plate .rays { position: absolute; inset: -40%;
+    background: repeating-conic-gradient(from -8deg at 50% 50%, color-mix(in srgb, var(--c) 55%, #fff5d8) 0deg 7deg, transparent 7deg 22deg);
+    -webkit-mask: radial-gradient(46% 46% at 50% 42%, #000 40%, transparent 82%);
+    mask: radial-gradient(46% 46% at 50% 42%, #000 40%, transparent 82%); opacity: .5; animation: rays 44s linear infinite; }
+  @keyframes rays { to { transform: rotate(360deg); } }
+  .motif { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
+    color: color-mix(in srgb, var(--c) 24%, #fff);
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)) drop-shadow(0 0 6px color-mix(in srgb, var(--c) 60%, transparent)); }
+  .motif svg { width: 118px; height: 78px; stroke: currentColor; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .motif .fill { fill: currentColor; stroke: none; }
+  .lens { position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit;
+    background: radial-gradient(130% 82% at 30% 8%, rgba(255,255,255,0.4), rgba(255,255,255,0.06) 26%, transparent 48%),
+      radial-gradient(100% 66% at 50% 112%, rgba(255,255,255,0.1), transparent 56%);
+    box-shadow: inset 0 0 22px rgba(0,0,0,0.5), inset 0 2px 3px rgba(255,255,255,0.26), inset 0 -3px 6px rgba(0,0,0,0.38); }
+
+  .led { position: absolute; top: 178px; right: 24px; width: 10px; height: 10px; border-radius: 50%; z-index: 3;
+    background: radial-gradient(circle at 38% 32%, #fff, #ff6a45 42%, #b21500);
+    box-shadow: 0 0 11px 3px rgba(255,80,40,0.8), 0 0 4px #ff5a3c; }
+  /* Knob grid: 1-3 in a row, 4 as 2x2, 5 as 3+2, 6 as 3x2 (--cols set per pedal). */
+  .knobs { position: absolute; left: 12px; right: 12px; top: 182px; z-index: 3;
+    display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); justify-items: center; row-gap: 16px; column-gap: 6px; }
+  .knob { position: relative; width: 40px; height: 40px; }
+  .knob .skirt { position: absolute; inset: 0; border-radius: 50%;
+    background: repeating-conic-gradient(from 0deg, #d3d8dd 0deg 2.1deg, #6d7379 2.1deg 4.2deg);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(0,0,0,0.45), inset 0 2px 2px rgba(255,255,255,0.32); }
+  .knob .cap { position: absolute; inset: 5px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 30%, #fff 0%, #e6eaee 20%, #aeb4ba 52%, #767c82 78%, #40454a 100%);
+    box-shadow: inset 0 2px 3px rgba(255,255,255,0.95), inset 0 -3px 5px rgba(0,0,0,0.5), 0 1px 1px rgba(0,0,0,0.4); }
+  .knob .cap::after { content: ''; position: absolute; top: 15%; left: 21%; width: 44%; height: 32%; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.95), transparent 72%); filter: blur(0.6px); }
+  .knob .ptr { position: absolute; top: 3px; left: 50%; width: 3.5px; height: 14px; margin-left: -1.75px; border-radius: 2px; z-index: 2;
+    background: linear-gradient(#fff, #d0d4d8); box-shadow: 0 1px 1px rgba(0,0,0,0.5); }
+  .knob b { position: absolute; top: 45px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+    font: 800 7px 'Inter'; letter-spacing: .06em; color: color-mix(in srgb, var(--c) 30%, #1a1206); text-shadow: 0 1px 0 rgba(255,255,255,0.3); }
+
+  .word { position: absolute; left: 0; right: 0; bottom: 74px; text-align: center; z-index: 4; padding: 0 8px;
+    font-family: var(--font); font-size: 24px; line-height: 1; color: color-mix(in srgb, var(--c) 22%, #fff8ea);
+    text-shadow: 0 2px 0 rgba(0,0,0,0.45), 0 -1px 0 rgba(255,255,255,0.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tagline { position: absolute; left: 0; right: 0; top: 292px; text-align: center; z-index: 4;
+    font: 800 7.5px 'Inter'; letter-spacing: .12em; color: color-mix(in srgb, var(--c) 40%, #fff); opacity: .8; }
+
+  .stomp { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); width: 50px; height: 50px; border-radius: 50%; z-index: 3;
+    background: conic-gradient(#46494d, #26292d, #4f5357, #26292d, #4f5357, #26292d, #4f5357, #26292d, #46494d);
+    box-shadow: 0 8px 13px rgba(0,0,0,0.62), inset 0 1px 1px rgba(255,255,255,0.24), inset 0 -2px 5px rgba(0,0,0,0.7); }
+  .stomp::after { content: ''; position: absolute; inset: 5px; border-radius: 50%;
+    background: radial-gradient(circle at 48% 26%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 38%),
+      linear-gradient(180deg, #d6dade 0%, #aab0b6 34%, #868c92 56%, #a6acb2 76%, #cfd4d8 96%);
+    box-shadow: inset 0 2px 4px rgba(255,255,255,0.55), inset 0 -4px 6px rgba(0,0,0,0.4); }
+
+  @media (prefers-reduced-motion: reduce) { .plate .rays { animation: none; } }
+</style>
+</head>
+<body>
+<h1>All effects — CSS pedal recreation</h1>
+<p class="sub"><b>Fuzz</b> is the finished reference (glass lens + rotating sunburst). The rest are recreated in the same premium hardware, each with its own colour / wordmark / motif — <b>base pedals awaiting per-effect WOW tailoring</b>.</p>
+<div class="grid" id="grid"></div>
+
+<script type="module">
+  const M = {
+    compressor: `<path stroke-width="5" fill="none" d="M12 54 A42 42 0 0 1 90 54"/><line stroke-width="4" x1="51" y1="54" x2="74" y2="20"/><circle class="fill" cx="51" cy="54" r="4"/>`,
+    boost: `<path class="fill" d="M51 8 L78 42 H63 V60 H39 V42 H24 Z"/>`,
+    gate: `<path stroke-width="5" fill="none" d="M10 42 q9 -20 18 0 t18 0 M56 42 H92"/><line stroke-width="3" stroke-dasharray="4 5" x1="52" y1="22" x2="52" y2="60"/>`,
+    fuzz: `<path stroke-width="8" fill="none" stroke-linejoin="miter" d="M8 46 H26 V22 H45 V62 H63 V22 H82 V46 H94"/>`,
+    octave: `<path stroke-width="4" fill="none" d="M51 6 L90 40 L51 74 L12 40 Z"/><path stroke-width="4" fill="none" d="M51 24 L72 40 L51 56 L30 40 Z"/>`,
+    wah: `<g stroke-width="4" fill="none"><path d="M14 20 L88 12 M14 32 L88 24 M14 44 L88 36"/></g><path class="fill" d="M20 60 L80 34 L80 46 L28 68 Z"/>`,
+    autowah: `<path stroke-width="6" fill="none" d="M12 58 Q51 6 90 58"/>`,
+    chorus: `<g stroke-width="4" fill="none"><path d="M8 26 q11 -11 22 0 t22 0 t22 0 t22 0"/><path d="M8 40 q11 -11 22 0 t22 0 t22 0 t22 0"/><path d="M8 54 q11 -11 22 0 t22 0 t22 0 t22 0"/></g>`,
+    flanger: `<g stroke-width="4" fill="none"><path d="M22 8 Q52 40 22 72"/><path d="M36 8 Q66 40 36 72"/><path d="M50 8 Q80 40 50 72"/></g>`,
+    phaser: `<g stroke-width="4" fill="none"><circle cx="51" cy="40" r="11"/><circle cx="51" cy="40" r="24"/><path d="M12 50 C34 50 34 30 51 30 C68 30 68 50 90 50"/></g>`,
+    tremolo: `<g class="fill"><rect x="16" y="34" width="7" height="14" rx="2"/><rect x="30" y="24" width="7" height="34" rx="2"/><rect x="44" y="16" width="7" height="50" rx="2"/><rect x="58" y="24" width="7" height="34" rx="2"/><rect x="72" y="34" width="7" height="14" rx="2"/></g>`,
+    vibrato: `<path stroke-width="6" fill="none" d="M8 40 q8 -18 16 0 t16 0 t16 0 t16 0 t16 0"/>`,
+    autopan: `<path stroke-width="5" fill="none" d="M14 46 Q51 6 88 46"/><circle class="fill" cx="14" cy="46" r="5"/><circle class="fill" cx="88" cy="46" r="5"/>`,
+    rotary: `<circle stroke-width="4" fill="none" cx="51" cy="40" r="22"/><g stroke-width="4"><line x1="51" y1="40" x2="51" y2="18"/><line x1="51" y1="40" x2="70" y2="51"/><line x1="51" y1="40" x2="32" y2="51"/></g><circle class="fill" cx="51" cy="40" r="5"/>`,
+    ringmod: `<circle class="fill" cx="51" cy="40" r="6"/><g stroke-width="3" fill="none"><ellipse cx="51" cy="40" rx="34" ry="13"/><ellipse cx="51" cy="40" rx="34" ry="13" transform="rotate(60 51 40)"/><ellipse cx="51" cy="40" rx="34" ry="13" transform="rotate(-60 51 40)"/></g>`,
+    delay: `<g class="fill"><rect x="18" y="20" width="8" height="42" rx="2"/><rect x="36" y="26" width="8" height="36" rx="2" opacity=".75"/><rect x="54" y="34" width="8" height="28" rx="2" opacity=".5"/><rect x="72" y="42" width="8" height="20" rx="2" opacity=".3"/></g>`,
+    'tape-echo': `<g stroke-width="4" fill="none"><circle cx="33" cy="40" r="17"/><circle cx="69" cy="40" r="17"/></g><circle class="fill" cx="33" cy="40" r="4"/><circle class="fill" cx="69" cy="40" r="4"/>`,
+    pingpong: `<path stroke-width="5" fill="none" d="M14 14 L51 54 L88 14"/><circle class="fill" cx="14" cy="14" r="5"/><circle class="fill" cx="88" cy="14" r="5"/>`,
+    reverb: `<g stroke-width="4" fill="none"><path d="M31 52 A22 22 0 0 1 71 52"/><path d="M20 52 A34 34 0 0 1 82 52"/><path d="M42 52 A11 11 0 0 1 60 52"/></g>`,
+    widener: `<g stroke-width="5" fill="none"><path d="M44 40 H14 M23 31 L14 40 L23 49"/><path d="M58 40 H88 M79 31 L88 40 L79 49"/></g>`,
+    limiter: `<line stroke-width="4" x1="10" y1="20" x2="92" y2="20"/><path stroke-width="5" fill="none" d="M10 54 q11 -30 22 0 t22 0 t22 0 t22 0"/>`,
+    pitchshift: `<g stroke-width="5" fill="none"><path d="M34 46 V16 M26 24 L34 16 L42 24"/><path d="M68 22 V52 M60 44 L68 52 L76 44"/></g>`,
+    looper: `<path stroke-width="5" fill="none" d="M30 50 A24 24 0 1 1 55 58"/><path class="fill" d="M50 46 L60 60 L44 62 Z"/>`
+  };
+  const P = [
+    ['fuzz','Fuzz','#e0a943',"'Bungee'",['SUSTAIN','TONE','VOL'],'SUSTAIN · TONE · VOL',true],
+    ['compressor','Compressor','#8fa3b0',"'Major Mono Display'",['THRESH','RATIO','ATK','REL','GAIN'],'DYNAMICS'],
+    ['boost','Boost','#2e9bff',"'Bungee'",['GAIN','LEVEL','TONE'],'GAIN · LEVEL'],
+    ['gate','Gate','#e9c93a',"'Major Mono Display'",['THRESH','DECAY'],'NOISE GATE'],
+    ['octave','Octave','#d4a017',"'Bungee'",['OCTAVE','FUZZ','TONE','MIX'],'OCTAVE FUZZ'],
+    ['wah','Wah','#ff5a4d',"'Bungee Inline'",['SWEEP','Q','LEVEL'],'SWEEP'],
+    ['autowah','Auto-Wah','#ff9f1c',"'Bungee Inline'",['SENS','Q','DECAY','MIX'],'ENVELOPE'],
+    ['chorus','Chorus','#5aa6d8',"'Audiowide'",['RATE','DEPTH','MIX'],'RATE · DEPTH · MIX'],
+    ['flanger','Flanger','#b08bff',"'Audiowide'",['RATE','DEPTH','FDBK','MIX'],'JET'],
+    ['phaser','Phaser','#ff4fd8',"'Audiowide'",['RATE','DEPTH','RES','MIX'],'SWEEP'],
+    ['tremolo','Tremolo','#e8c07a',"'Audiowide'",['SPEED','DEPTH','WAVE'],'AMPLITUDE'],
+    ['vibrato','Vibrato','#ffa64d',"'Audiowide'",['RATE','DEPTH'],'PITCH MOD'],
+    ['autopan','Auto-Pan','#ffcf5a',"'Audiowide'",['RATE','WIDTH','SHAPE'],'L · R'],
+    ['rotary','Rotary','#caa06a',"'Audiowide'",['SPEED','DRIVE','MIX'],'LESLIE'],
+    ['ringmod','Ring Mod','#e8b84b',"'Major Mono Display'",['FREQ','MIX'],'FREQ · MIX'],
+    ['delay','Delay','#39d98a',"'Orbitron'",['TIME','FDBK','MIX','TONE'],'TIME · FDBK · MIX'],
+    ['tape-echo','Tape Echo','#7fd8c6',"'Special Elite'",['TIME','FDBK','MIX','WOW','AGE'],'SPACE · TIME'],
+    ['pingpong','Ping-Pong','#ff8a3d',"'Orbitron'",['TIME','SPREAD','FDBK','MIX'],'STEREO'],
+    ['reverb','Reverb','#8f7dff',"'Orbitron'",['SIZE','MIX'],'SPACE'],
+    ['widener','Widener','#39d3ff',"'Orbitron'",['WIDTH'],'STEREO'],
+    ['limiter','Limiter','#9aa6ad',"'Major Mono Display'",['CEIL','RELEASE'],'BRICKWALL'],
+    ['pitchshift','Pitch Shift','#33e0c8',"'Major Mono Display'",['PITCH','MIX'],'INTERVAL'],
+    ['looper','Looper','#39d98a',"'Major Mono Display'",['LEVEL','FADE'],'LOOP'],
+  ];
+
+  const grid = document.getElementById('grid');
+  for (const [type, label, color, font, labels, tagline, sunburst] of P) {
+    const cell = document.createElement('div'); cell.className = 'cell';
+    const fx = document.createElement('div'); fx.className = 'fx'; fx.style.setProperty('--c', color); fx.style.setProperty('--font', font);
+    const knobs = labels.map(l => `<div class="knob"><i class="skirt"></i><i class="cap"></i><i class="ptr"></i><b>${l}</b></div>`).join('');
+    fx.innerHTML =
+      `<span class="screw tl"></span><span class="screw tr"></span><span class="screw bl"></span><span class="screw br"></span>
+       <div class="plate">${sunburst ? '<div class="rays"></div>' : ''}<div class="glow"></div>
+         <div class="motif"><svg viewBox="0 0 102 80" fill="none">${M[type] || ''}</svg></div><div class="lens"></div></div>
+       <div class="led"></div>
+       <div class="knobs">${knobs}</div>
+       <div class="word">${label.toUpperCase()}</div>
+       <div class="stomp"></div>
+       <div class="body-gloss"></div>`;
+    // Fixed height; WIDEN for more knobs so they stay in one row (wide enclosure).
+    const n = labels.length;
+    fx.style.setProperty('--cols', n);
+    fx.style.width = Math.max(168, 56 + n * 50) + 'px';
+    // Auto-fit the wordmark so long names (COMPRESSOR, PING-PONG…) don't overflow.
+    const wEl = fx.querySelector('.word');
+    const len = label.length;
+    wEl.style.fontSize = (len > 9 ? 15 : len > 7 ? 18 : 24) + 'px';
+    const cap = document.createElement('div'); cap.className = 'cap';
+    cap.innerHTML = `${label} <small>· ${labels.length}k${sunburst ? ' · ✨ready' : ''}</small>`;
+    cell.append(fx, cap); grid.appendChild(cell);
+  }
+</script>
+</body>
+</html>

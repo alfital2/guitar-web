@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pedal glass-up — before / after</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #161618; color: #f2f2f7; font: 14px/1.4 'Inter', system-ui, sans-serif; padding: 28px 34px 60px; }
+  h1 { font-size: 20px; font-weight: 800; margin: 0 0 4px; }
+  .sub { color: #9a9aa2; font-size: 13px; margin: 0 0 26px; }
+  .legend { display: inline-flex; gap: 18px; margin-bottom: 22px; font-size: 12px; }
+  .legend b { color: #f0b429; }
+  .row {
+    display: grid; grid-template-columns: 130px 1fr 1fr; align-items: center; gap: 20px;
+    padding: 16px 0; border-top: 1px solid rgba(255,255,255,0.07);
+  }
+  .row-label { font-weight: 700; font-size: 14px; }
+  .row-label small { display: block; color: #8a8a92; font-weight: 500; font-size: 11px; margin-top: 3px; }
+  .side { display: flex; justify-content: center; }
+  .badge { font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 3px 8px; border-radius: 5px; }
+  .col-head { display: grid; grid-template-columns: 130px 1fr 1fr; gap: 20px; margin-bottom: 4px; }
+  .col-head div { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .1em; color: #8a8a92; }
+  .col-head div:first-child { text-align: left; }
+  .col-head .after { color: #f0b429; }
+
+  /* Pedal shell + the SAME glass gloss the app uses, so this matches in-app. */
+  .pedal { position: relative; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(0,0,0,0.4); }
+  .pedal .face { display: block; width: 100%; height: auto; }
+  .pedal.glass::before {
+    content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.24), rgba(255,255,255,0.05) 15%, transparent 32%),
+      radial-gradient(130% 62% at 50% -12%, rgba(255,255,255,0.20), transparent 60%),
+      linear-gradient(120deg, transparent 42%, rgba(255,255,255,0.10) 49%, transparent 57%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -18px 30px rgba(0,0,0,0.3);
+    mix-blend-mode: screen;
+  }
+  .toggle { margin-bottom: 20px; }
+  .toggle label { font-size: 12px; color: #c8c8cd; cursor: pointer; user-select: none; }
+</style>
+</head>
+<body>
+<h1>Pedal glass-up — before / after</h1>
+<p class="sub">Left = original art · Right = glass rebuild. Only <b style="color:#f0b429">Fuzz</b> is rebuilt so far — every other row is identical on both sides (that's the backlog). The optional gloss overlay is what the live app adds on top.</p>
+<div class="toggle"><label><input type="checkbox" id="gloss" checked> Show the app's glass gloss overlay on both sides</label></div>
+<div class="col-head"><div>Effect</div><div>Before</div><div class="after">After</div></div>
+<div id="rows"></div>
+
+<script type="module">
+  import { fxArtSvg as newSvg, ensureFxArtSheet as newSheet, FX_KNOBS } from '../src/chain-ui/fx-art.js';
+  import { fxArtSvg as oldSvg, ensureFxArtSheet as oldSheet } from './fx-art-baseline.js';
+  newSheet(); oldSheet();
+
+  const TYPES = [
+    ['fuzz','Fuzz','rebuilt'],
+    ['compressor','Compressor'],['boost','Boost'],['gate','Noise Gate'],['octave','Octave Fuzz'],
+    ['wah','Wah'],['autowah','Auto-Wah'],['chorus','Chorus'],['flanger','Flanger'],['phaser','Phaser'],
+    ['tremolo','Tremolo'],['vibrato','Vibrato'],['autopan','Auto-Pan'],['rotary','Rotary'],['ringmod','Ring Mod'],
+    ['delay','Delay'],['tape-echo','Tape Echo'],['pingpong','Ping-Pong'],['reverb','Reverb'],['widener','Widener'],
+    ['limiter','Limiter'],['pitchshift','Pitch Shift'],['looper','Looper'],
+  ];
+  const WIDTH = 150; // display width per pedal
+  const rows = document.getElementById('rows');
+
+  function pedal(svg) {
+    const p = document.createElement('div');
+    p.className = 'pedal glass';
+    p.style.width = WIDTH + 'px';
+    svg.classList.add('face');
+    p.appendChild(svg);
+    return p;
+  }
+
+  for (const [type, label, note] of TYPES) {
+    const row = document.createElement('div'); row.className = 'row';
+    const lab = document.createElement('div'); lab.className = 'row-label';
+    lab.innerHTML = label + (note ? '<small style="color:#f0b429">✨ ' + note + '</small>' : '<small>original</small>');
+    const before = document.createElement('div'); before.className = 'side';
+    before.appendChild(pedal(oldSvg(type)));
+    const after = document.createElement('div'); after.className = 'side';
+    after.appendChild(pedal(newSvg(type)));
+    row.append(lab, before, after);
+    rows.appendChild(row);
+  }
+
+  document.getElementById('gloss').addEventListener('change', e => {
+    document.querySelectorAll('.pedal').forEach(p => p.classList.toggle('glass', e.target.checked));
+  });
+</script>
+</body>
+</html>
