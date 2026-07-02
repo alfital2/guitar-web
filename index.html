@@ -9,7 +9,7 @@
 <title>Guitar Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Bungee&family=Bungee+Inline&family=Audiowide&family=Orbitron:wght@600;800&family=Special+Elite&family=Major+Mono+Display&family=Pacifico&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Barlow+Condensed:wght@500;600;700&family=Oswald:wght@500;600;700&family=Audiowide&family=Orbitron:wght@600;800&family=Bungee&family=Righteous&family=Anton&family=Pacifico&display=swap" rel="stylesheet">
 <style>
   :root {
     /* Theme-able palette (Studio = default). Overridden per [data-theme] below. */
@@ -610,11 +610,22 @@
     display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); justify-items: center; column-gap: 3px; row-gap: 3px; }
   .pedal-knob { display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .pedal-knob .knob .label, .pedal-knob .knob .val { display: none; }
-  .pedal-knob b { font: 800 6.5px var(--font, 'Inter'); letter-spacing: .02em; text-transform: uppercase;
-    color: color-mix(in srgb, var(--c) 32%, #140d04); text-shadow: 0 1px 0 rgba(255,255,255,0.3); white-space: nowrap; }
-  .pedal-word { position: absolute; left: 0; right: 0; bottom: 60px; text-align: center; z-index: 4; padding: 0 6px; line-height: 1;
-    font-family: var(--font, 'Inter'); color: color-mix(in srgb, var(--c) 20%, #fff8ea);
-    text-shadow: 0 2px 0 rgba(0,0,0,0.45), 0 -1px 0 rgba(255,255,255,0.32); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Knob labels: ONE clean condensed sans on every pedal (personality lives in
+     the name, never at 8px). Ink direction + halo track the pedal body so labels
+     stay legible on both dark and bright enclosures. */
+  .pedal-knob b { font: 600 8px 'Barlow Condensed', 'Oswald', sans-serif; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--label-ink, #160d04); text-shadow: var(--label-halo, 0 1px 0 rgba(255,255,255,0.3)); white-space: nowrap; }
+  /* The pedal NAME is the branding element: per-effect personality font + a
+     directional engraved ink (light on dark bodies, dark on bright) with a soft
+     ink-well scrim behind it for a ≥4.5:1 contrast floor on every enclosure. */
+  .pedal-word { position: absolute; left: 0; right: 0; bottom: 58px; text-align: center; z-index: 4; padding: 0 5px; line-height: 1;
+    font-family: var(--name-font, 'Inter'); font-weight: var(--name-weight, 700); font-size: var(--name-size, 15px);
+    letter-spacing: var(--name-ls, .02em); text-transform: var(--name-transform, uppercase);
+    color: var(--name-ink, #fff8ea); text-shadow: var(--name-shadow, 0 2px 0 rgba(0,0,0,0.45));
+    transform: skewX(var(--name-skew, 0deg));
+    white-space: nowrap; overflow: visible; }
+  .pedal-word::before { content: ''; position: absolute; z-index: -1; inset: -7px 2px; border-radius: 10px;
+    background: var(--name-scrim, transparent); filter: blur(5px); pointer-events: none; }
   /* Knob name tooltip — single body-level element (never clipped by the pedal),
      positioned above the active knob; shown only while tuning or on hover. */
   #knob-tip.knob-tip {

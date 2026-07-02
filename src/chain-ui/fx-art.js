@@ -5,37 +5,61 @@
 // the right number of controls; height is fixed at 248. Pure inline SVG, injected
 // once as a hidden <symbol> sprite. Controls overlay on top in the DOM.
 
-export const FX_FONTS = {
-  fuzz:   { family: "'Bungee', sans-serif", ls: '.02em' },
-  boost:  { family: "'Bungee', sans-serif", ls: '.02em' },
-  octave: { family: "'Bungee', sans-serif", ls: '.02em' },
-  chorus:  { family: "'Audiowide', sans-serif", ls: '.04em' },
-  flanger: { family: "'Audiowide', sans-serif", ls: '.04em' },
-  phaser:  { family: "'Audiowide', sans-serif", ls: '.04em' },
-  tremolo: { family: "'Audiowide', sans-serif", ls: '.04em' },
-  vibrato: { family: "'Audiowide', sans-serif", ls: '.04em' },
-  rotary:  { family: "'Audiowide', sans-serif", ls: '.04em' },
-  autopan: { family: "'Audiowide', sans-serif", ls: '.04em' },
-  delay:   { family: "'Orbitron', sans-serif", ls: '.08em' },
-  reverb:  { family: "'Orbitron', sans-serif", ls: '.08em' },
-  pingpong:{ family: "'Orbitron', sans-serif", ls: '.08em' },
-  widener: { family: "'Orbitron', sans-serif", ls: '.08em' },
-  'tape-echo': { family: "'Special Elite', monospace", ls: '.06em' },
-  wah:     { family: "'Bungee Inline', sans-serif", ls: '.02em' },
-  autowah: { family: "'Bungee Inline', sans-serif", ls: '.02em' },
-  compressor: { family: "'Major Mono Display', monospace", ls: '.02em' },
-  gate:       { family: "'Major Mono Display', monospace", ls: '.02em' },
-  limiter:    { family: "'Major Mono Display', monospace", ls: '.02em' },
-  pitchshift: { family: "'Major Mono Display', monospace", ls: '.02em' },
-  looper:     { family: "'Major Mono Display', monospace", ls: '.02em' },
-  ringmod:    { family: "'Major Mono Display', monospace", ls: '.02em' },
-  acousticsim: { family: "'Special Elite', monospace", ls: '.06em' },
-  distortion:  { family: "'Bungee', sans-serif", ls: '.02em' },
-  harmonizer:  { family: "'Major Mono Display', monospace", ls: '.02em' },
-  univibe:     { family: "'Audiowide', sans-serif", ls: '.04em' },
-  springverb:  { family: "'Orbitron', sans-serif", ls: '.08em' },
-  whammy:      { family: "'Bungee Inline', sans-serif", ls: '.02em' },
+// ── Pedal typography system ────────────────────────────────────────────────
+// The pedal NAME is the branding element: one personality font per effect
+// (grouped by sonic family, differentiated per-pedal via size / tracking / skew)
+// carried at 10–17px. Knob labels are NOT here — they use one clean condensed
+// sans everywhere (Barlow Condensed, in CSS). `dir` is the ink direction the
+// wordmark needs against the faceplate's shaded lower band: 'light' = light ink
+// (dark bodies), 'dark' = dark ink (bright bodies). Fields:
+//   font  personality family (must be in the single <link> font budget)
+//   w     font-weight        size  px (10–17)     ls  letter-spacing
+//   tr    'up' uppercase | 'none' keep case (script faces read better mixed)
+//   skew  degrees of skewX (jet/metal lean)       dir 'light' | 'dark'
+export const FX_TYPE = {
+  // Industrial / dynamics — Oswald, machined with wide tracking.
+  compressor: { font: "'Oswald', sans-serif",   w: 600, size: 13, ls: '.12em', tr: 'up', skew: 0, dir: 'light' },
+  boost:      { font: "'Oswald', sans-serif",   w: 700, size: 16, ls: '.16em', tr: 'up', skew: 0, dir: 'light' },
+  gate:       { font: "'Oswald', sans-serif",   w: 600, size: 12, ls: '.10em', tr: 'up', skew: 0, dir: 'light' },
+  limiter:    { font: "'Oswald', sans-serif",   w: 600, size: 14, ls: '.14em', tr: 'up', skew: 0, dir: 'light' },
+  // Vintage / tape — Oswald, lighter weight + very wide tracking (silkscreen).
+  'tape-echo':{ font: "'Oswald', sans-serif",   w: 500, size: 12, ls: '.16em', tr: 'up', skew: 0, dir: 'light' },
+  tremolo:    { font: "'Oswald', sans-serif",   w: 500, size: 14, ls: '.14em', tr: 'up', skew: 0, dir: 'dark'  },
+  // Retro-digital / time + pitch — Audiowide.
+  delay:      { font: "'Audiowide', sans-serif", w: 400, size: 14, ls: '.02em', tr: 'up', skew: 0, dir: 'dark'  },
+  pingpong:   { font: "'Audiowide', sans-serif", w: 400, size: 11, ls: '0',     tr: 'up', skew: 0, dir: 'dark'  },
+  looper:     { font: "'Audiowide', sans-serif", w: 400, size: 13, ls: '.02em', tr: 'up', skew: 0, dir: 'light' },
+  pitchshift: { font: "'Audiowide', sans-serif", w: 400, size: 10, ls: '0',     tr: 'up', skew: 0, dir: 'light' },
+  harmonizer: { font: "'Audiowide', sans-serif", w: 400, size: 11, ls: '0',     tr: 'up', skew: 0, dir: 'light' },
+  whammy:     { font: "'Audiowide', sans-serif", w: 400, size: 13, ls: '.02em', tr: 'up', skew: 0, dir: 'light' },
+  // Psych / organic — Righteous, rounded retro.
+  fuzz:       { font: "'Righteous', sans-serif", w: 400, size: 17, ls: '.03em', tr: 'up', skew: 0, dir: 'light' },
+  univibe:    { font: "'Righteous', sans-serif", w: 400, size: 12, ls: '.02em', tr: 'up', skew: 0, dir: 'light' },
+  octave:     { font: "'Righteous', sans-serif", w: 400, size: 12, ls: '.02em', tr: 'up', skew: 0, dir: 'light' },
+  acousticsim:{ font: "'Righteous', sans-serif", w: 400, size: 11, ls: '.01em', tr: 'up', skew: 0, dir: 'light' },
+  // Metal + jet / sweep — Anton, ultra-condensed heavy, leaning.
+  distortion: { font: "'Anton', sans-serif",     w: 400, size: 15, ls: '.01em', tr: 'up', skew: -3, dir: 'light' },
+  flanger:    { font: "'Anton', sans-serif",     w: 400, size: 15, ls: '.02em', tr: 'up', skew: -9, dir: 'light' },
+  phaser:     { font: "'Anton', sans-serif",     w: 400, size: 16, ls: '.02em', tr: 'up', skew: -9, dir: 'light' },
+  // Funk / filter — Bungee, chunky.
+  wah:        { font: "'Bungee', sans-serif",    w: 400, size: 15, ls: '.01em', tr: 'up', skew: 0, dir: 'dark'  },
+  autowah:    { font: "'Bungee', sans-serif",    w: 400, size: 10, ls: '0',     tr: 'up', skew: 0, dir: 'dark'  },
+  // Space / spin — Orbitron.
+  rotary:     { font: "'Orbitron', sans-serif",  w: 800, size: 13, ls: '.06em', tr: 'up', skew: 0, dir: 'light' },
+  autopan:    { font: "'Orbitron', sans-serif",  w: 600, size: 11, ls: '.04em', tr: 'up', skew: 0, dir: 'light' },
+  ringmod:    { font: "'Orbitron', sans-serif",  w: 600, size: 10, ls: '.05em', tr: 'up', skew: 0, dir: 'light' },
+  widener:    { font: "'Orbitron', sans-serif",  w: 600, size: 12, ls: '.05em', tr: 'up', skew: 0, dir: 'light' },
+  reverb:     { font: "'Orbitron', sans-serif",  w: 800, size: 13, ls: '.08em', tr: 'up', skew: 0, dir: 'light' },
+  // Script / surf — Pacifico, flowing (kept mixed-case — script uppercases badly).
+  chorus:     { font: "'Pacifico', cursive",     w: 400, size: 17, ls: '0',     tr: 'none', skew: 0, dir: 'dark' },
+  vibrato:    { font: "'Pacifico', cursive",     w: 400, size: 16, ls: '0',     tr: 'none', skew: 0, dir: 'dark' },
+  springverb: { font: "'Pacifico', cursive",     w: 400, size: 12, ls: '0',     tr: 'none', skew: 0, dir: 'dark' },
 };
+
+// Legacy shape used by the SVG faceplate sheet + palette-modal tiles.
+export const FX_FONTS = Object.fromEntries(
+  Object.entries(FX_TYPE).map(([k, v]) => [k, { family: v.font, ls: v.ls }]),
+);
 
 export const FX_COLORS = {
   compressor: '#8fa3b0', boost: '#2e9bff', gate: '#e9c93a', fuzz: '#e0a943', octave: '#d4a017',
@@ -46,6 +70,82 @@ export const FX_COLORS = {
   acousticsim: '#c98a4a', distortion: '#ff7a1a', harmonizer: '#4a7dff',
   univibe: '#6fa8ff', springverb: '#49c9a4', whammy: '#ff3b30',
 };
+
+// Pedal BODY color as rendered on the board (the `--c` behind every pedal).
+// This is the single source of truth the pedalboard imports, and what the
+// typography contrast test measures ink against. (Includes the amp-head module
+// colors so the board can key everything off one map.)
+export const FX_BODY = {
+  compressor: '#0a84ff', drive: '#ff9f0a', eq: '#bf5af2', cabinet: '#32d74b',
+  delay: '#ffd60a', reverb: '#ff375f', chorus: '#5ac8fa', boost: '#ff9500',
+  fuzz: '#ff453a', octave: '#ff6482', tremolo: '#64d2ff', vibrato: '#40c8e0',
+  flanger: '#7d7aff', phaser: '#bf5af2', ringmod: '#ac8e68', autowah: '#30d158',
+  gate: '#8e8e93', wah: '#ffd60a', 'tape-echo': '#d4a017', pingpong: '#ffc857',
+  widener: '#5e5ce6', limiter: '#0a84ff', pitchshift: '#ff2d55', looper: '#34c759',
+  autopan: '#00c7be', rotary: '#a2845e', acousticsim: '#c98a4a', distortion: '#ff7a1a',
+  harmonizer: '#4a7dff', univibe: '#6fa8ff', springverb: '#49c9a4', whammy: '#ff3b30',
+};
+
+// ── WCAG contrast helpers + engraved-ink presentation ──────────────────────
+export const INK_LIGHT = '#fff6e8';   // warm near-white — used on dark bodies
+export const INK_DARK = '#160d04';    // warm near-black — used on bright bodies
+const _srgb = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+const _rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const _hex = (a) => '#' + a.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join('');
+export function relLuminance(hex) {
+  const [r, g, b] = _rgb(hex);
+  return 0.2126 * _srgb(r) + 0.7152 * _srgb(g) + 0.0722 * _srgb(b);
+}
+export function contrastRatio(a, b) {
+  const L1 = relLuminance(a), L2 = relLuminance(b);
+  const hi = Math.max(L1, L2), lo = Math.min(L1, L2);
+  return (hi + 0.05) / (lo + 0.05);
+}
+export function nameInk(type) { return (FX_TYPE[type]?.dir === 'dark') ? INK_DARK : INK_LIGHT; }
+// The wordmark renders ~0.68 down the faceplate's vertical gradient (the shaded
+// lower band) with a soft ink-well scrim behind it. This returns the effective
+// pixel color behind the glyphs, so contrast is checked against what the eye
+// actually sees — not the flat identity color.
+export function nameSurface(type) {
+  const body = FX_BODY[type]; if (!body) return '#000000';
+  const dir = FX_TYPE[type]?.dir || 'light';
+  const F = 0.68, A = 0.30; // gradient shade × ink-well scrim opacity
+  const band = _rgb(body).map((v) => v * F);
+  const scrim = dir === 'light' ? [0, 0, 0] : [255, 255, 255];
+  return _hex(band.map((v, i) => v * (1 - A) + scrim[i] * A));
+}
+const _DIRSTYLE = {
+  light: {
+    shadow: '0 1px 0 rgba(0,0,0,.55), 0 2px 4px rgba(0,0,0,.5)',
+    scrim: 'radial-gradient(closest-side, rgba(0,0,0,.58), rgba(0,0,0,0))',
+    halo: '0 0 2px rgba(0,0,0,.82), 0 1px 1px rgba(0,0,0,.7)',
+  },
+  dark: {
+    shadow: '0 1px 0 rgba(255,255,255,.55), 0 -1px 1px rgba(0,0,0,.22)',
+    scrim: 'radial-gradient(closest-side, rgba(255,255,255,.52), rgba(255,255,255,0))',
+    halo: '0 0 2px rgba(255,255,255,.7), 0 1px 0 rgba(255,255,255,.6)',
+  },
+};
+// CSS custom-property bundle for a pedal: name font/treatment/ink + the shared
+// condensed knob-label ink. Applied by the pedalboard onto the `.pedal` element.
+export function pedalTypographyVars(type) {
+  const t = FX_TYPE[type] || FX_TYPE.delay;
+  const ds = _DIRSTYLE[t.dir] || _DIRSTYLE.light;
+  const ink = t.dir === 'dark' ? INK_DARK : INK_LIGHT;
+  return {
+    '--name-font': t.font,
+    '--name-weight': String(t.w),
+    '--name-size': `${t.size}px`,
+    '--name-ls': t.ls,
+    '--name-transform': t.tr === 'none' ? 'none' : 'uppercase',
+    '--name-skew': `${t.skew || 0}deg`,
+    '--name-ink': ink,
+    '--name-shadow': ds.shadow,
+    '--name-scrim': ds.scrim,
+    '--label-ink': ink,
+    '--label-halo': ds.halo,
+  };
+}
 
 // Knob count per effect (from the effect schemas) → drives pedal width.
 export const FX_KNOBS = {

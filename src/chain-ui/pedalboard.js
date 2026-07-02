@@ -1,45 +1,14 @@
 // src/chain-ui/pedalboard.js
 import { createKnob } from './knob.js';
-import { fxArtSvg, FX_FONTS, fxWidth, FX_KNOB_STYLE, FX_KNOB_LAYOUT, FX_MOTIFS } from './fx-art.js';
+import { FX_FONTS, FX_BODY, pedalTypographyVars, FX_MOTIFS } from './fx-art.js';
 import { registerViz, resetViz } from './fx-viz.js';
 
 // Chrome cap for the CSS-pedal knobs (light → mid → dark), amber-ish arc per effect.
 const PEDAL_CAP = ['#eef2f5', '#aeb4ba', '#40454a'];
 
-const COLORS = {
-  compressor: '#0a84ff',
-  drive: '#ff9f0a',
-  eq: '#bf5af2',
-  cabinet: '#32d74b',
-  delay: '#ffd60a',
-  reverb: '#ff375f',
-  chorus: '#5ac8fa',
-  boost: '#ff9500',
-  fuzz: '#ff453a',
-  octave: '#ff6482',
-  tremolo: '#64d2ff',
-  vibrato: '#40c8e0',
-  flanger: '#7d7aff',
-  phaser: '#bf5af2',
-  ringmod: '#ac8e68',
-  autowah: '#30d158',
-  gate: '#8e8e93',
-  wah: '#ffd60a',
-  'tape-echo': '#d4a017',
-  pingpong: '#ffc857',
-  widener: '#5e5ce6',
-  limiter: '#0a84ff',
-  pitchshift: '#ff2d55',
-  looper: '#34c759',
-  autopan: '#00c7be',
-  rotary: '#a2845e',
-  acousticsim: '#c98a4a',
-  distortion: '#ff7a1a',
-  harmonizer: '#4a7dff',
-  univibe: '#6fa8ff',
-  springverb: '#49c9a4',
-  whammy: '#ff3b30',
-};
+// Pedal body colors are the single source of truth in fx-art.js (FX_BODY), so
+// the typography contrast test measures ink against exactly what renders.
+const COLORS = FX_BODY;
 
 // Pedal (addable) types and their display labels. Amp types (drive/eq/cabinet)
 // are excluded — they live in the amp head. Reverb is also excluded: it's now a
@@ -223,7 +192,6 @@ function pedalIcon(type, color) {
 function buildPedal(unit, handlers) {
   const type = unit.type;
   const color = COLORS[type] ?? '#8a8a90';
-  const font = (FX_FONTS[type] || {}).family || "'Inter', sans-serif";
   const params = unit.schema.params;
   const n = params.length;
 
@@ -233,7 +201,8 @@ function buildPedal(unit, handlers) {
   pedal.style.setProperty('--c', color);
   pedal.style.setProperty('--pedal-color', color);
   pedal.style.setProperty('--cols', String(n));
-  pedal.style.setProperty('--font', font);
+  // Per-effect name font/treatment/ink + shared condensed knob-label ink.
+  for (const [k, v] of Object.entries(pedalTypographyVars(type))) pedal.style.setProperty(k, v);
   pedal.style.width = `${Math.max(126, 44 + n * 34)}px`;
   if (unit.bypassed) pedal.classList.add('bypassed');
 
@@ -278,11 +247,11 @@ function buildPedal(unit, handlers) {
     knobs.appendChild(slot);
   });
 
+  // The name is the branding element. Keep the schema's own casing in the DOM
+  // (script faces stay mixed-case); CSS `text-transform` uppercases the rest.
   const word = document.createElement('div');
   word.className = 'pedal-word';
-  word.textContent = unit.schema.label.toUpperCase();
-  const wl = unit.schema.label.length;
-  word.style.fontSize = `${wl > 9 ? 12 : wl > 7 ? 15 : 19}px`;
+  word.textContent = unit.schema.label;
 
   const led = document.createElement('span');
   led.className = 'pedal-led';
