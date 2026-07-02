@@ -128,6 +128,49 @@ describe('mathematically true EQ response', () => {
   });
 });
 
+describe('compressor punch-up: hot vs parked', () => {
+  const P = paramsAt(registry.compressor.schema, (p) => p.default);
+  const callsAt = (t, params = P) => {
+    const g = stubCtx();
+    VIZ.compressor(g, t, params, 120, 80);
+    return JSON.stringify(g.__calls);
+  };
+
+  it('parked: the same frozen clock always draws the identical frame', () => {
+    expect(callsAt(1.234)).toBe(callsAt(1.234));
+    expect(callsAt(0)).toBe(callsAt(0));
+  });
+
+  it('hot: an advancing clock draws clearly different frames (pump + needle kick)', () => {
+    expect(callsAt(0)).not.toBe(callsAt(0.9));
+    expect(callsAt(0.9)).not.toBe(callsAt(1.8));
+    // even nearby clock values differ — the pump is bold, not a subtle drift
+    expect(callsAt(0.4)).not.toBe(callsAt(0.55));
+  });
+
+  it('draws the meter bars, the GR needle arc and the knee-riding probe', () => {
+    const g = stubCtx();
+    VIZ.compressor(g, 0.5, P, 120, 80);
+    const names = g.__calls.map(([m]) => m);
+    expect(names.filter((m) => m === 'fillRect').length).toBeGreaterThanOrEqual(6); // tracks + levels + caps
+    expect(names.filter((m) => m === 'arc').length).toBeGreaterThanOrEqual(4);      // probe + trail + gauge arc
+  });
+
+  it('the program level clamps inside the -60..0 dB plot at extreme params', () => {
+    const g = stubCtx();
+    VIZ.compressor(g, 0.7, { threshold: -60, ratio: 20, attack: 0.005, release: 0.25, makeup: 3 }, 120, 80);
+    for (const [m, a] of g.__calls) {
+      if (m === 'arc') { expect(a[0]).toBeGreaterThanOrEqual(0); expect(a[0]).toBeLessThanOrEqual(120); }
+    }
+  });
+
+  it('limiter keeps the original brick-wall knee draw (only the compressor changed)', () => {
+    const g = stubCtx();
+    expect(() => VIZ.limiter(g, 0.5, { threshold: -6, release: 0.05 }, 120, 80)).not.toThrow();
+    expect(g.__calls.length).toBeGreaterThan(0);
+  });
+});
+
 describe('ticker gates and lifecycle', () => {
   const defaults = paramsAt(registry.delay.schema, (p) => p.default);
 

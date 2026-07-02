@@ -417,7 +417,7 @@ VIZ.octave = (g, t, p, w, h) => {
   plot(g, (u) => h * 0.68 - shape(clip, shape(curve, Math.sin(TAU * u * 2 + ph))) * h * 0.18, 6, w - 6, 96);
 };
 
-// compressor/limiter: the true gain-computer knee + a probe dot riding it.
+// limiter: the true gain-computer knee + a probe dot riding it.
 function kneeViz(type, ratioOf) {
   const c = col(type);
   return (g, t, p, w, h) => {
@@ -446,7 +446,77 @@ function kneeViz(type, ratioOf) {
     g.fillRect(bx + bw + 3, y0 - (y0 - y1) * ((oDb + 60) / 60), bw, (y0 - y1) * ((oDb + 60) / 60));
   };
 }
-VIZ.compressor = kneeViz('compressor', (p) => p.ratio ?? 2.5);
+// compressor: the same true gain-computer knee, punched up — a program level
+// that pumps hard against the knee (bold IN/OUT meters whose gap IS the gain
+// reduction) and a GR needle that kicks with each pump. All motion rides `t`,
+// so while tuning the meters pump and the needle kicks; at rest the whole
+// screen parks as a static, param-true pose (mechanism guarantees stillness).
+VIZ.compressor = (g, t, p, w, h) => {
+  const c = col('compressor');
+  const thr = p.threshold ?? -18;
+  const ratio = p.ratio ?? 2.5;
+  const x0 = w * 0.36, x1 = w - 8, y0 = h - 10, y1 = 8;
+  const X = (dB) => x0 + (x1 - x0) * ((dB + 60) / 60);
+  const Y = (dB) => y0 + (y1 - y0) * ((dB + 60) / 60);
+  const outDb = (inDb) => (inDb <= thr ? inDb : thr + (inDb - thr) / ratio);
+  // knee + unity reference (true Threshold/Ratio math, unchanged)
+  g.strokeStyle = hexA(c, 0.25); g.lineWidth = 1;
+  g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, Y(0)); g.stroke();
+  g.strokeStyle = hexA(c, 0.95); g.lineWidth = 1.9;
+  plot(g, (u) => Y(outDb(-60 + 60 * u)), x0, x1, 48);
+  // program level: swings ±16dB around a point just past the threshold at
+  // ~0.7Hz — a much bolder pump than the old ±9dB probe, and fast enough that
+  // one tuning burst sweeps the full range (this is what animates the whole
+  // left column while tuning)
+  const pump = (tt) => Math.max(-60, Math.min(thr + 8 + 16 * Math.sin(tt * 4.2), 0));
+  const inDb = pump(t);
+  const oDb = outDb(inDb);
+  const gr = inDb - oDb; // dB of gain reduction right now
+  // probe rides the knee (bright dot + halo), with two fading trail dots (the
+  // pump's recent past)
+  for (const [back, r, a] of [[0.24, 1.8, 0.3], [0.12, 2.4, 0.55], [0, 3.4, 0.95]]) {
+    const tin = pump(t - back);
+    g.fillStyle = hexA(c, a);
+    g.beginPath(); g.arc(X(tin), Y(outDb(tin)), r, 0, TAU); g.fill();
+  }
+  g.fillStyle = hexA(c, 0.22); // halo around the live probe
+  g.beginPath(); g.arc(X(inDb), Y(oDb), 7, 0, TAU); g.fill();
+  // bold IN / OUT meter bars, left — their gap IS the gain reduction. Width
+  // scales with the screen so the pump reads on wide pedal plates too.
+  const bx = 6, bw = Math.max(6, Math.round(w * 0.055)), gap = 3;
+  const bh = (dB) => (y0 - y1) * ((dB + 60) / 60);
+  g.fillStyle = hexA(c, 0.12); // recessed meter tracks
+  g.fillRect(bx, y1, bw, y0 - y1);
+  g.fillRect(bx + bw + gap, y1, bw, y0 - y1);
+  g.fillStyle = hexA(c, 0.5);
+  g.fillRect(bx, y0 - bh(inDb), bw, bh(inDb));
+  g.fillStyle = hexA(c, 0.95);
+  g.fillRect(bx + bw + gap, y0 - bh(oDb), bw, bh(oDb));
+  // bright peak caps make the pump read at a glance
+  g.fillStyle = hexA(c, 0.95);
+  g.fillRect(bx, y0 - bh(inDb) - 2, bw, 2);
+  g.fillRect(bx + bw + gap, y0 - bh(oDb) - 2, bw, 2);
+  // gain-reduction needle (top, between the meters and the knee): sweeps
+  // 0..24dB of GR and kicks with each pump while tuning
+  const gx = (bx + 2 * bw + gap + x0) / 2, gy = 20;
+  const gRad = Math.max(Math.min(12, (x0 - (bx + 2 * bw + gap)) / 2 - 2), 7);
+  const a0 = -Math.PI / 2 - 1.05, a1 = -Math.PI / 2 + 1.05;
+  g.strokeStyle = hexA(c, 0.35); g.lineWidth = 1.2;
+  g.beginPath(); g.arc(gx, gy, gRad, a0, a1); g.stroke();
+  const na = a0 + (a1 - a0) * Math.min(gr / 24, 1);
+  g.strokeStyle = hexA(c, 0.95); g.lineWidth = 2;
+  g.beginPath(); g.moveTo(gx, gy);
+  g.lineTo(gx + Math.cos(na) * gRad * 0.95, gy + Math.sin(na) * gRad * 0.95);
+  g.stroke();
+  // GR strip along the top edge: grows right→left with the reduction — the
+  // long bright bar makes each pump land at a glance
+  const sx1 = x1, sx0 = gx + gRad + 6;
+  g.fillStyle = hexA(c, 0.12);
+  g.fillRect(sx0, y1, sx1 - sx0, 4);
+  g.fillStyle = hexA(c, 0.85);
+  const gw = (sx1 - sx0) * Math.min(gr / 24, 1);
+  g.fillRect(sx1 - gw, y1, gw, 4);
+};
 VIZ.limiter = kneeViz('limiter', () => 1000); // brick wall
 
 VIZ.gate = (g, t, p, w, h) => {
