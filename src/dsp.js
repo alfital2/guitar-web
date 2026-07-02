@@ -35,11 +35,14 @@ export function makeHardClipCurve(amount, n = 2048) {
 
 // Full-wave rectifier: y = |x|. Doubles the fundamental frequency, producing the
 // octave-up overtone behind an Octavia-style fuzz. depth 0..1 blends |x| with x.
+// NOTE: must satisfy f(0) = 0 like every shaping curve here — the old
+// `|x|*2 - 1` remap evaluated to -depth at x=0, leaking a constant DC offset
+// (~0.28 RMS hum) whenever the input was silent (probe report 2026-07-01).
 export function makeRectifierCurve(depth = 1, n = 2048) {
   const curve = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const x = (i / (n - 1)) * 2 - 1;
-    curve[i] = depth * (Math.abs(x) * 2 - 1) + (1 - depth) * x; // |x| remapped to -1..1
+    curve[i] = depth * Math.abs(x) + (1 - depth) * x; // f(0)=0; same endpoints as before
   }
   return curve;
 }

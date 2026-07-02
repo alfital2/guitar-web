@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mapRange, dbToGain, makeSoftClipCurve, makeReverbImpulse } from '../src/dsp.js';
+import { mapRange, dbToGain, makeSoftClipCurve, makeReverbImpulse,
+  makeRectifierCurve } from '../src/dsp.js';
 import { FakeAudioContext } from './fake-audio-context.js';
 
 describe('mapRange', () => {
@@ -28,5 +29,30 @@ describe('makeReverbImpulse', () => {
     const buf = makeReverbImpulse(ctx, 1.5, 2);
     expect(buf.length).toBe(72000);
     expect(buf.numberOfChannels).toBe(2);
+  });
+});
+
+describe('makeRectifierCurve', () => {
+  // A WaveShaper interpolates x=0 between the two center samples of an
+  // even-length curve, so "silence maps to silence" means their midpoint is
+  // ~0. The old curve's midpoint was -depth (a DC hum during silence — probe
+  // report 2026-07-01, octave gapRms ≈ 0.28).
+  it('passes through the origin for every depth (silence stays silent)', () => {
+    for (const depth of [0, 0.3, 0.7, 1]) {
+      const c = makeRectifierCurve(depth);
+      const mid = (c[1023] + c[1024]) / 2;
+      expect(Math.abs(mid)).toBeLessThan(1e-3);
+    }
+  });
+  it('keeps the rectify shape: even-symmetric at depth 1, endpoints preserved', () => {
+    const c = makeRectifierCurve(1);
+    expect(c[0]).toBeCloseTo(1, 5);            // f(-1) = |-1| = 1
+    expect(c[c.length - 1]).toBeCloseTo(1, 5); // f(+1) = 1
+    for (const i of [0, 200, 512, 900]) expect(c[i]).toBeCloseTo(c[c.length - 1 - i], 5);
+  });
+  it('blends toward identity as depth falls', () => {
+    const c = makeRectifierCurve(0);
+    expect(c[0]).toBeCloseTo(-1, 5);
+    expect(c[c.length - 1]).toBeCloseTo(1, 5);
   });
 });
