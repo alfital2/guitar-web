@@ -1285,6 +1285,9 @@
     text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
   .tab-note.in { transform: translate(-50%, -55%) scale(1); opacity: 1; transition: transform .12s ease, opacity .12s ease; }
   #tab-toggle.on { color: var(--accent); border-color: rgba(var(--accent-rgb),0.55); background: rgba(var(--accent-rgb),0.12); }
+  .tab-lane.paused .tab-live-dot { animation: none; background: var(--very-muted); box-shadow: none; }
+  .tab-lane.paused .tab-cursor { opacity: 0; }
+  .tab-lane.paused .tab-title { color: var(--text-secondary); }
 
   /* ── Safari compositor relief ─────────────────────────────
      WebKit re-filters backdrop-filter surfaces EVERY frame while anything

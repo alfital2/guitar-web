@@ -15,7 +15,7 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   const head = document.createElement('div');
   head.className = 'tab-head';
   head.innerHTML = `
-    <span class="tab-title">TAB <i class="tab-live-dot"></i> live transcription</span>
+    <span class="tab-title">TAB <i class="tab-live-dot"></i> <span class="tab-state">live transcription</span></span>
     <span class="tab-meta">${bpm} BPM · 16th grid · standard tuning</span>
     <span class="tab-spacer"></span>
     <button type="button" class="tab-clear">Clear</button>
@@ -91,6 +91,13 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
       cols = 0; notes = 0; ensureCols(16); scroll.scrollLeft = 0;
     },
     noteCount: () => notes,
+    // Listening vs stopped: stopping KEEPS the transcription on screen (the
+    // whole point is reading it back) — only the cursor/live-dot pause.
+    setLive(on) {
+      container.classList.toggle('paused', !on);
+      const st = head.querySelector('.tab-state');
+      if (st) st.textContent = on ? 'live transcription' : 'stopped — TAB records a fresh take';
+    },
     onClear(cb) { head.querySelector('.tab-clear').addEventListener('click', cb); },
     onClose(cb) { head.querySelector('.tab-close').addEventListener('click', cb); },
     destroy() { container.innerHTML = ''; container.hidden = true; },

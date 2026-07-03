@@ -1213,7 +1213,7 @@ const transport = mountTransport($('transport-cluster'), {
   getLiveAnalyser: () => analyser,
   onGain: (v) => { if (gainOut) gainOut.gain.value = v; },
   // Tempo drives the ruler grid + beat snap — re-render the lane on change.
-  onTempoChange: (n) => { uiBpm = n; renderTrack(); if (tabState) tabState.lane.setBpm(n); },
+  onTempoChange: (n) => { uiBpm = n; renderTrack(); if (tabLane) tabLane.setBpm(n); },
   onToggleTab: () => toggleTabMode(),
 });
 
@@ -1224,37 +1224,53 @@ const transport = mountTransport($('transport-cluster'), {
 // the amp. Detection/monitoring lag is compensated by a fixed offset so notes
 // played ON the click land ON the column.
 const TAB_LAG_SEC = 0.11; // click output latency + analysis window + onset frames
-let tabState = null;      // { lane, tracker, raf, t0, buf, prevPos, metroWasFree }
+let tabLane = null;       // persists after stop — the transcription stays readable
+let tabState = null;      // listening session: { tracker, raf, t0, buf, prevPos, metroWasFree }
 
-function stopTabMode() {
+// Stop LISTENING but keep the tab on screen (the point is reading it back).
+function stopTabListening() {
   if (!tabState) return;
   cancelAnimationFrame(tabState.raf);
   tabState.tracker.end((performance.now() - tabState.t0) / 1000);
   if (!tabState.metroWasFree) transport.setMetroFree(false); // leave things as we found them
-  tabState.lane.destroy();
   tabState = null;
+  tabLane?.setLive(false);
   $('tab-toggle')?.classList.remove('on');
 }
 
+// ✕ — remove the lane entirely.
+function closeTabLane() {
+  stopTabListening();
+  tabLane?.destroy();
+  tabLane = null;
+}
+
 function toggleTabMode() {
-  if (tabState) { stopTabMode(); return; }
+  if (tabState) { stopTabListening(); return; }
   if (!ctx || !analyser) { $('error').textContent = 'Power on first — live TAB listens to your guitar input.'; return; }
   const laneEl = $('tab-lane');
   if (!laneEl) return;
-  const lane = mountTabLane(laneEl, { bpm: uiBpm });
+  if (!tabLane) {
+    tabLane = mountTabLane(laneEl, { bpm: uiBpm });
+    tabLane.onClear(() => { tabLane.clear(); if (tabState) tabState.prevPos = null; });
+    tabLane.onClose(() => closeTabLane());
+  } else {
+    tabLane.clear(); // re-arming records a fresh take on a fresh grid
+  }
+  const lane = tabLane;
+  lane.setLive(true);
+  lane.setBpm(uiBpm);
   const tracker = createNoteTracker();
   const buf = new Float32Array(analyser.fftSize);
   const metroWasFree = transport.isMetroFree();
   if (!metroWasFree) transport.setMetroFree(true); // the grid needs an audible click
   const t0 = performance.now();
-  tabState = { lane, tracker, raf: 0, t0, buf, prevPos: null, metroWasFree };
-  lane.onClear(() => { lane.clear(); tabState.prevPos = null; });
-  lane.onClose(() => stopTabMode());
+  tabState = { tracker, raf: 0, t0, buf, prevPos: null, metroWasFree };
   $('tab-toggle')?.classList.add('on');
 
   const loop = () => {
     if (!tabState) return;
-    if (!ctx || !analyser) { stopTabMode(); return; }
+    if (!ctx || !analyser) { stopTabListening(); return; }
     const nowSec = (performance.now() - t0) / 1000;
     analyser.getFloatTimeDomainData(buf);
     let rms = 0;
@@ -1276,7 +1292,7 @@ function toggleTabMode() {
   loop();
 }
 if ($('diag')) window.__tabDebug = {
-  count: () => (tabState ? tabState.lane.noteCount() : -1),
+  count: () => (tabLane ? tabLane.noteCount() : -1),
   active: () => !!tabState,
   // Test-only: drive the tracker with synthetic pitch frames (the fake-mic
   // test device emits unpitched pulses that MPM rightly rejects, so e2e proves
@@ -1293,9 +1309,9 @@ if ($('diag')) window.__tabDebug = {
       const pos = assignFret(ev.midi, tabState.prevPos);
       if (!pos) continue;
       tabState.prevPos = pos;
-      tabState.lane.noteOn(pos.string, pos.fret, quantizeToGrid(ev.tSec - TAB_LAG_SEC, uiBpm));
+      tabLane.noteOn(pos.string, pos.fret, quantizeToGrid(ev.tSec - TAB_LAG_SEC, uiBpm));
     }
-    return tabState.lane.noteCount();
+    return tabLane.noteCount();
   },
 };
 
