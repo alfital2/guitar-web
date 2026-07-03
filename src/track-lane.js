@@ -346,7 +346,11 @@ export function renderTrackLane(container, {
   if (onToggleSnap) snapBtn.addEventListener('click', onToggleSnap);
   addRow.append(add, snapBtn);
   addRow.style.height = `${RULER_H}px`;
-  headers.appendChild(addRow);
+  // Spacer mirroring the timeline-tools strip so the +Track row still lines up
+  // with the ruler row.
+  const toolsSpacer = el('div', 'track-tools-spacer');
+  toolsSpacer.style.height = `${RULER_H}px`;
+  headers.append(toolsSpacer, addRow);
   for (const t of tracks) headers.appendChild(trackHeader(t, armedId, handlers));
 
   // ── Timelines column ──
@@ -474,9 +478,12 @@ export function renderTrackLane(container, {
 
   timeline.appendChild(scroll);
 
-  // ── Zoom: magnifier slider pinned to the ruler's top-right (doesn't scroll) ──
+  // ── Timeline tools strip: its own row above the ruler (zoom today; built to
+  // take more controls later). Fixed — never scrolls with the grid.
   const wrap = el('div', 'timeline-wrap');
-  wrap.appendChild(timeline);
+  const tools = el('div', 'timeline-tools');
+  tools.style.height = `${RULER_H}px`;
+  wrap.append(tools, timeline);
   if (onZoom) {
     const zc = el('div', 'zoom-ctl');
     zc.title = 'Timeline zoom';
@@ -486,7 +493,7 @@ export function renderTrackLane(container, {
     zr.setAttribute('aria-label', 'Timeline zoom');
     zr.addEventListener('input', () => onZoom(parseFloat(zr.value)));
     zc.appendChild(zr);
-    wrap.appendChild(zc);
+    tools.appendChild(zc);
 
     // ⌘/Ctrl + wheel (and trackpad pinch, which browsers deliver as a
     // ctrlKey-tagged wheel) zooms around the pointer, only over the timeline.

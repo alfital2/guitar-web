@@ -211,6 +211,7 @@
   @keyframes hint-bob { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-4px); } }
   @media (prefers-reduced-motion: reduce) { .start-hint { animation: none; } }
   body:not(.powered-off) .start-hint { display: none; }
+  html.has-started .start-hint { display: none; } /* returning users know the way */
   /* Until the engine is powered on, the workspace waits — dimmed + desaturated. */
   body.powered-off #track-lane, body.powered-off .amp-strip, body.powered-off .pedalboard-strip { opacity: 0.45; filter: grayscale(0.6); }
   @media (prefers-reduced-motion: no-preference) {
@@ -507,6 +508,9 @@
     background: linear-gradient(180deg, #dfe1e4, #b9bbc0 48%, #a7a9af);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.65), inset 0 -2px 5px rgba(0,0,0,0.28), 0 8px 22px rgba(0,0,0,0.45);
   }
+  /* Scroll-edge affordance: the strip scrolls horizontally when the rig is
+     narrow — fade the clipped edge so a cut label reads as "more", not broken. */
+  .amp-vstrip { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 26px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 26px), transparent); }
   .amp-vstrip:hover { filter: brightness(1.02); }
   .amp-vstrip-div { width: 1px; margin: 4px 0; background: linear-gradient(180deg, transparent, rgba(0,0,0,0.22), transparent); box-shadow: 1px 0 0 rgba(255,255,255,0.5); }
   .amp-vstrip-sec { display: flex; flex-direction: column; gap: 4px; padding: 2px 14px; flex: 0 0 auto; }
@@ -893,6 +897,8 @@
     font-size: 11px; font-weight: 400; color: #c2c2c7;
   }
   .pb-cat-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pb-cat-glyph { flex: 0 0 auto; display: inline-flex; margin-right: 7px; opacity: .75; }
+  .pb-cat.active .pb-cat-glyph { opacity: 1; }
   .pb-cat { position: relative; z-index: 1; transition: color .2s, background .2s, box-shadow .2s; }
   .pb-cat:hover { background: rgba(255,255,255,0.05); color: #fff; }
   .pb-cat.active {
@@ -1050,7 +1056,8 @@
   .settings-body { padding: 18px; }
   .settings-section { margin-bottom: 20px; }
   .settings-section + .settings-section { border-top: 1px solid rgba(255,255,255,0.055); padding-top: 18px; }
-  .settings-section h3 { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: var(--very-muted); margin: 0 0 12px; }
+  .settings-section h3 { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: var(--very-muted); margin: 0 0 12px; display: flex; align-items: center; gap: 6px; }
+  .settings-section h3 .sec-ic { color: rgba(var(--accent-rgb),0.55); flex: 0 0 auto; }
 
   label { display: block; font-size: 11px; color: #48484a; margin: 10px 0 5px; }
   .settings-section label:first-of-type { margin-top: 0; }
@@ -1100,9 +1107,12 @@
 
   /* Clip right-click menu */
   .ctx-menu {
-    position: fixed; z-index: 80; min-width: 156px; padding: 4px;
-    background: var(--surface); border: 1px solid var(--border-hi); border-radius: 8px;
-    box-shadow: 0 14px 36px rgba(0,0,0,0.6); display: flex; flex-direction: column; gap: 1px;
+    position: fixed; z-index: 120; min-width: 168px; padding: 5px;
+    /* Same material as the tuner strip — hairline border, dark glass, inner
+       top highlight — so menus belong to the hardware world, not a framework. */
+    background: var(--toolbar); border: 1px solid rgba(255,255,255,0.12); border-radius: 9px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.07);
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   }
   .ctx-item { text-align: left; font-size: 12.5px; color: var(--text-secondary); background: transparent; border: none; border-radius: 6px; padding: 7px 10px; cursor: pointer; }
   .ctx-item:hover:not(:disabled) { background: var(--surface-hi); color: var(--text); }
@@ -1143,13 +1153,23 @@
   }
   .browser-notice-close:hover { filter: brightness(1.07); }
 
-  /* ── Timeline zoom control (magnifier + slider, pinned over the ruler) ── */
-  .timeline-wrap { position: relative; flex: 1; min-width: 0; display: flex; }
-  .timeline-wrap .track-timeline { flex: 1; min-width: 0; }
+  /* ── Timeline tools strip (zoom lives here; room for future controls) ── */
+  .timeline-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .timeline-wrap .track-timeline { flex: 1; min-width: 0;
+    /* faint lane guides so the empty area below the tracks reads as rows
+       waiting for content, not a void (one guide per ROW_H = 124px, offset
+       past the 22px ruler) */
+    background-image: repeating-linear-gradient(180deg, transparent 0 123px, rgba(255,255,255,0.03) 123px 124px);
+    background-position: 0 22px;
+  }
+  .timeline-tools {
+    display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+    padding: 0 8px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.015);
+  }
+  .track-tools-spacer { border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.015); }
   .zoom-ctl {
-    position: absolute; top: 0; right: 6px; height: 22px; z-index: 8;
-    display: flex; align-items: center; gap: 6px; padding: 0 6px;
-    color: var(--muted); background: rgba(10,10,14,0.55); border-radius: 0 0 6px 6px;
+    display: flex; align-items: center; gap: 6px; color: var(--muted);
   }
   .zoom-ctl:hover { color: var(--text-secondary); }
   .zoom-range { -webkit-appearance: none; appearance: none; width: 92px; height: 3px;
@@ -1186,6 +1206,7 @@
      real headroom. html.safari is set by main.js UA-detection. */
   html.safari .toolbar,
   html.safari .metro-menu,
+  html.safari .ctx-menu,
   html.safari .tuner-strip,
   html.safari .settings-panel,
   html.safari .fx-modal-backdrop,
@@ -1554,13 +1575,13 @@
   <div class="settings-body">
 
     <section class="settings-section">
-      <h3>Guitar Profile</h3>
+      <h3><svg class="sec-ic" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 1.5c-2 0-3 1.2-3 3 0 1.4.6 2.3 1.2 3.3.4.8.3 1.6-.4 2.2-1.2 1-1.8 2-1.8 3 0 1 .8 1.5 4 1.5s4-.5 4-1.5c0-1-.6-2-1.8-3-.7-.6-.8-1.4-.4-2.2.6-1 1.2-1.9 1.2-3.3 0-1.8-1-3-3-3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Guitar Profile</h3>
       <div id="calibration"></div>
       <div id="tone-card"><p class="caption">Calibrate a guitar to see its tone card.</p></div>
     </section>
 
     <section class="settings-section">
-      <h3>Devices</h3>
+      <h3><svg class="sec-ic" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M2 5h12v6H2zM5 11v2h6v-2M8 7.5v1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Devices</h3>
       <label for="input">Input</label>
       <select id="input"></select>
       <label for="output">Output</label>
@@ -1584,7 +1605,7 @@
     </section>
 
     <section class="settings-section">
-      <h3>Diagnostics</h3>
+      <h3><svg class="sec-ic" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M1.5 8h3l1.5-4 3 8 1.5-4h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Diagnostics</h3>
       <div class="meter" style="margin-bottom:12px"><div id="diag-meter" class="meter-fill"></div></div>
       <div class="diag-grid">
         <div class="stat"><span>Sample rate</span><b id="sr">—</b></div>
@@ -1600,7 +1621,7 @@
     </section>
 
     <section class="settings-section">
-      <h3>Come Together <span class="jam-beta">beta</span></h3>
+      <h3><svg class="sec-ic" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M5 10a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM11 12a3 3 0 1 1 0-6 3 3 0 0 1 0 6zM5 10v3M11 12v2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Come Together <span class="jam-beta">beta</span></h3>
       <p class="caption" style="margin:0 0 10px;line-height:1.5">Jam live with a friend anywhere — direct peer-to-peer, no server. Swap two codes over any chat to link up. Use headphones.</p>
       <div class="row" style="gap:8px">
         <button id="jam-host" class="primary">Create invite</button>
@@ -1636,7 +1657,7 @@
     </section>
 
     <section class="settings-section">
-      <h3>Calibration</h3>
+      <h3><svg class="sec-ic" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 2v3M8 11v3M2 8h3M11 8h3M8 6.5A1.5 1.5 0 1 1 8 9.5 1.5 1.5 0 0 1 8 6.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Calibration</h3>
       <button id="calib-start">Calibrate New Guitar</button>
       <div id="calib-wizard" style="display:none;margin-top:14px">
         <p id="calib-instr" class="caption" style="margin:0 0 8px;line-height:1.55">Play across the whole neck — low to high — for ~12s.</p>

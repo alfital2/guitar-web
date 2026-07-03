@@ -85,3 +85,21 @@ export function loadZoom() {
     return Number.isFinite(v) ? Math.max(0.5, Math.min(4, v)) : 1;
   } catch { return 1; }
 }
+
+// ── Input channel (1/2 on multi-input interfaces) ──
+const INPUT_CH_KEY = 'gs-input-channel';
+export function saveInputChannel(ch) {
+  try { localStorage.setItem(INPUT_CH_KEY, String(ch)); } catch {}
+}
+export function loadInputChannel() {
+  try { const v = parseInt(localStorage.getItem(INPUT_CH_KEY), 10); return v === 1 ? 1 : 0; } catch { return 0; }
+}
+
+// ── First-run "Start here" hint (hidden once the user has powered on) ──
+const STARTED_KEY = 'gs-has-started';
+export function saveHasStarted() {
+  try { localStorage.setItem(STARTED_KEY, '1'); } catch {}
+}
+export function loadHasStarted() {
+  try { return localStorage.getItem(STARTED_KEY) === '1'; } catch { return false; }
+}

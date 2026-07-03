@@ -44,7 +44,7 @@ let boardCollapsed = chainStore.loadBoardCollapsed(); // pedalboard folded to mi
 let reverbStage = null;                // audio node: engine.output -> reverbStage -> normGain
 let calibrationEq, calibRAF, calibState, calibCountdown;
 let inputSplitter = null;   // ChannelSplitterNode after source; picks a hardware input channel
-let inputChannel = 0;       // selected input channel: 0 = input 1, 1 = input 2 (persists across power cycles)
+let inputChannel = chainStore.loadInputChannel(); // 0 = input 1, 1 = input 2 — REMEMBERED across sessions (interface users live on ch 2)
 let chMeters = null;        // [AnalyserNode, AnalyserNode] tapping splitter outs 0/1 for the settings CH1/CH2 meters
 let vuLevel = 0;            // smoothed 0..1 output level driving the amp-head VU needle
 let pitchBuf, lastNoteMs = 0;
@@ -332,6 +332,8 @@ if (isSafari) document.documentElement.classList.add('safari');
 // One-time honest heads-up that Safari's live-input path is higher-latency than
 // Chrome's (a WebKit limitation below the web layer — can't be fixed here).
 maybeShowSafariNotice(isSafari);
+// Returning users know where Power is — retire the "Start here" callout.
+if (chainStore.loadHasStarted()) document.documentElement.classList.add('has-started');
 if (isSafari) { const n = $('safari-latency-note'); if (n) n.hidden = false; }
 
 $('safari-warn').style.display = hasSetSinkId ? 'none' : 'block';
@@ -986,6 +988,8 @@ async function start() {
     setTimeout(showStats, 600);
 
     setPower(true);
+  chainStore.saveHasStarted(); // first successful power-on retires the Start-here hint
+  document.documentElement.classList.add('has-started');
     // One-shot power-on ritual: tubes warm up, then the chain connectors light
     // once left→right and settle (≤2s; skipped under prefers-reduced-motion).
     playPowerOnRitual();
@@ -1110,6 +1114,7 @@ function routeInputChannel(ch) {
 // selection so it survives power cycles; no-op on the graph until Start wires it.
 function setInputChannel(ch) {
   inputChannel = Math.min(1, Math.max(0, ch | 0));
+  chainStore.saveInputChannel(inputChannel); // survives reloads, not just power cycles
   routeInputChannel(inputChannel);
 }
 
@@ -1138,6 +1143,7 @@ setPower(false);
 $('calib-save').addEventListener('click', saveCalibration);
 $('calib-cancel').addEventListener('click', stopCalibration);
 $('calib-start').addEventListener('click', startCalibration);
+$('input-channel').value = String(inputChannel); // reflect the remembered channel
 $('input-channel').addEventListener('change', (e) => setInputChannel(+e.target.value));
 
 // Settings slide-in panel
