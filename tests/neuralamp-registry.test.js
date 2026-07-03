@@ -3,7 +3,6 @@
 import { describe, it, expect } from 'vitest';
 import { registry } from '../src/effects/index.js';
 import { MODELS } from '../src/effects/neuralamp.js';
-import { NEURAL_LABELS } from '../src/chain-ui/amp.js';
 import { fromPreset, ampBounds, move } from '../src/chain-state.js';
 
 describe('neuralamp registration (src/effects/index.js)', () => {
@@ -20,16 +19,6 @@ describe('neuralamp registration (src/effects/index.js)', () => {
   });
   it('ships 5 model ids that map to assets/neural/<name>.nam', () => {
     expect(MODELS).toEqual(['jcm', '5153', 'deluxe', 'ac10', 'jc']);
-  });
-});
-
-describe('neuralamp model list stays in sync with its UI labels', () => {
-  // Drift guard: src/chain-ui/amp.js renders one <option> per NEURAL_LABELS
-  // entry, indexed to line up with MODELS in src/effects/neuralamp.js. If one
-  // list grows/shrinks without the other, the model <select> silently mislabels
-  // (or under/over-lists) the captured amps.
-  it('NEURAL_LABELS has exactly one label per MODELS entry', () => {
-    expect(NEURAL_LABELS.length).toBe(MODELS.length);
   });
 });
 

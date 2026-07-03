@@ -61,3 +61,14 @@ export function signature(chain) {
   // Include bypass so loudness re-measures when an effect is powered on/off.
   return chain.map((u) => (u.bypassed ? `!${u.type}` : u.type)).join('>');
 }
+
+// Reverb is an amp stage, not a pedal: pull any reverb entries out of a
+// preset/saved chain and fold them into the amp reverb (last one wins; none →
+// reverb off). Single source — main.js and the audit harness both import this.
+export function extractReverb(chainData) {
+  const rev = chainData.filter((e) => e.type === 'reverb');
+  return {
+    rest: chainData.filter((e) => e.type !== 'reverb'),
+    reverb: rev.length ? { size: 0.4, mix: 0.12, ...rev[rev.length - 1].params } : null,
+  };
+}

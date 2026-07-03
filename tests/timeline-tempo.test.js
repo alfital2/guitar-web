@@ -23,15 +23,10 @@ describe('tempo-aware timeline grid', () => {
   });
 });
 
-// ── zoom persistence + steps ──
-import { ZOOM_STEPS } from '../src/track-lane.js';
+// ── zoom persistence ──
 import { saveZoom, loadZoom } from '../src/chain-store.js';
 
 describe('timeline zoom', () => {
-  it('ZOOM_STEPS are ascending and include 1 (the default)', () => {
-    expect(ZOOM_STEPS).toContain(1);
-    for (let i = 1; i < ZOOM_STEPS.length; i++) expect(ZOOM_STEPS[i]).toBeGreaterThan(ZOOM_STEPS[i - 1]);
-  });
   it('persists and clamps zoom to [0.5, 4]', () => {
     saveZoom(2); expect(loadZoom()).toBe(2);
     saveZoom(99); expect(loadZoom()).toBe(4);

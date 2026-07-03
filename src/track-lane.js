@@ -5,7 +5,6 @@ import { drawWaveform } from './waveform.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 
-export const BAR_W = 64;        // px per bar at 120 BPM 4/4 (legacy default)
 export const PX_PER_SEC = 32;   // pixels per real second (constant density)
 export const BEATS_PER_BAR = 4; // 4/4 time
 
@@ -40,7 +39,6 @@ export function ensureRulerBars(container, uptoSec, bpm, zoom) {
 // Z, every pointer delta is divided by Z on the way back in. Take positions
 // (`x`) and all committed handler values stay in BASE px (PX_PER_SEC), so
 // zooming never moves audio and snap stays on the musical grid.
-export const ZOOM_STEPS = [0.5, 0.75, 1, 1.5, 2, 3, 4];
 let Z = 1; // set by renderTrackLane from opts.zoom; gestures read it live
 const CLIP_H = 80;              // clip/canvas height in px
 const ROW_H = 124;              // track row height (header + strip)

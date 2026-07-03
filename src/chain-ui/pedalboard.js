@@ -194,10 +194,6 @@ function enableDrag(pedal, plate, unit, handlers, getBoard) {
   });
 }
 
-// Pedal knobs are rendered a touch smaller than amp knobs so the control band
-// fits inside the bespoke faceplate (which is sized to the knob count).
-const PEDAL_KNOB_SIZE = 36;
-
 // Knob hardware finishes. Each effect gets ONE finish for its whole knob row
 // (real pedals ship matching knobs) — but different effects get different
 // hardware, picked deterministically from the type name, so the board isn't

@@ -21,14 +21,8 @@ import {
 
 const SR = 48000;
 
-// ── main.js replica (keep in lockstep with src/main.js) ───────────────────
-function extractReverb(chainData) {
-  const rev = chainData.filter((e) => e.type === 'reverb');
-  return {
-    rest: chainData.filter((e) => e.type !== 'reverb'),
-    reverb: rev.length ? { size: 0.4, mix: 0.12, ...rev[rev.length - 1].params } : null,
-  };
-}
+// Single-source: the same extractReverb main.js uses (no more drift risk).
+const { extractReverb } = chainState;
 
 // ── Deterministic guitar-like VERIFICATION signal ──────────────────────────
 // Deliberately DIFFERENT from normalize.js's 3 s reference (different seed,

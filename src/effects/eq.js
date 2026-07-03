@@ -15,7 +15,7 @@ export const schema = {
 const toDb = (v) => mapRange(v, 0, 10, -12, 12);
 
 export function create(ctx, params) {
-  const low = ctx.createBiquadFilter();  low.type = 'lowshelf';  low.frequency.value = 120;
+  const low = ctx.createBiquadFilter();  low.type = 'lowshelf';  low.frequency.value = 190; // 120 Hz sat under the cab rolloff — the knob audit measured it at 0.2 dB (dead)
   const mid = ctx.createBiquadFilter();  mid.type = 'peaking';   mid.Q.value = 1;
   const high = ctx.createBiquadFilter(); high.type = 'highshelf'; high.frequency.value = 3000;
   low.connect(mid); mid.connect(high);

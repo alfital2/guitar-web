@@ -18,7 +18,7 @@ import { detectPitchMPM } from './pitch/mpm.js';
 import { freqToNote, noteLabel } from './pitch/note.js';
 import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
-import { measureLoudnessGain } from './normalize.js';
+import { createLoudnessController } from './loudness.js';
 import { mountTransport } from './transport-ui.js';
 import { renderTrackLane, PX_PER_SEC, beatPx, ensureRulerBars, getSelectedClips, clearClipSelection, setClipSelection } from './track-lane.js';
 import { punchTakes, recordHeadTrimSec } from './take-ops.js';
@@ -32,7 +32,7 @@ import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
 import { connectInputChannel } from './audio/input-channel.js';
 import { maybeShowSafariNotice } from './browser-notice.js';
-import { createJam } from './jam.js';
+import { initJamUI } from './jam-ui.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
@@ -309,14 +309,16 @@ function clearLiveClip() {
 }
 let currentChain = [];   // array of units (chain-state model) — source of truth
 let nextId = 1;          // monotonic instanceId source
-let normTimer = null;    // debounce handle for loudness re-measure
-let normSig = null;      // last-measured chain structure signature
-let normToken = 0;       // monotonic measure id — only the NEWEST measure may land
-let normRetries = 0;     // bounded retries after an untrustworthy (null) measure
-let normApplyCount = 0;  // how many gains have landed (e2e bridge observes this)
-const normCache = new Map(); // param-inclusive chain key -> measured gain (session-scoped)
-let normMutePending = false; // preset/amp loads: HOLD SILENCE until the measured gain lands
-let normPrevGain = null;     // gain to restore if a muted measure ultimately fails
+// Loudness normalization: measuring lives in normalize.js, the WHEN/HOW
+// controller in loudness.js. Reverb wet mix affects loudness → in the signature.
+const loudness = createLoudnessController({
+  getCtx: () => ctx,
+  getNormGain: () => normGain,
+  getEngineChain: () => chainState.toEngineChain(currentChain),
+  getSignature: () => chainState.signature(currentChain) + `|rv${ampReverb.size},${ampReverb.mix}`,
+  getReverb: () => ampReverb,
+});
+const scheduleNormalize = () => loudness.schedule();
 
 const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
 const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
@@ -413,8 +415,7 @@ function setParamLive(instanceId, key, value) {
   // treat it like a preset change and re-measure.
   const unit = currentChain.find((u) => u.instanceId === instanceId);
   if (unit && unit.type === 'neuralamp' && key === 'model') {
-    normMutePending = true; // an amp swap holds silence until its gain lands
-    normSig = null;
+    loudness.invalidate({ mute: true }); // an amp swap holds silence until its gain lands
     scheduleNormalize();
   }
 }
@@ -430,16 +431,6 @@ function onAmpParam(instanceId, key, value) {
     return;
   }
   setParamLive(instanceId, key, value);
-}
-
-// Reverb is no longer a pedal: pull any reverb entries out of a preset/saved
-// chain and fold them into the amp reverb (last one wins; none → reverb off).
-function extractReverb(chainData) {
-  const rev = chainData.filter((e) => e.type === 'reverb');
-  return {
-    rest: chainData.filter((e) => e.type !== 'reverb'),
-    reverb: rev.length ? { size: 0.4, mix: 0.12, ...rev[rev.length - 1].params } : null,
-  };
 }
 
 function addEffect(type, beforeId) {
@@ -485,16 +476,15 @@ let activePresetName = null;
 function loadPreset(preset) {
   const errors = validatePreset(preset, registry);
   if (errors.length) { $('error').textContent = errors.join('; '); return; }
-  const { rest, reverb } = extractReverb(preset.chain);
+  const { rest, reverb } = chainState.extractReverb(preset.chain);
   ampReverb = reverb || { size: 0.4, mix: 0 };
   chainStore.saveReverb(ampReverb);
   const r = chainState.fromPreset(rest, nextId);
   currentChain = r.chain; nextId = r.nextId;
   activePresetName = preset.name;
-  normMutePending = true; // hold silence until this preset's gain is measured
-  normSig = null; // a preset load ALWAYS re-measures loudness — two presets can
-                  // share a chain signature (same types, different params) yet
-                  // differ hugely in level (e.g. the five neural amp models)
+  loudness.invalidate({ mute: true }); // a preset load ALWAYS re-measures (two
+  // presets can share a signature yet differ hugely in level) and holds
+  // silence until its gain lands
   rebuildGraph();
   saveTrackPatch(armedTrack()); // the armed track now owns this preset
   renderBrowser();
@@ -520,8 +510,7 @@ function loadTrackPatch(track) {
   const r = chainState.fromPreset(p.chain.filter((e) => registry[e.type]), nextId);
   currentChain = r.chain; nextId = r.nextId;
   activePresetName = p.name || null;
-  normMutePending = true; // hold silence until the patch's gain is measured
-  normSig = null; // patch loads re-measure like preset loads (params differ)
+  loudness.invalidate({ mute: true }); // patch loads re-measure like preset loads
   rebuildGraph();
   renderBrowser();
   return true;
@@ -719,81 +708,13 @@ function renderTrack() {
 
 // Restore a persisted chain (array of {type, params}) into the model.
 function loadStoredChain(data) {
-  const { rest, reverb } = extractReverb(data);
+  const { rest, reverb } = chainState.extractReverb(data);
   ampReverb = chainStore.loadReverb() || reverb || { size: 0.4, mix: 0 };
   const valid = rest.filter((e) => registry[e.type]); // drop unknown types defensively
   const r = chainState.fromPreset(valid, nextId);
   currentChain = r.chain; nextId = r.nextId;
-  normMutePending = true; // hold silence until the restored chain's gain is measured
-  normSig = null; // restored chains re-measure like preset loads
+  loudness.invalidate({ mute: true }); // restored chains re-measure like preset loads
   rebuildGraph();
-}
-
-// Apply a normalization gain with a short ramp (~50 ms) instead of a hard step
-// — a step is audible and lands in recordings (the recorder taps normGain).
-function applyNormGain(g) {
-  if (!normGain) return;
-  if (ctx && normGain.gain.setTargetAtTime) normGain.gain.setTargetAtTime(g, ctx.currentTime, 0.05);
-  else normGain.gain.value = g;
-  normApplyCount++;
-}
-
-// Param-inclusive cache key: two presets can share a structure signature yet
-// need very different gains (params!), and repeat visits to the same preset
-// should get their gain INSTANTLY (no multi-second wrong-gain window while the
-// offline measure — wasm compile included, for neural — runs).
-function normCacheKey() {
-  return JSON.stringify(chainState.toEngineChain(currentChain)) + `|rv${ampReverb.size},${ampReverb.mix}`;
-}
-
-// Re-measure loudness normalization whenever the chain STRUCTURE changes
-// (debounced). Param-only edits keep the signature, so they don't re-measure.
-// One unified path: neural chains render offline too (their wasm/model
-// handshake completes before startRendering — see normalize.js).
-function scheduleNormalize() {
-  if (!normGain) return;
-  // Reverb wet mix affects output loudness, so fold it into the signature.
-  const sig = chainState.signature(currentChain) + `|rv${ampReverb.size},${ampReverb.mix}`;
-  if (sig === normSig) return;
-  normSig = sig;
-  clearTimeout(normTimer);
-  const my = ++normToken; // any older in-flight measure is now void
-  const key = normCacheKey();
-  const cached = normCache.get(key);
-  if (cached != null) { normRetries = 0; normMutePending = false; normPrevGain = null; applyNormGain(cached); return; }
-  // Preset/amp loads hold SILENCE until the measured gain lands, so the user
-  // never hears the brief unmatched level while the offline measure runs. The
-  // debounce is skipped too — start measuring immediately.
-  const muted = normMutePending;
-  if (muted) {
-    normMutePending = false;
-    if (normPrevGain == null) normPrevGain = normGain.gain.value; // restore point if the measure fails
-    try { normGain.gain.cancelScheduledValues(ctx ? ctx.currentTime : 0); } catch {}
-    normGain.gain.value = 0;
-  }
-  normTimer = setTimeout(async () => {
-    try {
-      const g = await measureLoudnessGain(chainState.toEngineChain(currentChain), { sampleRate: ctx ? ctx.sampleRate : 48000, reverb: ampReverb });
-      // Only the newest measure may land — a monotonic token, not a signature
-      // compare (all five neural amp presets share one signature, and the old
-      // suffix-mismatched compare silently disabled normalization for months).
-      if (normToken !== my || !normGain) return;
-      if (g == null) {
-        // Untrustworthy measure (handshake timeout / worklet failure / silent
-        // render): retry a bounded number of times. If we were holding silence
-        // and ran out of retries, restore the pre-load gain — a wrong level
-        // beats a dead rig.
-        if (normRetries < 2) { normRetries++; normSig = null; normTimer = setTimeout(scheduleNormalize, 2500); }
-        else if (normPrevGain != null) { applyNormGain(normPrevGain); normPrevGain = null; }
-        return;
-      }
-      normRetries = 0;
-      normPrevGain = null;
-      normCache.set(key, g);
-      if (normCache.size > 60) normCache.delete(normCache.keys().next().value);
-      applyNormGain(g); // ramps up from silence on muted loads (~50 ms)
-    } catch (e) { console.warn('loudness normalize failed:', e); }
-  }, muted ? 0 : 150);
 }
 
 function showStats() {
@@ -1096,7 +1017,7 @@ function installE2EBridge() {
     booted: () => !!ctx && ctx.state === 'running',
     sampleRate: () => ctx.sampleRate,
     normGainValue: () => (normGain ? normGain.gain.value : null),
-    normApplyCount: () => normApplyCount,
+    normApplyCount: () => loudness.applyCount(),
     clock: () => ({ ctxTime: ctx.currentTime, wall: performance.now() }),
     proPresetNames: () => (proCat() ? proCat().presets.map((p) => p.name) : []),
     chainTypes: () => currentChain.map((u) => u.type),
@@ -1160,12 +1081,7 @@ function stop() {
   { const c = $('note-circle'); if (c) { c.textContent = '—'; c.classList.remove('active'); } }
   if (stream) stream.getTracks().forEach(t => t.stop());
   if (ctx) ctx.close();
-  // Reset normalization bookkeeping: the next power-on rebuilds normGain at
-  // unity, so the same chain MUST re-measure (or re-apply from cache) — a stale
-  // normSig would skip that and leave the chain un-normalized (~15 dB hot on a
-  // loud amp). Bump the token so any in-flight measure can't land on the new
-  // graph.
-  normSig = null; normToken++; normRetries = 0; clearTimeout(normTimer);
+  loudness.reset(); // next power-on MUST re-measure; void in-flight measures
   ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = reverbStage = inputSplitter = null;
   chMeters = null; vuLevel = 0;
   { const n = $('amp')?.querySelector('.amp-vu-needle'); if (n) n.style.transform = 'rotate(-50deg)'; }
@@ -1475,106 +1391,5 @@ const transport = mountTransport($('transport-cluster'), {
   updateTransport();
 }
 
-// ── "Come Together" — serverless two-player jam (see src/jam.js) ───────────
-{
-  const jam = createJam({ getCtx: () => ctx, getSendNode: () => normGain });
-  const el2 = (id) => $(id);
-  const hostBtn = el2('jam-host'), joinBtn = el2('jam-join'), leaveBtn = el2('jam-leave');
-  const outWrap = el2('jam-out-wrap'), outTa = el2('jam-out'), copyBtn = el2('jam-copy');
-  const inWrap = el2('jam-in-wrap'), inTa = el2('jam-in'), inLabel = el2('jam-in-label'), goBtn = el2('jam-go');
-  const statusEl = el2('jam-status'), statusText = el2('jam-status-text'), errEl = el2('jam-error');
-  const mixRow = el2('jam-mix-row'), volEl = el2('jam-vol'), meterFill = el2('jam-meter-fill');
-  const ultraRow = el2('jam-ultra-row'), ultraCb = el2('jam-ultra'), statsEl = el2('jam-stats');
-  let mode = null; // 'host' | 'guest'
-  let meterT = null;
-
-  const err = (m) => { if (errEl) { errEl.textContent = m || ''; errEl.hidden = !m; } };
-  const status = (cls, text) => {
-    if (!statusEl) return;
-    statusEl.classList.remove('live', 'wait', 'bad');
-    if (cls) statusEl.classList.add(cls);
-    statusText.textContent = text;
-  };
-  function ui(stage) {
-    const idle = stage === 'idle', connected = stage === 'connected';
-    if (hostBtn) hostBtn.hidden = !idle;
-    if (joinBtn) joinBtn.hidden = !idle;
-    if (leaveBtn) leaveBtn.hidden = idle;
-    if (outWrap) outWrap.hidden = !(stage === 'host-wait' || stage === 'guest-wait');
-    if (inWrap) inWrap.hidden = !(stage === 'host-wait' || stage === 'join-entry');
-    if (mixRow) mixRow.hidden = !connected;
-    if (ultraRow) ultraRow.hidden = !connected;
-    if (statsEl) statsEl.hidden = !connected;
-    if (connected) {
-      clearInterval(meterT);
-      meterT = setInterval(() => { if (meterFill) meterFill.style.width = `${Math.min(100, jam.remoteLevel() * 130)}%`; }, 120);
-    } else { clearInterval(meterT); meterT = null; }
-  }
-
-  jam.onState((s, detail) => {
-    if (s === 'connected') { status('live', 'Connected — you are jamming!'); err(''); ui('connected'); }
-    else if (s === 'failed') { status('bad', 'Connection failed'); err(detail || 'Peer link failed.'); ui('idle'); mode = null; }
-    else if (s === 'closed') { status('', 'Jam ended'); ui('idle'); mode = null; }
-    else if (s === 'idle') { status('', 'Not connected'); ui('idle'); mode = null; }
-  });
-
-  const needPower = () => { err('Power on first — the jam sends your live amp sound.'); };
-
-  if (hostBtn) hostBtn.addEventListener('click', async () => {
-    if (!ctx || !normGain) return needPower();
-    err('');
-    try {
-      mode = 'host';
-      status('wait', 'Creating invite…');
-      const code = await jam.host();
-      outTa.value = code;
-      inTa.value = '';
-      inLabel.textContent = "Paste your friend's REPLY code";
-      status('wait', 'Send the invite, then paste the reply below');
-      ui('host-wait');
-    } catch (e) { err(String(e.message || e)); status('bad', 'Could not create invite'); ui('idle'); mode = null; }
-  });
-
-  if (joinBtn) joinBtn.addEventListener('click', () => {
-    if (!ctx || !normGain) return needPower();
-    err('');
-    mode = 'guest';
-    inTa.value = '';
-    inLabel.textContent = "Paste your friend's INVITE code";
-    status('wait', 'Paste the invite code you received');
-    ui('join-entry');
-  });
-
-  if (goBtn) goBtn.addEventListener('click', async () => {
-    err('');
-    try {
-      if (mode === 'guest') {
-        status('wait', 'Building your reply…');
-        const reply = await jam.join(inTa.value);
-        outTa.value = reply;
-        status('wait', 'Send the reply code back — connecting…');
-        ui('guest-wait');
-      } else if (mode === 'host') {
-        await jam.acceptReply(inTa.value);
-        status('wait', 'Connecting…');
-      }
-    } catch (e) { err(String(e.message || e)); }
-  });
-
-  if (copyBtn) copyBtn.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(outTa.value); copyBtn.textContent = 'Copied!'; setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1200); }
-    catch { outTa.select(); document.execCommand('copy'); }
-  });
-
-  if (volEl) volEl.addEventListener('input', () => jam.setRemoteLevel(parseFloat(volEl.value)));
-  if (ultraCb) ultraCb.addEventListener('change', () => jam.setUltra(ultraCb.checked));
-  jam.onStats((st) => {
-    if (!statsEl || statsEl.hidden) return;
-    const mode = st.mode === 'ultra' ? 'ULTRA raw link' : (st.wanted ? 'Opus (waiting for raw link…)' : 'Opus');
-    const bits = [mode];
-    if (st.rttMs != null) bits.push(`RTT ${st.rttMs} ms`);
-    if (st.mode === 'ultra' && st.bufMs != null) bits.push(`buffer ${st.bufMs} ms (target ${st.targetMs})`);
-    statsEl.textContent = bits.join(' · ');
-  });
-  if (leaveBtn) leaveBtn.addEventListener('click', () => { jam.leave(); });
-}
+// "Come Together" jam UI lives in src/jam-ui.js.
+initJamUI({ getCtx: () => ctx, getSendNode: () => normGain });
