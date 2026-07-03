@@ -1,0 +1,20 @@
+{
+  "name": "Sovtek MIG-50",
+  "artist": "NAM capture",
+  "song": "Raw captured amp \u2014 play it your way",
+  "category": "pro",
+  "chain": [
+    {
+      "type": "neuralamp",
+      "params": {
+        "model": 6,
+        "trim": 5,
+        "bass": 5,
+        "mid": 5,
+        "treble": 5,
+        "presence": 5,
+        "level": 5
+      }
+    }
+  ]
+}

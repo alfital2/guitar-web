@@ -7,10 +7,10 @@ import { MODELS } from '../src/effects/neuralamp.js';
 describe('05 Professional category', () => {
   const pro = GB_CATEGORIES.find((c) => c.id === 'pro');
 
-  it('exists with the "05 Professional" label and exactly 5 presets', () => {
+  it('exists with the "05 Professional" label and exactly 10 presets', () => {
     expect(pro).toBeTruthy();
     expect(pro.label).toBe('05 Professional');
-    expect(pro.presets).toHaveLength(5);
+    expect(pro.presets).toHaveLength(10);
   });
 
   it('every preset is a single neuralamp amp-head with a valid model index', () => {
@@ -31,9 +31,9 @@ describe('05 Professional category', () => {
     }
   });
 
-  it('covers all five distinct model indices 0..4', () => {
-    const idx = pro.presets.map((p) => p.chain[0].params.model).sort();
-    expect(idx).toEqual([0, 1, 2, 3, 4]);
+  it('covers all ten distinct model indices 0..9', () => {
+    const idx = pro.presets.map((p) => p.chain[0].params.model).sort((a, b) => a - b);
+    expect(idx).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 });
 

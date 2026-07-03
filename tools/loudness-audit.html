@@ -30,7 +30,7 @@ const { extractReverb } = chainState;
 // guitar-like material in general, not just on the exact calibration signal.
 const SIG_SEC = 5.0;
 function makeGuitarSignal(lengthSec) {
-  const n = Math.floor(SR * lengthSec);
+  const n = Math.floor(SR * lengthSec); // one (hot) half; the builder returns 2n
   const out = new Float32Array(n);
   let seed = 777001;
   const rand = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed / 0x7fffffff) * 2 - 1; };
@@ -57,9 +57,10 @@ function makeGuitarSignal(lengthSec) {
   pluck(293.66, 3.4, 1.3, 0.9);   // D4
   let peak = 0;
   for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(out[i]));
-  const k = peak > 0 ? 0.251 / peak : 1;               // -12 dBFS peak
-  for (let i = 0; i < n; i++) out[i] *= k;
-  return out;
+  const k = peak > 0 ? 0.126 / peak : 1;               // -18 dBFS hot half
+  const two = new Float32Array(n * 2);                 // + soft half at −12 dB —
+  for (let i = 0; i < n; i++) { two[i] = out[i] * k; two[n + i] = out[i] * k * 0.25; } // mirrors normalize.js
+  return two;
 }
 
 const peakOf = (channels) => {
@@ -88,7 +89,7 @@ function awaitNeuralReady(timeoutMs) {
 // Render chain + reverb + normGain against the verification signal; measure.
 let guitarSig = null;
 async function renderChain(chain, reverb, normLinear, { neural, firstNeural }) {
-  const len = Math.floor(SR * SIG_SEC);
+  const len = Math.floor(SR * SIG_SEC) * 2; // two-level signal = double length
   const oc = new OfflineAudioContext(2, len, SR);
   try { await loadWorklets(oc); } catch (e) { return { error: 'loadWorklets: ' + e.message }; }
 
@@ -113,7 +114,12 @@ async function renderChain(chain, reverb, normLinear, { neural, firstNeural }) {
   const rendered = await oc.startRendering();
   try { engine.destroy(); } catch {} // free the wasm instance (see normalize.js)
   const channels = [rendered.getChannelData(0), rendered.getChannelData(1)];
-  return { lufs: integratedLufs(channels, SR), peak: peakOf(channels) };
+  // Two-point verification (mean of hot/soft halves) — the same quantity the
+  // calibrator equalizes, so the gate keeps a tight, meaningful tolerance.
+  const half = Math.floor(channels[0].length / 2);
+  const hot = integratedLufs(channels.map((c) => c.subarray(0, half)), SR);
+  const soft = integratedLufs(channels.map((c) => c.subarray(half)), SR);
+  return { lufs: (hot + soft) / 2, peak: peakOf(channels) };
 }
 
 const dB = (lin) => 20 * Math.log10(Math.max(1e-9, lin));

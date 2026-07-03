@@ -17,12 +17,18 @@ import pro5153 from './presets/pro-5153.json' with { type: 'json' };
 import proDeluxe from './presets/pro-deluxe.json' with { type: 'json' };
 import proAc10 from './presets/pro-ac10.json' with { type: 'json' };
 import proJc from './presets/pro-jc.json' with { type: 'json' };
+import proTwin from './presets/pro-twin.json' with { type: 'json' };
+import proMig50 from './presets/pro-mig50.json' with { type: 'json' };
+import proOrange from './presets/pro-orange.json' with { type: 'json' };
+import proDumble from './presets/pro-dumble.json' with { type: 'json' };
+import proAmpeg from './presets/pro-ampeg.json' with { type: 'json' };
 import { GB_PRESETS } from './presets/garageband.js';
 
 // Artist/utility presets, then all GarageBand patches (tagged with a category).
 export const PRESETS = [clean, mayerEdge, mayerLead, knopflerSultans, asatoClean, hensonClean, hetfieldRhythm, hammettLead,
   funkAutowah, fuzzFace, ambientWash, surfTremolo, swirlPhaser, octaveDown,
   proJcm, pro5153, proDeluxe, proAc10, proJc,
+  proTwin, proMig50, proOrange, proDumble, proAmpeg,
   ...GB_PRESETS];
 
 // Browser categories: GarageBand patches plus the artist/showcase presets that
@@ -35,7 +41,7 @@ export const GB_CATEGORIES = [
   // 05 Professional: real captured amps (NAM WaveNet). Each preset is a single
   // `neuralamp` amp-head node; loudness is normalized at load time by the same
   // offline measurement path as every other preset (see normalize.js).
-  { id: 'pro', label: '05 Professional', presets: [proJcm, pro5153, proDeluxe, proAc10, proJc] },
+  { id: 'pro', label: '05 Professional', presets: [proJcm, pro5153, proDeluxe, proAc10, proJc, proTwin, proMig50, proOrange, proDumble, proAmpeg] },
 ];
 
 export function validatePreset(preset, registry) {

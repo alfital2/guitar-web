@@ -60,6 +60,15 @@ function fetchModelJson(index) {
   return fetch(new URL(`../../assets/neural/${name}.nam`, import.meta.url)).then((r) => r.text());
 }
 
+// Per-capture INPUT sensitivity trims (dB), measured empirically at small
+// signal (linear regime, quiet guitar reference): community captures expect
+// wildly different input levels — jc/twin/ampeg sat 35 dB below deluxe/ac10,
+// which is why quiet presets on those models nearly vanished with a real
+// guitar. These equalize every capture's sensitivity to the jcm reference;
+// the loudness normalizer then only handles CHAIN gain, not capture quirks.
+// Re-derive with tools/knob-audit-style small-signal measure if models change.
+const INPUT_TRIM_DB = { jcm: 0, '5153': -1.3, deluxe: -3.8, ac10: -4.9, jc: 35.1, twin: 35.6, mig50: 9.4, orange: -3.6, dumble: 12.4, ampeg: 34.3 };
+
 // 0..10 knob → gain. 5 = unity (default, so preset loudness is unchanged);
 // each step is ±1 dB up to 10 (+5 dB). The bottom of the range fades to TRUE
 // ZERO so Level/Trim at 0 is silence — the old pure 10**((v-5)*0.1) bottomed
@@ -164,7 +173,8 @@ export function create(ctx, params) {
   const apply = (p) => {
     const idx = Math.round(Number.isFinite(p.model) ? p.model : 0);
     wantModel = idx;
-    trimGain.gain.value = gainFor(p.trim);
+    const sensDb = INPUT_TRIM_DB[MODELS[idx]] ?? 0; // capture sensitivity equalization
+    trimGain.gain.value = gainFor(p.trim) * Math.pow(10, sensDb / 20);
     bassEq.gain.value = dbFor(p.bass, 12);        // ±12 dB @ 100 Hz shelf
     midEq.gain.value = dbFor(p.mid, 9);           // ±9 dB @ 650 Hz peak
     trebleEq.gain.value = dbFor(p.treble, 12);    // ±12 dB @ 3 kHz shelf

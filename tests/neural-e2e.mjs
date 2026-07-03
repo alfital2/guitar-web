@@ -47,7 +47,7 @@ const CHANGE_FLOOR = 0.03;    // absolute floor for "output changed"; actual gat
 const HF_RATIO_MIN = 1.5;     // max/min of the 5 amps' HF-energy ratio — proves
                               // distinct models by SPECTRAL shape (loudness is
                               // normalized post-fix, so RMS can't discriminate)
-const GAIN_RATIO_MIN = 2.0;   // max/min of the 5 amps' settled normGain — proves
+const GAIN_RATIO_MIN = 1.15;  // max/min of the amps' settled normGain — proves
                               // per-amp loudness normalization actually lands
                               // (the 2026-07 bug: one stale gain stuck across
                               // every preset switch). True per-amp gains span
@@ -142,7 +142,7 @@ async function run() {
 
     const pros = await page.evaluate(() => window.__neuralE2E.proPresetNames());
     console.log('Professional amps:', pros.join(', '));
-    check(pros.length === 5, `05 Professional has 5 amps (got ${pros.length})`);
+    check(pros.length === 10, `05 Professional has 10 amps (got ${pros.length})`);
 
     // 1) First amp: finite, sustained non-silent, realtime.
     await page.evaluate((n) => window.__neuralE2E.loadPresetByName(n), pros[0]);
@@ -248,7 +248,7 @@ async function run() {
     check(hfRatio > HF_RATIO_MIN, `5 amps process distinctly, not uniform passthrough (hf ratio ${hfRatio.toFixed(2)}x > ${HF_RATIO_MIN}x)`);
     // Loudness normalization is ALIVE per amp (the volume-inconsistency fix):
     const gains = switchGains.filter((g) => g != null && isFinite(g));
-    const gainRatio = gains.length === 5 ? Math.max(...gains) / Math.max(Math.min(...gains), 1e-6) : 0;
+    const gainRatio = gains.length === pros.length ? Math.max(...gains) / Math.max(Math.min(...gains), 1e-6) : 0;
     console.log(`  per-amp normGain ratio ${gainRatio.toFixed(2)}x (gains: ${gains.map((g) => g.toFixed(2)).join(', ')})`);
     check(gainRatio > GAIN_RATIO_MIN, `per-amp loudness normalization lands (gain ratio ${gainRatio.toFixed(2)}x > ${GAIN_RATIO_MIN}x)`);
 

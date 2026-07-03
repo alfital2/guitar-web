@@ -32,14 +32,18 @@ export function isNeuralChain(chain) {
 }
 
 // ── Deterministic guitar-like reference (Karplus-Strong plucks) ────────────
-// Two E-minor strums + three single notes over 3 s. Fixed seed → identical
-// samples every run. Peak −12 dBFS (typical DI hot-pick level).
-export const REF_SECONDS = 3.0;
+// TWO-LEVEL: 3 s of strums+notes at −18 dBFS peak (hot playing) followed by
+// the SAME 3 s at −12 dB relative (soft playing). Captures are nonlinear —
+// a cranked capture holds its loudness when you play soft, a clean one drops
+// with you — so a single-level calibration lies at the other level (that was
+// the "Folsom nearly silent live" bug). Gains are set on the MEAN of the two
+// halves, splitting the residual dynamics difference fairly.
+export const REF_SECONDS = 6.0;
 const refCache = new Map(); // sampleRate -> Float32Array
 
 export function makeGuitarReference(sampleRate) {
   if (refCache.has(sampleRate)) return refCache.get(sampleRate);
-  const n = Math.floor(sampleRate * REF_SECONDS);
+  const n = Math.floor(sampleRate * (REF_SECONDS / 2)); // one half; doubled below
   const out = new Float32Array(n);
   let seed = 424242;
   const rand = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed / 0x7fffffff) * 2 - 1; };
@@ -66,10 +70,11 @@ export function makeGuitarReference(sampleRate) {
   pluck(329.63, 2.6, 1.2, 0.9);   // E4
   let peak = 0;
   for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(out[i]));
-  const k = peak > 0 ? 0.251 / peak : 1; // −12 dBFS
-  for (let i = 0; i < n; i++) out[i] *= k;
-  refCache.set(sampleRate, out);
-  return out;
+  const k = peak > 0 ? 0.126 / peak : 1; // −18 dBFS hot half
+  const two = new Float32Array(n * 2);
+  for (let i = 0; i < n; i++) { two[i] = out[i] * k; two[n + i] = out[i] * k * 0.25; } // quiet half −12 dB
+  refCache.set(sampleRate, two);
+  return two;
 }
 
 // ── Integrated loudness, ITU-R BS.1770-4 ───────────────────────────────────
@@ -194,9 +199,13 @@ async function measureOnce(chain, {
   // Free the chain — the neural worklet holds a whole wasm INSTANCE; without an
   // explicit destroy, repeated measures exhaust Chrome's wasm memory pool.
   try { engine.destroy(); } catch {}
-  const lufs = integratedLufs(
-    [rendered.getChannelData(0), rendered.getChannelData(1)], sampleRate,
-  );
-  if (!isFinite(lufs)) return null; // silent render — measurement failed
+  // Two-point loudness: mean of the hot half and the soft half (see the
+  // reference builder) so nonlinear chains are fair at both playing levels.
+  const half = Math.floor(length / 2);
+  const chs = [rendered.getChannelData(0), rendered.getChannelData(1)];
+  const hot = integratedLufs(chs.map((c) => c.subarray(0, half)), sampleRate);
+  const soft = integratedLufs(chs.map((c) => c.subarray(half)), sampleRate);
+  if (!isFinite(hot) || !isFinite(soft)) return null; // silent render — failed
+  const lufs = (hot + soft) / 2;
   return Math.max(min, Math.min(max, 10 ** ((target - lufs) / 20)));
 }
