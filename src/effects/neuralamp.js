@@ -18,7 +18,7 @@ export const schema = {
   type: 'neuralamp',
   label: 'Neural Amp',
   params: [
-    { key: 'model',    label: 'Amp',      min: 0, max: 4,  default: 0, step: 1 },
+    { key: 'model',    label: 'Amp',      min: 0, max: 9,  default: 0, step: 1 },
     { key: 'trim',     label: 'Trim',     min: 0, max: 10, default: 5, step: 0.1 },
     // Post-model analog tone stack (REAL biquads, not decoration): standard
     // NAM-player practice — the capture nails the amp's character, the stack
@@ -31,8 +31,12 @@ export const schema = {
   ],
 };
 
-// Model index → assets/neural/<name>.nam (WaveNet captures from the POC).
-export const MODELS = ['jcm', '5153', 'deluxe', 'ac10', 'jc'];
+// Model index → assets/neural/<name>.nam (WaveNet captures). Order is API:
+// presets reference indices — APPEND only, never reorder.
+// 0-4: original POC bank · 5-9: 2026-07-03 expansion (Twin Reverb, Sovtek
+// MIG-50, Orange Rockerverb via pelennor2170/NAM_models [GPL-3.0, attributed
+// in assets/LICENSE-nam-models.md]; Dumble-style + Ampeg from the POC).
+export const MODELS = ['jcm', '5153', 'deluxe', 'ac10', 'jc', 'twin', 'mig50', 'orange', 'dumble', 'ampeg'];
 
 // The compiled engine's wasm bytes are identical for every node and every
 // context, so fetch them exactly once and share the promise across all create()

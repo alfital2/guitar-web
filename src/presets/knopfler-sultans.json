@@ -1,8 +1,45 @@
-{ "name": "Knopfler — Sultans Clean", "artist": "Mark Knopfler", "song": "Sultans of Swing", "chain": [
-  { "type": "compressor", "params": { "threshold": -28, "ratio": 2.5, "attack": 0.018, "release": 0.25, "makeup": 4 } },
-  { "type": "drive",      "params": { "amount": 1.5, "tone": 5, "level": 7, "blend": 0.12, "midBump": 2 } },
-  { "type": "eq",         "params": { "bass": 6, "mid": 4.5, "midFreq": 700, "treble": 5.5 } },
-  { "type": "cabinet",    "params": { "brightness": 4, "body": 7, "mix": 1 } },
-  { "type": "delay",      "params": { "time": 240, "feedback": 0.22, "tone": 4, "mix": 0.20 } },
-  { "type": "reverb",     "params": { "size": 0.25, "mix": 0.14 } }
-] }
+{
+  "name": "Knopfler \u2014 Sultans Clean",
+  "artist": "Mark Knopfler",
+  "song": "Sultans of Swing",
+  "chain": [
+    {
+      "type": "compressor",
+      "params": {
+        "threshold": -28,
+        "ratio": 2.5,
+        "attack": 0.018,
+        "release": 0.25,
+        "makeup": 4
+      }
+    },
+    {
+      "type": "neuralamp",
+      "params": {
+        "model": 5,
+        "trim": 4.7,
+        "bass": 6,
+        "mid": 4.5,
+        "treble": 5.5,
+        "presence": 5.5,
+        "level": 5
+      }
+    },
+    {
+      "type": "delay",
+      "params": {
+        "time": 240,
+        "feedback": 0.22,
+        "tone": 4,
+        "mix": 0.2
+      }
+    },
+    {
+      "type": "reverb",
+      "params": {
+        "size": 0.25,
+        "mix": 0.14
+      }
+    }
+  ]
+}

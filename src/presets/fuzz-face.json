@@ -1,7 +1,41 @@
-{ "name": "Fuzz Face", "artist": "Showcase", "song": "Hendrix-style fuzz + gate", "chain": [
-  { "type": "gate",    "params": { "threshold": 2.5, "release": 4 } },
-  { "type": "fuzz",    "params": { "fuzz": 7, "tone": 5, "level": 4 } },
-  { "type": "eq",      "params": { "bass": 6, "mid": 6, "midFreq": 700, "treble": 5 } },
-  { "type": "cabinet", "params": { "brightness": 4, "body": 6, "mix": 1 } },
-  { "type": "reverb",  "params": { "size": 0.4, "mix": 0.12 } }
-] }
+{
+  "name": "Fuzz Face",
+  "artist": "Showcase",
+  "song": "Hendrix-style fuzz + gate",
+  "chain": [
+    {
+      "type": "gate",
+      "params": {
+        "threshold": 2.5,
+        "release": 4
+      }
+    },
+    {
+      "type": "fuzz",
+      "params": {
+        "fuzz": 7,
+        "tone": 5,
+        "level": 4
+      }
+    },
+    {
+      "type": "neuralamp",
+      "params": {
+        "model": 5,
+        "trim": 5,
+        "bass": 6,
+        "mid": 6,
+        "treble": 5,
+        "presence": 5.5,
+        "level": 5
+      }
+    },
+    {
+      "type": "reverb",
+      "params": {
+        "size": 0.4,
+        "mix": 0.12
+      }
+    }
+  ]
+}

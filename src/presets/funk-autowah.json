@@ -1,7 +1,47 @@
-{ "name": "Funk — Auto-Wah", "artist": "Showcase", "song": "Envelope filter quack", "chain": [
-  { "type": "compressor", "params": { "threshold": -20, "ratio": 4, "attack": 0.003, "release": 0.2, "makeup": 4 } },
-  { "type": "autowah",    "params": { "sensitivity": 7, "range": 4, "resonance": 8, "mix": 0.9 } },
-  { "type": "eq",         "params": { "bass": 5, "mid": 6, "midFreq": 800, "treble": 6 } },
-  { "type": "cabinet",    "params": { "brightness": 5, "body": 5, "mix": 1 } },
-  { "type": "delay",      "params": { "time": 260, "feedback": 0.18, "tone": 5, "mix": 0.1 } }
-] }
+{
+  "name": "Funk \u2014 Auto-Wah",
+  "artist": "Showcase",
+  "song": "Envelope filter quack",
+  "chain": [
+    {
+      "type": "compressor",
+      "params": {
+        "threshold": -20,
+        "ratio": 4,
+        "attack": 0.003,
+        "release": 0.2,
+        "makeup": 4
+      }
+    },
+    {
+      "type": "autowah",
+      "params": {
+        "sensitivity": 7,
+        "range": 4,
+        "resonance": 8,
+        "mix": 0.9
+      }
+    },
+    {
+      "type": "neuralamp",
+      "params": {
+        "model": 4,
+        "trim": 5,
+        "bass": 5,
+        "mid": 6,
+        "treble": 6,
+        "presence": 6.0,
+        "level": 5
+      }
+    },
+    {
+      "type": "delay",
+      "params": {
+        "time": 260,
+        "feedback": 0.18,
+        "tone": 5,
+        "mix": 0.1
+      }
+    }
+  ]
+}

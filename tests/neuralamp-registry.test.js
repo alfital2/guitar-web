@@ -17,8 +17,8 @@ describe('neuralamp registration (src/effects/index.js)', () => {
     const keys = registry['neuralamp'].schema.params.map((p) => p.key);
     expect(keys).toEqual(['model', 'trim', 'bass', 'mid', 'treble', 'presence', 'level']);
   });
-  it('ships 5 model ids that map to assets/neural/<name>.nam', () => {
-    expect(MODELS).toEqual(['jcm', '5153', 'deluxe', 'ac10', 'jc']);
+  it('ships the model ids that map to assets/neural/<name>.nam', () => {
+    expect(MODELS).toEqual(['jcm', '5153', 'deluxe', 'ac10', 'jc', 'twin', 'mig50', 'orange', 'dumble', 'ampeg']);
   });
 });
 

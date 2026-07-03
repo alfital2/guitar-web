@@ -1,3 +1,17 @@
-{ "name": "Clean (bypass)", "chain": [
-  { "type": "cabinet", "params": { "brightness": 6, "body": 5, "mix": 1 } }
-] }
+{
+  "name": "Clean (bypass)",
+  "chain": [
+    {
+      "type": "neuralamp",
+      "params": {
+        "model": 5,
+        "trim": 5,
+        "bass": 5,
+        "mid": 5,
+        "treble": 5,
+        "presence": 5,
+        "level": 5
+      }
+    }
+  ]
+}

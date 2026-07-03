@@ -7,6 +7,7 @@
   if (!location.search.includes('heavy')) document.documentElement.classList.add('perf-lite');</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Guitar Studio</title>
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Barlow+Condensed:wght@500;600;700&family=Oswald:wght@500;600;700&family=Audiowide&family=Orbitron:wght@600;800&family=Bungee&family=Righteous&family=Anton&family=Pacifico&display=swap" rel="stylesheet">
@@ -1193,6 +1194,62 @@
   #jam-status.bad .jam-dot { background: var(--red); box-shadow: 0 0 6px rgba(255,69,58,0.5); }
   .jam-meter { width: 46px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; flex: 0 0 46px; }
   .jam-meter i { display: block; height: 100%; width: 0; background: var(--green); border-radius: 3px; }
+
+  /* Twin — silverface: brushed aluminum panel, turquoise pinline. */
+  .amp-head.amp-face-twin .amp-panel {
+    background: linear-gradient(180deg, #d9dde2 0%, #eef1f5 12%, #b8bdc4 45%, #cfd4da 70%, #9aa0a8 100%);
+    border-color: #55595f;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), inset 0 3px 0 -1px rgba(64,178,190,0.65), inset 0 -2px 6px rgba(30,34,40,0.3), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .amp-face-twin .amp-group-head { color: #10353a; background: linear-gradient(180deg, #e7ebef, #c4cad1); text-shadow: 0 1px 0 rgba(255,255,255,0.7); }
+  .amp-face-twin .amp-knob-label { color: #23404a; text-shadow: 0 1px 0 rgba(255,255,255,0.6); }
+  .amp-face-twin .amp-group::before { border-color: rgba(30,60,70,0.35); box-shadow: 0 1px 1px rgba(255,255,255,0.5), inset 0 1px 1px rgba(40,60,70,0.2); }
+
+  /* MIG-50 — Soviet olive-drab steel, cream stencil labels. */
+  .amp-head.amp-face-mig50 .amp-panel {
+    background: linear-gradient(180deg, #4a4f3d 0%, #575d47 14%, #3a3e30 52%, #464b39 80%, #2c2f24 100%);
+    border-color: #1d1f16;
+    box-shadow: inset 0 1px 0 rgba(220,225,190,0.25), inset 0 -2px 6px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .amp-face-mig50 .amp-group-head { color: #e9e5c8; background: linear-gradient(180deg, #555b45, #40452f); text-shadow: 0 1px 1px rgba(0,0,0,0.65); }
+  .amp-face-mig50 .amp-knob-label { color: #d9d5b4; text-shadow: 0 1px 1px rgba(0,0,0,0.6); }
+  .amp-face-mig50 .amp-group::before { border-color: rgba(233,229,200,0.28); box-shadow: 0 1px 1px rgba(0,0,0,0.45), inset 0 1px 1px rgba(0,0,0,0.3); }
+
+  /* Orange — THE orange tolex; cream hieroglyph panel. */
+  .amp-head.amp-face-orange {
+    background:
+      radial-gradient(120% 90% at 30% 0%, rgba(255,255,255,0.12), transparent 40%),
+      repeating-linear-gradient(45deg, rgba(0,0,0,0.06) 0 2px, transparent 2px 4px),
+      linear-gradient(180deg, #d96a1e 0%, #c25812 45%, #a84a0e 100%);
+  }
+  .amp-head.amp-face-orange .amp-panel {
+    background: linear-gradient(180deg, #f3ead6 0%, #efe2c4 14%, #dfcda2 52%, #e9dbba 80%, #c9b488 100%);
+    border-color: #7c5a22;
+    box-shadow: inset 0 1px 0 rgba(255,252,240,0.9), inset 0 -2px 6px rgba(120,80,20,0.3), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .amp-face-orange .amp-group-head { color: #5c3208; background: linear-gradient(180deg, #f0e5c8, #dcc99e); text-shadow: 0 1px 0 rgba(255,250,235,0.7); }
+  .amp-face-orange .amp-knob-label { color: #613c11; text-shadow: 0 1px 0 rgba(255,250,235,0.6); }
+  .amp-face-orange .amp-group::before { border-color: rgba(122,84,26,0.45); box-shadow: 0 1px 1px rgba(255,248,230,0.4), inset 0 1px 1px rgba(110,74,20,0.25); }
+
+  /* Dumble — blond boutique: lacquered cream panel, chocolate labels. */
+  .amp-head.amp-face-dumble .amp-panel {
+    background: linear-gradient(180deg, #efe6d2 0%, #f7f0e0 12%, #ddcfb2 48%, #e9ddc4 74%, #c3b294 100%);
+    border-color: #6e5b3c;
+    box-shadow: inset 0 1px 0 rgba(255,253,246,0.95), inset 0 -2px 6px rgba(96,76,44,0.28), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .amp-face-dumble .amp-group-head { color: #4a3617; background: linear-gradient(180deg, #efe6cf, #dccbA6); text-shadow: 0 1px 0 rgba(255,252,244,0.7); }
+  .amp-face-dumble .amp-knob-label { color: #503d1d; text-shadow: 0 1px 0 rgba(255,252,244,0.6); }
+  .amp-face-dumble .amp-group::before { border-color: rgba(110,91,60,0.4); box-shadow: 0 1px 1px rgba(255,250,240,0.45), inset 0 1px 1px rgba(96,76,40,0.22); }
+
+  /* Ampeg — midnight navy, silver script vibe. */
+  .amp-head.amp-face-ampeg .amp-panel {
+    background: linear-gradient(180deg, #10182c 0%, #182238 14%, #0a1122 52%, #121b30 80%, #060b18 100%);
+    border-color: #030610;
+    box-shadow: inset 0 1px 0 rgba(180,200,240,0.18), inset 0 2px 0 -1px rgba(196,206,226,0.4), inset 0 -2px 6px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.5);
+  }
+  .amp-face-ampeg .amp-group-head { color: #cfd8ea; background: linear-gradient(180deg, #1a2440, #101830); text-shadow: 0 1px 1px rgba(0,0,0,0.7); }
+  .amp-face-ampeg .amp-knob-label { color: #b8c3da; text-shadow: 0 1px 1px rgba(0,0,0,0.65); }
+  .amp-face-ampeg .amp-group::before { border-color: rgba(196,206,226,0.28); box-shadow: 0 1px 1px rgba(0,0,0,0.5), inset 0 1px 1px rgba(0,0,0,0.35); }
 
   /* Solid-state faces (Roland JC): no bottles, no tube shelf. */
   .amp-tubes.no-tubes { background: none; }

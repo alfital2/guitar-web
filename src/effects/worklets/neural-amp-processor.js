@@ -65,6 +65,10 @@ class NeuralAmpProcessor extends AudioWorkletProcessor {
       // flag so process() returns false, which lets the browser tear the node
       // down instead of scheduling it every render quantum.
       this.destroyed = true;
+      // Drop every wasm reference: with ~40+ neural renders in one page
+      // (all-neural preset audits, long sessions) retained instances exhaust
+      // Chrome's wasm memory pool ("Cannot allocate Wasm memory").
+      this.dsp = null; this.module = null; this.pendingModel = null;
       return;
     }
     if (msg.type === 'wasm') {

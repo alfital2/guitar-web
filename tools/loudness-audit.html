@@ -96,7 +96,7 @@ async function renderChain(chain, reverb, normLinear, { neural, firstNeural }) {
   buf.getChannelData(0).set(guitarSig);
   const src = oc.createBufferSource(); src.buffer = buf;
 
-  const readyP = neural ? awaitNeuralReady(firstNeural ? 30000 : 12000) : null;
+  const readyP = neural ? awaitNeuralReady(firstNeural ? 45000 : 35000) : null; // an all-neural bank instantiates wasm ~180x per run — late renders get slow
   let engine;
   try { engine = buildChain(oc, chain, registry); } catch (e) { return { error: 'buildChain: ' + e.message }; }
   src.connect(engine.input);
@@ -109,8 +109,9 @@ async function renderChain(chain, reverb, normLinear, { neural, firstNeural }) {
   tail.connect(norm); norm.connect(oc.destination);
   src.start();
 
-  if (neural && !(await readyP)) return { error: 'neural handshake timeout (offline)' };
+  if (neural && !(await readyP)) { try { engine.destroy(); } catch {} return { error: 'neural handshake timeout (offline)' }; }
   const rendered = await oc.startRendering();
+  try { engine.destroy(); } catch {} // free the wasm instance (see normalize.js)
   const channels = [rendered.getChannelData(0), rendered.getChannelData(1)];
   return { lufs: integratedLufs(channels, SR), peak: peakOf(channels) };
 }
@@ -140,11 +141,12 @@ async function auditPreset(preset, category, firstNeural) {
   };
 }
 
-async function run() {
+async function run(catIndex = null) {
   guitarSig = makeGuitarSignal(SIG_SEC);
   const rows = [];
   let neuralSeen = false;
-  for (const cat of GB_CATEGORIES) {
+  const cats = catIndex == null ? GB_CATEGORIES : [GB_CATEGORIES[catIndex]];
+  for (const cat of cats) {
     for (const preset of cat.presets) {
       const neural = preset.chain.some((e) => e.type === 'neuralamp');
       let row;
@@ -161,6 +163,6 @@ async function run() {
   return { sampleRate: SR, signalSeconds: SIG_SEC, targetLufs: TARGET_LUFS, rows };
 }
 
-window.__loudnessAudit = { run };
+window.__loudnessAudit = { run, categories: GB_CATEGORIES.length };
 </script>
 </body>

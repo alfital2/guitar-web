@@ -50,13 +50,13 @@ beforeAll(() => {
 });
 
 describe('neuralamp effect', () => {
-  it('exposes the neuralamp schema and the 5 model ids', () => {
+  it('exposes the neuralamp schema and the model ids', () => {
     expect(schema.type).toBe('neuralamp');
     expect(schema.label).toBe('Neural Amp');
     expect(schema.params.map((p) => p.key)).toEqual(['model', 'trim', 'bass', 'mid', 'treble', 'presence', 'level']);
     const model = schema.params.find((p) => p.key === 'model');
-    expect([model.min, model.max, model.default, model.step]).toEqual([0, 4, 0, 1]);
-    expect(MODELS).toEqual(['jcm', '5153', 'deluxe', 'ac10', 'jc']);
+    expect([model.min, model.max, model.default, model.step]).toEqual([0, 9, 0, 1]);
+    expect(MODELS).toEqual(['jcm', '5153', 'deluxe', 'ac10', 'jc', 'twin', 'mig50', 'orange', 'dumble', 'ampeg']);
   });
 
   it('create() returns {input, output, apply} with distinct gain nodes', () => {

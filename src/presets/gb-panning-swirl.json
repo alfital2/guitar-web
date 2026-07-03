@@ -6,28 +6,24 @@
     {
       "type": "drive",
       "params": {
-        "amount": 5,
+        "amount": 2.8,
         "tone": 5,
         "level": 5,
-        "blend": 0.7,
+        "master": 5,
+        "blend": 0.8,
         "midBump": 3
       }
     },
     {
-      "type": "eq",
+      "type": "neuralamp",
       "params": {
+        "model": 0,
+        "trim": 6.2,
         "bass": 5,
         "mid": 6,
-        "midFreq": 750,
-        "treble": 5
-      }
-    },
-    {
-      "type": "cabinet",
-      "params": {
-        "brightness": 5,
-        "body": 6,
-        "mix": 1
+        "treble": 5,
+        "presence": 6.0,
+        "level": 5
       }
     },
     {

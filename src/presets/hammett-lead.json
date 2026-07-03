@@ -1,8 +1,55 @@
-{ "name": "Hammett — Singing Lead", "artist": "Kirk Hammett (Metallica)", "chain": [
-  { "type": "compressor", "params": { "threshold": -24, "ratio": 4, "attack": 0.005, "release": 0.2, "makeup": 3 } },
-  { "type": "drive",      "params": { "amount": 8.5, "tone": 6.5, "level": 6, "blend": 0.92, "midBump": 6 } },
-  { "type": "eq",         "params": { "bass": 5, "mid": 6, "midFreq": 800, "treble": 7.5 } },
-  { "type": "cabinet",    "params": { "brightness": 7, "body": 5, "mix": 1 } },
-  { "type": "delay",      "params": { "time": 300, "feedback": 0.2, "tone": 6, "mix": 0.22 } },
-  { "type": "reverb",     "params": { "size": 0.4, "mix": 0.12 } }
-] }
+{
+  "name": "Hammett \u2014 Singing Lead",
+  "artist": "Kirk Hammett (Metallica)",
+  "chain": [
+    {
+      "type": "compressor",
+      "params": {
+        "threshold": -24,
+        "ratio": 4,
+        "attack": 0.005,
+        "release": 0.2,
+        "makeup": 3
+      }
+    },
+    {
+      "type": "drive",
+      "params": {
+        "amount": 7.7,
+        "tone": 6.5,
+        "level": 5,
+        "master": 5,
+        "blend": 1,
+        "midBump": 6
+      }
+    },
+    {
+      "type": "neuralamp",
+      "params": {
+        "model": 1,
+        "trim": 7.8,
+        "bass": 5,
+        "mid": 6,
+        "treble": 7.5,
+        "presence": 7.0,
+        "level": 5
+      }
+    },
+    {
+      "type": "delay",
+      "params": {
+        "time": 300,
+        "feedback": 0.2,
+        "tone": 6,
+        "mix": 0.22
+      }
+    },
+    {
+      "type": "reverb",
+      "params": {
+        "size": 0.4,
+        "mix": 0.12
+      }
+    }
+  ]
+}

@@ -193,7 +193,7 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
   // Tube complement matches what the amp IS: 100 W heads (JCM, 5153) run a
   // quad; small combos (Studio analytic, Deluxe, AC10) a pair; the Roland JC
   // is famously SOLID-STATE — no bottles at all, just the clean grille.
-  const TUBE_COUNT = { jcm: 4, '5153': 4, deluxe: 2, ac10: 2, jc: 0 };
+  const TUBE_COUNT = { jcm: 4, '5153': 4, deluxe: 2, ac10: 2, jc: 0, twin: 4, mig50: 2, orange: 2, dumble: 2, ampeg: 2 };
   const neuralName = neural ? (MODELS[Math.round(Number(neural.params?.model ?? 0))] || MODELS[0]) : null;
   const nTubes = neural ? TUBE_COUNT[neuralName] ?? 2 : 2;
   tubes.innerHTML = '<i class="amp-tube"></i>'.repeat(nTubes);

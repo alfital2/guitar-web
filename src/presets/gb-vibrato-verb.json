@@ -4,30 +4,15 @@
   "song": "Watery vibrato clean",
   "chain": [
     {
-      "type": "drive",
+      "type": "neuralamp",
       "params": {
-        "amount": 0.5,
-        "tone": 6,
-        "level": 5,
-        "blend": 0.3,
-        "midBump": 0
-      }
-    },
-    {
-      "type": "eq",
-      "params": {
+        "model": 5,
+        "trim": 4.2,
         "bass": 5,
         "mid": 4,
-        "midFreq": 600,
-        "treble": 7
-      }
-    },
-    {
-      "type": "cabinet",
-      "params": {
-        "brightness": 7,
-        "body": 4,
-        "mix": 1
+        "treble": 7,
+        "presence": 7.0,
+        "level": 5
       }
     },
     {

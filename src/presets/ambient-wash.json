@@ -1,10 +1,69 @@
-{ "name": "Ambient Wash", "artist": "Showcase", "song": "Chorus + tape + ping-pong + space", "chain": [
-  { "type": "compressor", "params": { "threshold": -22, "ratio": 3, "attack": 0.01, "release": 0.3, "makeup": 3 } },
-  { "type": "eq",         "params": { "bass": 5, "mid": 4, "midFreq": 600, "treble": 6 } },
-  { "type": "cabinet",    "params": { "brightness": 6, "body": 5, "mix": 1 } },
-  { "type": "chorus",     "params": { "rate": 0.8, "depth": 5, "mix": 0.4 } },
-  { "type": "tape-echo",  "params": { "time": 420, "feedback": 0.4, "tone": 4, "flutter": 4, "mix": 0.28 } },
-  { "type": "pingpong",   "params": { "time": 300, "feedback": 0.35, "tone": 5, "mix": 0.2 } },
-  { "type": "reverb",     "params": { "size": 0.85, "mix": 0.3 } },
-  { "type": "widener",    "params": { "width": 6 } }
-] }
+{
+  "name": "Ambient Wash",
+  "artist": "Showcase",
+  "song": "Chorus + tape + ping-pong + space",
+  "chain": [
+    {
+      "type": "compressor",
+      "params": {
+        "threshold": -22,
+        "ratio": 3,
+        "attack": 0.01,
+        "release": 0.3,
+        "makeup": 3
+      }
+    },
+    {
+      "type": "neuralamp",
+      "params": {
+        "model": 4,
+        "trim": 5,
+        "bass": 5,
+        "mid": 4,
+        "treble": 6,
+        "presence": 6.5,
+        "level": 5
+      }
+    },
+    {
+      "type": "chorus",
+      "params": {
+        "rate": 0.8,
+        "depth": 5,
+        "mix": 0.4
+      }
+    },
+    {
+      "type": "tape-echo",
+      "params": {
+        "time": 420,
+        "feedback": 0.4,
+        "tone": 4,
+        "flutter": 4,
+        "mix": 0.28
+      }
+    },
+    {
+      "type": "pingpong",
+      "params": {
+        "time": 300,
+        "feedback": 0.35,
+        "tone": 5,
+        "mix": 0.2
+      }
+    },
+    {
+      "type": "reverb",
+      "params": {
+        "size": 0.85,
+        "mix": 0.3
+      }
+    },
+    {
+      "type": "widener",
+      "params": {
+        "width": 6
+      }
+    }
+  ]
+}

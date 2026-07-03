@@ -13,30 +13,15 @@
       }
     },
     {
-      "type": "drive",
+      "type": "neuralamp",
       "params": {
-        "amount": 3,
-        "tone": 5,
-        "level": 4,
-        "blend": 0.7,
-        "midBump": 1
-      }
-    },
-    {
-      "type": "eq",
-      "params": {
+        "model": 0,
+        "trim": 5.3,
         "bass": 5,
         "mid": 5,
-        "midFreq": 700,
-        "treble": 4
-      }
-    },
-    {
-      "type": "cabinet",
-      "params": {
-        "brightness": 4,
-        "body": 7,
-        "mix": 1
+        "treble": 4,
+        "presence": 5.5,
+        "level": 5
       }
     },
     {

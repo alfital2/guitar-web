@@ -186,11 +186,14 @@ async function measureOnce(chain, {
     // Model never came up. Let the context render to completion in the
     // background so it (and any late events, now unmatchable) can be GC'd,
     // and report "couldn't measure".
-    offline.startRendering().catch(() => {});
+    offline.startRendering().catch(() => {}).then(() => { try { engine.destroy(); } catch {} });
     return null;
   }
 
   const rendered = await offline.startRendering();
+  // Free the chain — the neural worklet holds a whole wasm INSTANCE; without an
+  // explicit destroy, repeated measures exhaust Chrome's wasm memory pool.
+  try { engine.destroy(); } catch {}
   const lufs = integratedLufs(
     [rendered.getChannelData(0), rendered.getChannelData(1)], sampleRate,
   );

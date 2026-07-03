@@ -1,6 +1,40 @@
-{ "name": "Hetfield — Puppets Rhythm", "artist": "James Hetfield (Metallica)", "song": "Master of Puppets", "chain": [
-  { "type": "compressor", "params": { "threshold": -20, "ratio": 3, "attack": 0.01, "release": 0.15, "makeup": 2 } },
-  { "type": "drive",      "params": { "amount": 8, "tone": 6, "level": 6, "blend": 0.9, "midBump": 2 } },
-  { "type": "eq",         "params": { "bass": 4.5, "mid": 2.5, "midFreq": 750, "treble": 7 } },
-  { "type": "cabinet",    "params": { "brightness": 6, "body": 5, "mix": 1 } }
-] }
+{
+  "name": "Hetfield \u2014 Puppets Rhythm",
+  "artist": "James Hetfield (Metallica)",
+  "song": "Master of Puppets",
+  "chain": [
+    {
+      "type": "compressor",
+      "params": {
+        "threshold": -20,
+        "ratio": 3,
+        "attack": 0.01,
+        "release": 0.15,
+        "makeup": 2
+      }
+    },
+    {
+      "type": "drive",
+      "params": {
+        "amount": 7.0,
+        "tone": 6,
+        "level": 5,
+        "master": 5,
+        "blend": 1,
+        "midBump": 2
+      }
+    },
+    {
+      "type": "neuralamp",
+      "params": {
+        "model": 1,
+        "trim": 7.6,
+        "bass": 4.5,
+        "mid": 2.5,
+        "treble": 7,
+        "presence": 6.5,
+        "level": 5
+      }
+    }
+  ]
+}

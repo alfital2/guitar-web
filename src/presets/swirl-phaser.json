@@ -1,9 +1,54 @@
-{ "name": "Swirl — Phaser/Flanger", "artist": "Showcase", "song": "Modulation sweep", "chain": [
-  { "type": "boost",   "params": { "gain": 4, "tilt": 5, "tight": 3 } },
-  { "type": "drive",   "params": { "amount": 3, "tone": 5, "level": 5, "blend": 0.6, "midBump": 2 } },
-  { "type": "eq",      "params": { "bass": 5, "mid": 5, "midFreq": 750, "treble": 5 } },
-  { "type": "cabinet", "params": { "brightness": 5, "body": 6, "mix": 1 } },
-  { "type": "phaser",  "params": { "rate": 0.4, "depth": 7, "feedback": 0.5, "mix": 0.5 } },
-  { "type": "flanger", "params": { "rate": 0.3, "depth": 5, "feedback": 0.5, "mix": 0.35 } },
-  { "type": "delay",   "params": { "time": 340, "feedback": 0.25, "tone": 4, "mix": 0.15 } }
-] }
+{
+  "name": "Swirl \u2014 Phaser/Flanger",
+  "artist": "Showcase",
+  "song": "Modulation sweep",
+  "chain": [
+    {
+      "type": "boost",
+      "params": {
+        "gain": 4,
+        "tilt": 5,
+        "tight": 3
+      }
+    },
+    {
+      "type": "neuralamp",
+      "params": {
+        "model": 3,
+        "trim": 5.3,
+        "bass": 5,
+        "mid": 5,
+        "treble": 5,
+        "presence": 6.0,
+        "level": 5
+      }
+    },
+    {
+      "type": "phaser",
+      "params": {
+        "rate": 0.4,
+        "depth": 7,
+        "feedback": 0.5,
+        "mix": 0.5
+      }
+    },
+    {
+      "type": "flanger",
+      "params": {
+        "rate": 0.3,
+        "depth": 5,
+        "feedback": 0.5,
+        "mix": 0.35
+      }
+    },
+    {
+      "type": "delay",
+      "params": {
+        "time": 340,
+        "feedback": 0.25,
+        "tone": 4,
+        "mix": 0.15
+      }
+    }
+  ]
+}
