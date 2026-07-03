@@ -10,7 +10,7 @@ const TP = [
   ['tp-record', '⏺', 'Record'],
 ];
 
-export function mountTransport(container, { getLiveAnalyser, onGain, onTempoChange, onToggleTab }) {
+export function mountTransport(container, { getLiveAnalyser, onGain, onTempoChange }) {
   container.innerHTML = '';
   container.classList.add('transport-cluster');
 
@@ -125,17 +125,12 @@ export function mountTransport(container, { getLiveAnalyser, onGain, onTempoChan
   const tunerWrap = el('div', 'tuner');
   const tunerBtn = el('button', 'tuner-toggle'); tunerBtn.id = 'tuner-toggle'; tunerBtn.type = 'button';
   tunerBtn.title = 'Tuner'; tunerBtn.setAttribute('aria-label', 'Tuner'); tunerBtn.textContent = 'TUNER';
-  // Live TAB transcription toggle — sits beside the tuner; main.js owns the mode.
-  const tabBtn = el('button', 'tuner-toggle tab-toggle'); tabBtn.id = 'tab-toggle'; tabBtn.type = 'button';
-  tabBtn.title = 'Live TAB — transcribe what you play to tablature (metronome grid)';
-  tabBtn.setAttribute('aria-label', 'Live TAB transcription'); tabBtn.textContent = 'TAB';
-  if (onToggleTab) tabBtn.addEventListener('click', () => onToggleTab());
   const strip = el('div', 'tuner-strip'); strip.hidden = true;
   strip.innerHTML = `
     <span class="tuner-note">—</span>
     <span class="tuner-meter"><span class="tuner-ticks"></span><span class="tuner-needle"></span></span>
     <span class="tuner-readout"><span class="tuner-cents">--</span><span class="tuner-hz">— Hz</span></span>`;
-  tunerWrap.append(tabBtn, tunerBtn, strip);
+  tunerWrap.append(tunerBtn, strip);
   const noteEl = strip.querySelector('.tuner-note');
   const needle = strip.querySelector('.tuner-needle');
   const centsEl = strip.querySelector('.tuner-cents');
