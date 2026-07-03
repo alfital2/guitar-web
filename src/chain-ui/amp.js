@@ -36,6 +36,14 @@ function buildVU() {
   const label = el('div', 'amp-vu-label');
   label.textContent = 'VU';
   wrap.append(peak, label);
+  // Bezel screws: the meter is bolted through the faceplate, not floating on
+  // it. Same slotted-screw treatment as the panel corners, smaller, and again
+  // every slot at its own angle.
+  [['tl', 37], ['tr', -52], ['bl', 67], ['br', 9]].forEach(([pos, deg]) => {
+    const sc = el('i', `amp-screw amp-vu-screw amp-screw-${pos}`);
+    sc.style.setProperty('--slot', `${deg}deg`);
+    wrap.appendChild(sc);
+  });
   return wrap;
 }
 
@@ -47,15 +55,21 @@ function wireWarmup() {
   if (warmupWired || typeof window === 'undefined') return;
   warmupWired = true;
   const head = () => document.querySelector('.amp-head');
-  window.addEventListener('neural-amp-loading', () => {
+  // Offline-tagged events come from silent loudness-measurement renders
+  // (normalize.js), not the live amp — they must not flash the warm-up UI.
+  const live = (e) => !(e && e.detail && e.detail.offline);
+  window.addEventListener('neural-amp-loading', (e) => {
+    if (!live(e)) return;
     const h = head(); if (!h) return;
     h.classList.add('amp-warming'); h.classList.remove('amp-ready', 'amp-errored');
   });
-  window.addEventListener('neural-amp-ready', () => {
+  window.addEventListener('neural-amp-ready', (e) => {
+    if (!live(e)) return;
     const h = head(); if (!h) return;
     h.classList.remove('amp-warming', 'amp-errored'); h.classList.add('amp-ready');
   });
-  window.addEventListener('neural-amp-error', () => {
+  window.addEventListener('neural-amp-error', (e) => {
+    if (!live(e)) return;
     const h = head(); if (!h) return;
     h.classList.remove('amp-warming', 'amp-ready'); h.classList.add('amp-errored');
   });
@@ -148,27 +162,14 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
     gh.textContent = m.schema.label;
     const row = el('div', 'amp-group-knobs');
 
-    // Neural amp head: the 'model' param is a discrete captured-amp chooser, so
-    // it renders as a <select> (not a sweepable knob). It sits between the group
-    // head and the Trim/Level knob row and fires the SAME onParamChange handler.
+    // Neural amp head: the 'model' is chosen from the 05 Professional preset
+    // browser, so it is NOT shown on the faceplate (an on-amp <select> just
+    // duplicated that list). We still skip it below — it's not a sweepable knob.
     const modelParam = m.type === 'neuralamp' ? m.schema.params.find((p) => p.key === 'model') : null;
     group.appendChild(gh);
-    if (modelParam) {
-      const sel = el('select', 'amp-model-select');
-      sel.setAttribute('aria-label', modelParam.label);
-      NEURAL_LABELS.forEach((name, i) => {
-        const o = el('option');
-        o.value = String(i);
-        o.textContent = name;
-        sel.appendChild(o);
-      });
-      sel.value = String(m.params[modelParam.key] ?? modelParam.default);
-      sel.addEventListener('change', () => onParamChange(m.instanceId, modelParam.key, Number(sel.value)));
-      group.appendChild(sel);
-    }
 
     for (const p of m.schema.params) {
-      if (p === modelParam) continue; // rendered as the <select> above
+      if (p === modelParam) continue; // model is preset-driven, not on the faceplate
       const slot = el('div', 'amp-knob');
       const { el: kEl } = createKnob(p, m.params[p.key] ?? p.default, (v) => onParamChange(m.instanceId, p.key, v), 44, AMP_KNOB_STYLE);
       const lbl = el('div', 'amp-knob-label');
@@ -182,6 +183,15 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
 
   // SVG needle VU output meter, rightmost on the control panel.
   panel.appendChild(buildVU());
+
+  // Slotted mounting screws pinning the faceplate to the cab, one per corner.
+  // Each slot sits at its own angle — real screws never align once the panel
+  // has been off the chassis a few times. Purely decorative (CSS in index.html).
+  [['tl', 24], ['tr', -63], ['bl', 78], ['br', -11]].forEach(([pos, deg]) => {
+    const s = el('i', `amp-screw amp-screw-${pos}`);
+    s.style.setProperty('--slot', `${deg}deg`);
+    panel.appendChild(s);
+  });
 
   // Dark grille with glowing vacuum tubes behind a woven mesh + brand + power lamp.
   const grille = el('div', 'amp-grille');

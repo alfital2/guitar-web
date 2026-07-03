@@ -31,6 +31,21 @@ function arcPath(cx, cy, r, startDeg, endDeg) {
 }
 function svgEl(name, attrs) { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
 
+// Blend two #rrggbb colors (t = share of `other`). SVG gradients need literal
+// colors, so accent-tinted ring stops are computed here rather than color-mix.
+function mixHex(hex, other, t) {
+  const n = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const a = n(hex), b = n(other);
+  const c = a.map((v, i) => Math.round(v + (b[i] - v) * t));
+  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+// Bezel-ring finishes (top-lit vertical sheen: crown → waist → dark → rim).
+const RING_STOPS = {
+  chrome: ['#f4f6f8', '#9aa0a6', '#54595f', '#c8ced3'],
+  dark: ['#6a6f76', '#33363b', '#17191c', '#4a4f55'],
+};
+
 export function createKnob(param, value, onChange, small = false, style = {}) {
   const { min, max, step, unit, label } = param;
   const uid = `knob${knobSeq++}`;

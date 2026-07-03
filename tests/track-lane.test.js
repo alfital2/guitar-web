@@ -1,6 +1,6 @@
 // tests/track-lane.test.js
 import { describe, it, expect } from 'vitest';
-import { renderTrackLane, PX_PER_SEC, getSelectedClips, clearClipSelection } from '../src/track-lane.js';
+import { renderTrackLane, PX_PER_SEC, getSelectedClips, clearClipSelection, loopRepeatFromDrag } from '../src/track-lane.js';
 
 function tracks() {
   return [
@@ -218,5 +218,161 @@ describe('renderTrackLane (multi-track)', () => {
     h.dispatchEvent(new MouseEvent('pointermove', { clientX: 32, clientY: 0, bubbles: true }));
     h.dispatchEvent(new MouseEvent('pointerup', { clientX: 32, clientY: 0, bubbles: true }));
     expect(trims).toEqual([[1, 1, 1, 1, 42]]);
+  });
+
+  // The clip's 1px border pixel sits outside the trim handles (overflow:hidden
+  // clips them to the padding box), so grabs within ~8px of an edge on the clip
+  // BODY must route to trim, not start a move. jsdom rects are 0×0, so mock them.
+  const mockRect = (clip) => { clip.getBoundingClientRect = () => ({ left: 10, right: 74, top: 0, bottom: 80, width: 64, height: 80 }); };
+  it('grabbing the clip body at the left edge starts a trim, not a move', () => {
+    const el = document.createElement('div');
+    const trims = [], moves = [];
+    renderTrackLane(el, { tracks: tracks(), armedId: 1,
+      onTrimClip: (tid, n, off, len, x) => trims.push([tid, n, +off.toFixed(2), +len.toFixed(2), x]),
+      onMoveClips: (m) => moves.push(m), onMoveClip: (...a) => moves.push(a) });
+    const clip = el.querySelector('.track-clip');
+    mockRect(clip);
+    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 11, clientY: 40, bubbles: true })); // 1px inside the edge
+    expect(clip.classList.contains('trimming')).toBe(true); // trim drag engaged
+    const h = clip.querySelector('.clip-trim-l');
+    h.dispatchEvent(new MouseEvent('pointermove', { clientX: 43, clientY: 40, bubbles: true })); // +32px = +1s
+    h.dispatchEvent(new MouseEvent('pointerup', { clientX: 43, clientY: 40, bubbles: true }));
+    expect(trims).toEqual([[1, 1, 1, 1, 42]]);
+    expect(moves).toEqual([]);
+    clearClipSelection();
+  });
+  it('grabbing the clip body at the right edge starts a trim, not a move', () => {
+    const el = document.createElement('div');
+    const trims = [], moves = [];
+    renderTrackLane(el, { tracks: tracks(), armedId: 1,
+      onTrimClip: (tid, n, off, len, x) => trims.push([tid, n, off, +len.toFixed(2), x]),
+      onMoveClips: (m) => moves.push(m) });
+    const clip = el.querySelector('.track-clip');
+    mockRect(clip);
+    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 73, clientY: 40, bubbles: true })); // 1px inside the right edge
+    expect(clip.classList.contains('trimming')).toBe(true);
+    const h = clip.querySelector('.clip-trim-r');
+    h.dispatchEvent(new MouseEvent('pointermove', { clientX: 41, clientY: 40, bubbles: true })); // −32px = −1s
+    h.dispatchEvent(new MouseEvent('pointerup', { clientX: 41, clientY: 40, bubbles: true }));
+    expect(trims).toEqual([[1, 1, 0, 1, 10]]);
+    expect(moves).toEqual([]);
+    clearClipSelection();
+  });
+  it('grabbing the clip body away from the edges still moves it', () => {
+    const el = document.createElement('div');
+    const trims = [], moves = [];
+    renderTrackLane(el, { tracks: tracks(), armedId: 1,
+      onTrimClip: (...a) => trims.push(a), onMoveClips: (m) => moves.push(m) });
+    const clip = el.querySelector('.track-clip');
+    mockRect(clip);
+    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 40, clientY: 0, bubbles: true })); // middle of the clip
+    expect(clip.classList.contains('trimming')).toBe(false);
+    clip.dispatchEvent(new MouseEvent('pointermove', { clientX: 72, clientY: 0, bubbles: true }));
+    clip.dispatchEvent(new MouseEvent('pointerup', { clientX: 72, clientY: 0, bubbles: true }));
+    expect(moves).toEqual([[{ trackId: 1, n: 1, x: 42 }]]); // 10 + 32
+    expect(trims).toEqual([]);
+    clearClipSelection();
+  });
+
+  // ── Loop-drag (GarageBand): the top of the right edge repeats the clip ──
+  const looped = (rep) => [{ id: 1, name: 'A', armed: true, takes: [
+    { n: 1, name: 'A', x: 0, duration: 2, len: 2, offset: 0, repeat: rep, samples: new Float32Array(4) },
+  ] }];
+
+  it('loopRepeatFromDrag: follows the pointer, snaps to whole reps, collapses < 1.05', () => {
+    expect(loopRepeatFromDrag(1, 2, 96)).toBeCloseTo(2.5);  // 64px window +96px → 2.5, far from a boundary
+    expect(loopRepeatFromDrag(1, 2, 60)).toBe(2);           // 1.9375 → 4px from the 2× boundary → snaps
+    expect(loopRepeatFromDrag(1, 2, 68)).toBe(2);           // just past the boundary snaps back too
+    expect(loopRepeatFromDrag(2.5, 2, -96)).toBe(1);        // dragged back to ~1 → loop removed
+    expect(loopRepeatFromDrag(1, 2, 2)).toBe(1);            // barely out from 1 → snap back to 1
+    expect(loopRepeatFromDrag(1, 2, -50)).toBe(1);          // can't go below one repetition
+    expect(loopRepeatFromDrag(1, 0, 50)).toBe(1);           // zero-length window → inert
+  });
+  it('clips have a loop handle; a looped clip spans len*repeat with boundary notches', () => {
+    const el = document.createElement('div');
+    renderTrackLane(el, { tracks: looped(2.5), armedId: 1 });
+    const clip = el.querySelector('.track-clip');
+    expect(clip.querySelector('.clip-loop')).toBeTruthy();
+    expect(clip.style.width).toBe(`${2 * 2.5 * PX_PER_SEC}px`); // 160px: window × repeat
+    expect(clip.querySelector('canvas.clip-wave').width).toBe(160);
+    const notches = [...clip.querySelectorAll('.clip-loop-notch')];
+    expect(notches.map((n) => n.style.left)).toEqual(['64px', '128px']); // each repetition edge
+  });
+  it('an unlooped clip renders no notches', () => {
+    const el = document.createElement('div');
+    renderTrackLane(el, { tracks: tracks(), armedId: 1 });
+    expect(el.querySelectorAll('.clip-loop-notch')).toHaveLength(0);
+  });
+  it('dragging the loop handle commits the snapped repeat via onLoopClip', () => {
+    const el = document.createElement('div');
+    const loops = [];
+    renderTrackLane(el, { tracks: tracks(), armedId: 1, onLoopClip: (tid, n, rep) => loops.push([tid, n, rep]) });
+    const h = el.querySelector('.track-clip .clip-loop');
+    // duration 2 → 64px window; +96px = 2.5 windows (no snap at 32px from a boundary)
+    h.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 64, clientY: 0, bubbles: true }));
+    h.dispatchEvent(new MouseEvent('pointermove', { clientX: 160, clientY: 0, bubbles: true }));
+    h.dispatchEvent(new MouseEvent('pointerup', { clientX: 160, clientY: 0, bubbles: true }));
+    expect(loops).toEqual([[1, 1, 2.5]]);
+  });
+  it('loop drag live-previews the width and snaps near a whole repetition', () => {
+    const el = document.createElement('div');
+    const loops = [];
+    renderTrackLane(el, { tracks: tracks(), armedId: 1, onLoopClip: (tid, n, rep) => loops.push([tid, n, rep]) });
+    const clip = el.querySelector('.track-clip');
+    const h = clip.querySelector('.clip-loop');
+    h.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 64, clientY: 0, bubbles: true }));
+    expect(clip.classList.contains('looping')).toBe(true);
+    h.dispatchEvent(new MouseEvent('pointermove', { clientX: 124, clientY: 0, bubbles: true })); // +60px → 1.9375 → snaps to 2
+    expect(clip.style.width).toBe('128px');                    // preview follows the snap
+    h.dispatchEvent(new MouseEvent('pointerup', { clientX: 124, clientY: 0, bubbles: true }));
+    expect(clip.classList.contains('looping')).toBe(false);
+    expect(loops).toEqual([[1, 1, 2]]);
+  });
+  it('dragging a looped clip back under ~1.05 windows removes the loop', () => {
+    const el = document.createElement('div');
+    const loops = [];
+    renderTrackLane(el, { tracks: looped(2.5), armedId: 1, onLoopClip: (tid, n, rep) => loops.push([tid, n, rep]) });
+    const h = el.querySelector('.track-clip .clip-loop');
+    h.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 160, clientY: 0, bubbles: true }));
+    h.dispatchEvent(new MouseEvent('pointermove', { clientX: 62, clientY: 0, bubbles: true })); // span → ~62px ≈ 0.97 windows
+    h.dispatchEvent(new MouseEvent('pointerup', { clientX: 62, clientY: 0, bubbles: true }));
+    expect(loops).toEqual([[1, 1, 1]]);
+  });
+  it('grabbing the clip body at the TOP of the right edge starts a loop drag, not a trim', () => {
+    const el = document.createElement('div');
+    const loops = [], trims = [], moves = [];
+    renderTrackLane(el, { tracks: tracks(), armedId: 1,
+      onLoopClip: (tid, n, rep) => loops.push([tid, n, rep]),
+      onTrimClip: (...a) => trims.push(a), onMoveClips: (m) => moves.push(m) });
+    const clip = el.querySelector('.track-clip');
+    mockRect(clip);
+    // right edge (73 ≥ 74−8), upper 40% of the 80px clip (y 10 < 32) → loop
+    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 73, clientY: 10, bubbles: true }));
+    expect(clip.classList.contains('looping')).toBe(true);
+    expect(clip.classList.contains('trimming')).toBe(false);
+    const h = clip.querySelector('.clip-loop');
+    h.dispatchEvent(new MouseEvent('pointermove', { clientX: 169, clientY: 10, bubbles: true })); // +96px → 2.5
+    h.dispatchEvent(new MouseEvent('pointerup', { clientX: 169, clientY: 10, bubbles: true }));
+    expect(loops).toEqual([[1, 1, 2.5]]);
+    expect(trims).toEqual([]); expect(moves).toEqual([]);
+    clearClipSelection();
+  });
+  it('the right edge of a LOOPED clip below the loop zone resizes the span, not the window', () => {
+    const el = document.createElement('div');
+    const loops = [], trims = [];
+    renderTrackLane(el, { tracks: looped(2), armedId: 1,
+      onLoopClip: (tid, n, rep) => loops.push([tid, n, rep]), onTrimClip: (...a) => trims.push(a) });
+    const clip = el.querySelector('.track-clip');
+    clip.getBoundingClientRect = () => ({ left: 0, right: 128, top: 0, bottom: 80, width: 128, height: 80 });
+    // bottom 60% of the right edge → routed to trim, which span-resizes a looped clip
+    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 127, clientY: 60, bubbles: true }));
+    expect(clip.classList.contains('trimming')).toBe(true);
+    const h = clip.querySelector('.clip-trim-r');
+    h.dispatchEvent(new MouseEvent('pointermove', { clientX: 159, clientY: 60, bubbles: true })); // +32px = +1s → 2.5 windows
+    expect(clip.style.width).toBe('160px');
+    h.dispatchEvent(new MouseEvent('pointerup', { clientX: 159, clientY: 60, bubbles: true }));
+    expect(loops).toEqual([[1, 1, 2.5]]);
+    expect(trims).toEqual([]); // the base window is never touched under a loop
+    clearClipSelection();
   });
 });

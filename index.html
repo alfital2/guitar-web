@@ -80,7 +80,6 @@
      each effect's canvas shows through the panels' translucent fills.) */
 
   /* ClickSpark overlay — transient amber bursts (drawn in interactions.js). */
-  .spark-fx { position: fixed; inset: 0; z-index: 95; pointer-events: none; width: 100%; height: 100%; }
 
   /* ── Window (fills the viewport) ────────────────────── */
   .window {
@@ -267,29 +266,85 @@
   .amp-head::before {
     content: ""; position: absolute; inset: 6px; border-radius: 11px; border: 2px solid rgba(0,0,0,0.55);
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); pointer-events: none;
+    /* Corner-wrap distortion: where the tolex stretches over each corner block
+       the vinyl pulls darker, with a faint lighter ridge just past the stretch.
+       Plus a barely-lighter abrasion along the top edge at the handle mounts
+       (where hands slide under the strap). Paints above the tolex tile, below
+       the panel/grille/corner children. */
+    background:
+      radial-gradient(78px 20px at calc(50% - 104px) 0, rgba(255,255,255,0.065), transparent 70%),
+      radial-gradient(78px 20px at calc(50% + 104px) 0, rgba(255,255,255,0.055), transparent 70%),
+      radial-gradient(105px 105px at 0 0, transparent 52%, rgba(255,255,255,0.05) 61%, transparent 72%),
+      radial-gradient(105px 105px at 100% 0, transparent 52%, rgba(255,255,255,0.045) 61%, transparent 72%),
+      radial-gradient(105px 105px at 0 100%, transparent 52%, rgba(255,255,255,0.04) 61%, transparent 72%),
+      radial-gradient(105px 105px at 100% 100%, transparent 52%, rgba(255,255,255,0.05) 61%, transparent 72%),
+      radial-gradient(88px 88px at 0 0, rgba(0,0,0,0.34), rgba(0,0,0,0.14) 46%, transparent 70%),
+      radial-gradient(88px 88px at 100% 0, rgba(0,0,0,0.3), rgba(0,0,0,0.12) 46%, transparent 70%),
+      radial-gradient(88px 88px at 0 100%, rgba(0,0,0,0.3), rgba(0,0,0,0.13) 46%, transparent 70%),
+      radial-gradient(88px 88px at 100% 100%, rgba(0,0,0,0.34), rgba(0,0,0,0.14) 46%, transparent 70%);
   }
   .amp-handle {
-    position: absolute; top: -13px; left: 50%; transform: translateX(-50%); width: 230px; height: 28px;
-    display: flex; align-items: center; justify-content: space-between; z-index: 2;
+    position: absolute; top: -14px; left: 50%; transform: translateX(-50%); width: 230px; height: 32px;
+    display: flex; align-items: center; justify-content: space-between; z-index: 2; pointer-events: none;
   }
-  .amp-handle-strap {
-    flex: 1; height: 15px; margin: 0 -8px; border-radius: 10px;
-    background: linear-gradient(180deg, #2c2c2e, #0d0d0f); border: 1px solid #000;
-    box-shadow: inset 0 2px 3px rgba(255,255,255,0.08), inset 0 -3px 6px rgba(0,0,0,0.7), 0 4px 7px rgba(0,0,0,0.6);
-  }
+  /* Cast-metal end brackets — same alloy + single-light-source treatment as the
+     corner caps, so the hardware reads as one set. A slotted screw fastens each
+     to the cabinet; the strap bolts down over them. */
   .amp-handle-mount {
-    width: 40px; height: 24px; border-radius: 6px; background: linear-gradient(180deg, #4c4c50, #202024); border: 1px solid #000;
-    box-shadow: inset 0 1px 1px rgba(255,255,255,0.22), 0 2px 4px rgba(0,0,0,0.6);
+    position: relative; z-index: 1; width: 30px; height: 26px; border-radius: 6px 6px 8px 8px;
+    background:
+      repeating-linear-gradient(40deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 4px),
+      linear-gradient(155deg, #6c6c74, #2b2b30 68%, #17171a);
+    border: 1px solid #000;
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.30), inset 0 -2px 4px rgba(0,0,0,0.5), 0 3px 5px rgba(0,0,0,0.55);
+  }
+  .amp-handle-mount::after {
+    content: ""; position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%);
+    width: 8px; height: 8px; border-radius: 50%;
+    background:
+      linear-gradient(52deg, transparent 42%, rgba(8,8,10,0.85) 46% 54%, transparent 58%),
+      radial-gradient(circle at 33% 29%, #c4c7cd, #83868d 52%, #212227 96%);
+    box-shadow: inset 0 -1px 1px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.3);
+  }
+  /* Molded leather strap: domed top from one light source, center burnished
+     where hands grab, ends tucked over the metal brackets. Stitched seams sit
+     on the ::before so they stop short of the brackets. */
+  .amp-handle-strap {
+    position: relative; z-index: 2; flex: 1; height: 19px; margin: 0 -9px; border-radius: 10px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.18) 0 6%, rgba(255,255,255,0.05) 20%, transparent 40%),
+      radial-gradient(80px 9px at 50% 52%, rgba(150,126,92,0.22), transparent 76%),
+      linear-gradient(180deg, #313134, #1b1b1e 52%, #0a0a0c);
+    border: 1px solid #000;
+    box-shadow: inset 0 2px 2px rgba(255,255,255,0.10), inset 0 -4px 7px rgba(0,0,0,0.72), 0 5px 8px rgba(0,0,0,0.5);
+  }
+  .amp-handle-strap::before {
+    content: ""; position: absolute; left: 14px; right: 14px; top: 4px; bottom: 4px; pointer-events: none;
+    background:
+      repeating-linear-gradient(90deg, rgba(158,136,100,0.5) 0 2px, transparent 2px 7px) top/100% 1px no-repeat,
+      repeating-linear-gradient(90deg, rgba(158,136,100,0.5) 0 2px, transparent 2px 7px) bottom/100% 1px no-repeat;
   }
   .amp-corner {
-    position: absolute; width: 34px; height: 34px; background: linear-gradient(135deg, #62626a, #26262b); border: 1px solid #000;
+    position: absolute; width: 34px; height: 34px; border: 1px solid #000;
+    /* faint directional scuffing over the cast metal — road wear on the caps */
+    background:
+      repeating-linear-gradient(38deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 4px),
+      linear-gradient(135deg, #62626a, #26262b);
     box-shadow: inset 0 1px 2px rgba(255,255,255,0.28), 0 2px 4px rgba(0,0,0,0.6); z-index: 1;
   }
-  .amp-corner::after { content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #9a9aa0, #1a1a1e); }
-  .amp-corner-tl { top: 7px; left: 7px; border-radius: 11px 0 9px 0; } .amp-corner-tl::after { right: 6px; bottom: 6px; }
-  .amp-corner-tr { top: 7px; right: 7px; border-radius: 0 11px 0 9px; } .amp-corner-tr::after { left: 6px; bottom: 6px; }
-  .amp-corner-bl { bottom: 7px; left: 7px; border-radius: 0 9px 0 11px; } .amp-corner-bl::after { right: 6px; top: 6px; }
-  .amp-corner-br { bottom: 7px; right: 7px; border-radius: 9px 0 11px 0; } .amp-corner-br::after { left: 6px; top: 6px; }
+  /* Corner screws: slotted heads, specular top-left (one light source), each
+     slot at its own angle — hardware that's actually been driven. */
+  .amp-corner::after {
+    content: ""; position: absolute; width: 9px; height: 9px; border-radius: 50%;
+    background:
+      linear-gradient(var(--slot, 60deg), transparent 43%, rgba(8,8,10,0.85) 47% 53%, transparent 57%),
+      radial-gradient(circle at 32% 28%, #c4c7cd, #83868d 52%, #212227 96%);
+    box-shadow: inset 0 -1px 1px rgba(0,0,0,0.55), inset 0 1px 1px rgba(255,255,255,0.3), 0 1px 1px rgba(0,0,0,0.4);
+  }
+  .amp-corner-tl { top: 7px; left: 7px; border-radius: 11px 0 9px 0; --slot: 58deg; } .amp-corner-tl::after { right: 5px; bottom: 5px; }
+  .amp-corner-tr { top: 7px; right: 7px; border-radius: 0 11px 0 9px; --slot: 149deg; } .amp-corner-tr::after { left: 5px; bottom: 5px; }
+  .amp-corner-bl { bottom: 7px; left: 7px; border-radius: 0 9px 0 11px; --slot: 12deg; } .amp-corner-bl::after { right: 5px; top: 5px; }
+  .amp-corner-br { bottom: 7px; right: 7px; border-radius: 9px 0 11px 0; --slot: 104deg; } .amp-corner-br::after { left: 5px; top: 5px; }
   .amp-panel {
     /* wrap: when the head hits max-width the knob groups flow to a second row
        INSIDE the silver panel instead of spilling past its edges (the 8px
@@ -297,12 +352,40 @@
     position: relative; display: flex; flex-wrap: wrap; align-items: stretch; justify-content: center; gap: 8px 2px;
     margin: 10px 16px 14px; padding: 8px 12px; border-radius: 8px;
     background:
+      /* a few asymmetric nicks + one dull scuff — years of cable ends and rings */
+      radial-gradient(2.5px 2px at 23% 72%, rgba(52,58,66,0.22), transparent 75%),
+      radial-gradient(2px 2.5px at 81% 24%, rgba(52,58,66,0.18), transparent 75%),
+      radial-gradient(16px 5px at 64% 12%, rgba(255,255,255,0.14), transparent 72%),
+      /* hairline micro-scratches, two near-horizontal passes at offset angles */
+      repeating-linear-gradient(3deg, rgba(38,43,50,0.045) 0 1px, transparent 1px 5px),
+      repeating-linear-gradient(357.5deg, rgba(38,43,50,0.03) 0 1px, transparent 1px 4px),
+      /* warm grime settled into the panel-to-tolex seams (top + bottom) */
+      linear-gradient(180deg, rgba(66,52,28,0.13), transparent 7px),
+      linear-gradient(0deg, rgba(58,46,26,0.15), transparent 8px),
+      /* faint heat tint above the tubes, bottom center */
+      radial-gradient(38% 26px at 50% 100%, rgba(196,148,72,0.07), transparent 78%),
       linear-gradient(118deg, transparent 15%, rgba(255,255,255,0.95) 18.5%, transparent 22%,
         transparent 50%, rgba(255,255,255,0.75) 53.5%, transparent 57%,
         transparent 74%, rgba(255,255,255,0.6) 77%, transparent 80%),
       linear-gradient(180deg, #eef1f4 0%, #ffffff 11%, #c6ccd2 30%, #b0b7be 45%, #d2d8dd 60%, #f4f7fa 78%, #b6bdc3 100%);
     border: 1px solid #5a5c61; box-shadow: inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -2px 6px rgba(0,0,0,0.24), 0 2px 6px rgba(0,0,0,0.5);
   }
+  /* Slotted faceplate mounting screws (built in amp.js, one per panel corner).
+     Slot angle comes in as --slot inline — every screw settles differently. */
+  .amp-screw {
+    position: absolute; width: 11px; height: 11px; border-radius: 50%; z-index: 4; pointer-events: none;
+    background: radial-gradient(circle at 30% 26%, #fbfcfd, #ccd1d7 38%, #93989f 64%, #5f636a 100%);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.9), inset 0 -1.5px 2px rgba(0,0,0,0.4),
+      0 0 0 1px rgba(72,76,82,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  }
+  .amp-screw::before {
+    content: ""; position: absolute; left: 1.5px; right: 1.5px; top: 50%; height: 1.5px; margin-top: -0.75px;
+    border-radius: 1px; background: rgba(16,18,22,0.78);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.55); /* lower slot lip catches the light */
+    transform: rotate(var(--slot, 0deg));
+  }
+  .amp-screw-tl { top: 5px; left: 7px; } .amp-screw-tr { top: 5px; right: 7px; }
+  .amp-screw-bl { bottom: 5px; left: 7px; } .amp-screw-br { bottom: 5px; right: 7px; }
   .amp-group { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; padding: 14px 10px 9px; position: relative; }
   .amp-group::before {
     content: ""; position: absolute; inset: 7px 5px; border: 1.5px solid rgba(255,255,255,0.9); border-radius: 8px;
@@ -330,18 +413,46 @@
     background: linear-gradient(180deg, #14100c, #0b0908);
     border: 1px solid #000; box-shadow: inset 0 0 0 3px #000, inset 0 2px 10px rgba(0,0,0,0.8);
   }
-  /* Glowing vacuum tubes behind a woven mesh. */
-  .amp-tubes { position: absolute; inset: 0; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 70px; pointer-events: none; }
+  /* Glowing vacuum tubes behind a woven mesh — bottom-aligned on a chassis
+     deck so every bottle sits in a socket instead of floating mid-cutout. */
+  .amp-tubes { position: absolute; inset: 0; z-index: 1; display: flex; align-items: flex-end; justify-content: center; gap: 70px; padding-bottom: 23px; pointer-events: none;
+    /* chassis shelf the sockets bolt to; its front edge catches a little tube light */
+    background: linear-gradient(180deg, transparent 128px, rgba(104,86,60,0.38) 129px, rgba(56,46,33,0.3) 132px, rgba(22,18,14,0.55) 142px, rgba(9,8,6,0.7) 100%); }
   .amp-tube { position: relative; width: 38px; height: 104px; border-radius: 19px 19px 8px 8px;
-    background: linear-gradient(180deg, rgba(255,180,90,0.25), rgba(255,120,40,0.5) 55%, rgba(120,50,10,0.6));
+    background:
+      /* getter flash: silvered mirror coating inside the dome */
+      radial-gradient(11px 8px at 50% 7px, rgba(198,210,220,0.5), rgba(130,146,158,0.22) 62%, transparent 80%),
+      /* the glass catches the room light down its left side */
+      linear-gradient(90deg, transparent 4px, rgba(255,244,216,0.28) 7px, transparent 12px),
+      /* anode plate: dark internal column the filament runs through */
+      linear-gradient(180deg, transparent, rgba(56,40,28,0.5) 16%, rgba(34,25,18,0.55) 84%, transparent) 50% 60% / 16px 70% no-repeat,
+      linear-gradient(180deg, rgba(255,180,90,0.25), rgba(255,120,40,0.5) 55%, rgba(120,50,10,0.6));
     box-shadow: 0 0 38px 13px rgba(255,140,50,0.4), inset 0 0 13px rgba(255,220,150,0.6);
     animation: amp-tube 3.4s ease-in-out infinite; }
   .amp-tube::before { content: ''; position: absolute; left: 50%; top: 20px; transform: translateX(-50%); width: 4px; height: 62px;
     background: linear-gradient(180deg, #fff3d0, #ff8a2c); border-radius: 2px; box-shadow: 0 0 10px 3px rgba(255,180,80,0.9); }
-  .amp-tube:nth-child(2) { animation-delay: .6s; } .amp-tube:nth-child(3) { animation-delay: 1.2s; } .amp-tube:nth-child(4) { animation-delay: 1.8s; }
+  /* Octal socket + collar: every bottle is plugged into something. */
+  .amp-tube::after { content: ''; position: absolute; left: -5px; right: -5px; bottom: -14px; height: 17px;
+    border-radius: 3px 3px 5px 5px;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.16), transparent 26%, transparent 74%, rgba(255,255,255,0.06)),
+      linear-gradient(180deg, #46464c, #202024 45%, #0e0e11);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 2px 5px rgba(0,0,0,0.65); }
+  /* A MATCHED quad: identical HEIGHT + filament position so the bottles line up
+     and the filaments all start at the same level. Only the opacity flicker is
+     staggered (temporal) for a little life — EXCEPT #3, the one tube that runs a
+     touch cooler like a real slightly-worn bottle: same geometry, just less
+     light (softer glow + dimmer filament). */
+  .amp-tube:nth-child(2) { animation-delay: .6s; }
+  .amp-tube:nth-child(3) { animation-delay: 1.2s;
+    box-shadow: 0 0 22px 7px rgba(255,125,45,0.2), inset 0 0 9px rgba(255,205,140,0.34); }
+  .amp-tube:nth-child(3)::before { background: linear-gradient(180deg, #f2dcb0, #e0801f); box-shadow: 0 0 6px 2px rgba(255,175,85,0.5); }
+  .amp-tube:nth-child(4) { animation-delay: 1.8s; }
   @keyframes amp-tube { 0%, 100% { opacity: .8; } 50% { opacity: 1; } }
   .amp-mesh { position: absolute; inset: 0; z-index: 2; pointer-events: none;
     background:
+      /* dust film caught in the weave along the top lip where light lands */
+      linear-gradient(180deg, rgba(204,186,148,0.12), rgba(204,186,148,0.035) 6px, transparent 16px),
       radial-gradient(circle at 50% 50%, rgba(0,0,0,0.55) 0.9px, transparent 1.4px) 0 0 / 5px 5px,
       radial-gradient(circle at 50% 50%, rgba(0,0,0,0.55) 0.9px, transparent 1.4px) 2.5px 2.5px / 5px 5px,
       linear-gradient(180deg, rgba(255,255,255,0.04), transparent 40%);
@@ -538,7 +649,8 @@
     background: rgba(255,255,255,0.02);
   }
   .track-bar {
-    width: 64px; flex: 0 0 64px; font: 10px var(--mono); color: var(--muted);
+    /* width + flex-basis are set inline from the tempo (see track-lane.js barPx) */
+    font: 10px var(--mono); color: var(--muted);
     display: flex; align-items: center; padding-left: 5px; border-right: 1px solid rgba(255,255,255,0.05);
   }
   .track-playhead { position: absolute; top: 0; bottom: 0; left: 0; width: 1px; background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb),0.6); z-index: 6; }
@@ -563,11 +675,26 @@
   .track-clip.will-delete { opacity: 0.4; outline: 2px solid var(--red); }
   /* Selected clips (Cmd/Ctrl+click to multi-select; drag moves them together). */
   .track-clip.selected { outline: 2px solid var(--accent); outline-offset: -1px; box-shadow: 0 0 0 1px var(--accent), 0 2px 12px rgba(var(--accent-rgb),0.5); border-color: var(--accent); }
-  /* Trim handles: drag a clip's edge to resize it. */
-  .clip-trim { position: absolute; top: 0; bottom: 0; width: 7px; z-index: 4; cursor: ew-resize; }
+  /* Trim handles: drag a clip's edge to resize it. Width pairs with the ~8px
+     edge-grab zone in track-lane.js (the border pixel routes there too). */
+  .clip-trim { position: absolute; top: 0; bottom: 0; width: 8px; z-index: 4; cursor: ew-resize; }
   .clip-trim-l { left: 0; } .clip-trim-r { right: 0; }
   .clip-trim:hover { background: rgba(255,255,255,0.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5); }
   .track-clip.trimming { opacity: 0.92; }
+  /* Loop handle (GarageBand): the top of a clip's right edge repeats the clip.
+     Pairs with the LOOP_ZONE edge-routing in track-lane.js (top ~40% = loop,
+     rest of the edge = trim). Custom loop cursor with an e-resize fallback. */
+  .clip-loop { position: absolute; top: 0; right: 0; width: 10px; height: 40%; z-index: 5;
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M13 8a5 5 0 1 1-2-4' fill='none' stroke='%23000' stroke-width='3.4' stroke-linecap='round'/%3E%3Cpath d='M13 8a5 5 0 1 1-2-4' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round'/%3E%3Cpath d='M11 1l1 3-3 1z' fill='%23fff' stroke='%23000' stroke-width='0.8'/%3E%3C/svg%3E") 8 8, e-resize; }
+  .clip-loop:hover { background: rgba(255,255,255,0.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5); }
+  /* Hover chip: a small repeat glyph so the affordance reads before you grab. */
+  .clip-loop:hover::after { content: '↻'; position: absolute; top: 1px; right: 11px; padding: 0 3px;
+    font: 700 11px/14px var(--font); color: #fff; background: rgba(0,0,0,0.5); border-radius: 3px; pointer-events: none; }
+  .track-clip.looping { opacity: 0.92; }
+  /* Loop boundary notches: thin darker line + small top tick at each repetition edge. */
+  .clip-loop-notch { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(0,0,0,0.32); z-index: 2; pointer-events: none; }
+  .clip-loop-notch::before { content: ''; position: absolute; top: 0; left: -2px; width: 5px; height: 4px;
+    background: rgba(0,0,0,0.5); clip-path: polygon(0 0, 100% 0, 50% 100%); }
   /* In-progress clip grows in real time; right edge glows red. */
   .recording-clip { border-right: 2px solid var(--red); box-shadow: 0 2px 8px rgba(0,0,0,0.35), 0 0 10px rgba(255,69,58,0.35); }
   .track-rec.recording, #tp-record.recording { color: #fff; background: var(--red); border-color: var(--red); animation: rec-pulse 1s ease-in-out infinite; }
@@ -640,8 +767,8 @@
     box-shadow: inset 0 0 18px rgba(0,0,0,0.5), inset 0 2px 3px rgba(255,255,255,0.26), inset 0 -3px 5px rgba(0,0,0,0.38); }
   .pedal-led { position: absolute; top: 32px; right: 24px; width: 8px; height: 8px; border-radius: 50%; z-index: 5;
     background: radial-gradient(circle at 40% 35%, #fff, #ff6a45 40%, #b21500); box-shadow: 0 0 9px 2px rgba(255,80,40,0.85); }
-  .pedal-knobs { position: absolute; left: 8px; right: 8px; top: 144px; z-index: 3;
-    display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); justify-items: center; column-gap: 3px; row-gap: 3px; }
+  .pedal-knobs { position: absolute; left: 8px; right: 8px; top: 140px; z-index: 3;
+    display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); justify-items: center; column-gap: 4px; row-gap: 3px; }
   .pedal-knob { display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .pedal-knob .knob .label, .pedal-knob .knob .val { display: none; }
   /* Knob labels: ONE clean condensed sans on every pedal (personality lives in
@@ -677,8 +804,8 @@
   @media (prefers-reduced-motion: no-preference) { #knob-tip.knob-tip { transition: opacity .12s ease; } }
   /* Footswitch = bypass toggle: a chrome dome on a faceted nut. */
   .pedal-power {
-    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
-    width: 42px; height: 42px; border-radius: 50%; z-index: 3; padding: 0; border: none; cursor: pointer;
+    position: absolute; left: 50%; bottom: 15px; transform: translateX(-50%);
+    width: 34px; height: 34px; border-radius: 50%; z-index: 3; padding: 0; border: none; cursor: pointer;
     background: conic-gradient(#46494d, #26292d, #4f5357, #26292d, #4f5357, #26292d, #4f5357, #26292d, #46494d);
     box-shadow: 0 6px 11px rgba(0,0,0,0.6), inset 0 1px 1px rgba(255,255,255,0.24), inset 0 -2px 4px rgba(0,0,0,0.7);
   }
@@ -687,6 +814,11 @@
       linear-gradient(180deg, #d6dade 0%, #aab0b6 34%, #868c92 56%, #a6acb2 76%, #cfd4d8 96%);
     box-shadow: inset 0 2px 3px rgba(255,255,255,0.55), inset 0 -3px 5px rgba(0,0,0,0.4); }
   .pedal-power:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.5), 0 6px 11px rgba(0,0,0,0.6); }
+  /* The global `button:active { transform: scale(.97) }` (see the reset near the
+     top) drops this button's translateX(-50%) while held, shoving it to the
+     right until release. Re-assert the centering in the pressed transform. */
+  .pedal-power:active { transform: translateX(-50%) scale(.97); }
+  @media (prefers-reduced-motion: reduce) { .pedal-power:active { transform: translateX(-50%); } }
   /* powered off (bypassed): LED dark, pedal dimmed — chain still passes signal */
   .pedal.bypassed .pedal-led { background: radial-gradient(circle at 40% 35%, #6a6a70, #2a2a2e 60%); box-shadow: inset 0 1px 2px rgba(0,0,0,0.8); }
   .pedal.bypassed { filter: saturate(0.55) brightness(0.8); }
@@ -984,6 +1116,70 @@
   html.perf-lite #bg-fx,
   html.perf-lite .bg-vignette,
   html.perf-lite .grain { display: none !important; }
+
+  /* ── Safari live-latency notice (dismissible, one-time) ──── */
+  .browser-notice {
+    position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 140%);
+    z-index: 200; max-width: 560px; width: calc(100% - 32px);
+    display: flex; align-items: center; gap: 13px; padding: 13px 15px;
+    background: linear-gradient(180deg, rgba(38,38,42,0.98), rgba(28,28,31,0.98));
+    border: 1px solid rgba(var(--accent-rgb),0.35); border-radius: 12px;
+    box-shadow: 0 14px 40px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
+    color: var(--text); opacity: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .browser-notice { transition: transform .32s cubic-bezier(.2,.85,.25,1), opacity .32s; }
+  }
+  .browser-notice.in { transform: translate(-50%, 0); opacity: 1; }
+  .browser-notice.leaving { transform: translate(-50%, 140%); opacity: 0; }
+  .browser-notice-icon { font-size: 22px; line-height: 1; flex: 0 0 auto; }
+  .browser-notice-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .browser-notice-body strong { font-size: 13px; font-weight: 700; letter-spacing: 0.01em; }
+  .browser-notice-body span { font-size: 12px; line-height: 1.4; color: var(--text-secondary); }
+  .browser-notice-close {
+    flex: 0 0 auto; align-self: flex-start; padding: 6px 12px; font-size: 12px; font-weight: 700;
+    color: #120900; background: var(--accent); border: none; border-radius: 7px; cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+  .browser-notice-close:hover { filter: brightness(1.07); }
+
+  /* ── Timeline zoom control (magnifier + slider, pinned over the ruler) ── */
+  .timeline-wrap { position: relative; flex: 1; min-width: 0; display: flex; }
+  .timeline-wrap .track-timeline { flex: 1; min-width: 0; }
+  .zoom-ctl {
+    position: absolute; top: 0; right: 6px; height: 22px; z-index: 8;
+    display: flex; align-items: center; gap: 6px; padding: 0 6px;
+    color: var(--muted); background: rgba(10,10,14,0.55); border-radius: 0 0 6px 6px;
+  }
+  .zoom-ctl:hover { color: var(--text-secondary); }
+  .zoom-range { -webkit-appearance: none; appearance: none; width: 92px; height: 3px;
+    background: rgba(255,255,255,0.14); border-radius: 2px; cursor: pointer; }
+  .zoom-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
+    width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 4px rgba(var(--accent-rgb),0.6); }
+  .zoom-range::-moz-range-thumb { width: 10px; height: 10px; border: none; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 4px rgba(var(--accent-rgb),0.6); }
+
+  /* ── Safari compositor relief ─────────────────────────────
+     WebKit re-filters backdrop-filter surfaces EVERY frame while anything
+     beneath them animates (the aurora layer never stops) — a constant GPU/CPU
+     drain that Chromium's compositor caches away. All the surfaces below are
+     ≥90%-opaque already, so dropping the blur is visually negligible on
+     Safari and buys the whole UI (and the audio thread on a busy machine)
+     real headroom. html.safari is set by main.js UA-detection. */
+  html.safari .toolbar,
+  html.safari .metro-menu,
+  html.safari .tuner-strip,
+  html.safari .settings-panel,
+  html.safari .fx-modal-backdrop,
+  html.safari .track-pan {
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  }
+  html.safari .toolbar { background: rgb(30,30,32); }
+  /* Animated opacity UNDER a blend mode forces a full re-composite of the
+     blended region per frame in WebKit — freeze the grille breathing glow to
+     its lit state on Safari (the per-tube filament animation remains). */
+  html.safari .amp-grille::after { animation: none !important; opacity: 0.8; }
   html.perf-lite *, html.perf-lite *::before, html.perf-lite *::after { animation: none !important; }
   /* backdrop-filter blur on the glass panels is KEPT — it was never the heat
      (that was the WebGL shader + the ambient 42px blur on a 24fps-redrawn
@@ -1105,6 +1301,16 @@
   .amp-vu-label { position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); font: 800 8px var(--font); letter-spacing: .18em; color: #55575d; }
   .amp-vu::after { content: ''; position: absolute; inset: 3px; border-radius: 6px; pointer-events: none;
     background: linear-gradient(160deg, rgba(255,255,255,0.45), transparent 44%); }
+  /* Meter bezel screws (amp.js buildVU): the dial is bolted through the
+     faceplate. Smaller take on .amp-screw, corners of the chrome bezel. */
+  .amp-vu-screw { width: 7px; height: 7px; z-index: 2;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.85), inset 0 -1px 1px rgba(0,0,0,0.5),
+      0 0 0 0.5px rgba(50,53,58,0.55), 0 1px 1px rgba(0,0,0,0.35); }
+  .amp-vu-screw::before { left: 1px; right: 1px; height: 1.2px; margin-top: -0.6px; }
+  .amp-vu-screw.amp-screw-tl { top: 2px; left: 2px; }
+  .amp-vu-screw.amp-screw-tr { top: 2px; right: 2px; }
+  .amp-vu-screw.amp-screw-bl { bottom: 2px; left: 2px; }
+  .amp-vu-screw.amp-screw-br { bottom: 2px; right: 2px; }
 
   /* Tube warm-up: amber glow layer + jewel lamp states driven by neuralamp events. */
   .amp-warm-glow {
@@ -1371,6 +1577,9 @@
       </div>
       <div id="verdict" class="verdict"></div>
       <div id="diag" class="caption" style="margin-top:8px"></div>
+      <div id="safari-latency-note" class="caption" hidden style="margin-top:6px; color: var(--accent)">
+        Safari adds a little extra live-monitoring latency (a WebKit limitation). For the tightest guitar response, use Chrome — everything else works the same here.
+      </div>
     </section>
 
     <section class="settings-section">

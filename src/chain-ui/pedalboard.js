@@ -101,31 +101,47 @@ function repositionPlaceholder(board, lifted, ph, clientX) {
 // Pointer-drag a pedal by its nameplate. The pedal lifts and follows the cursor;
 // a placeholder holds its slot and the other pedals flow aside in real time.
 // Dragging off the board deletes it.
-function enableDrag(pedal, plate, unit, handlers, getBoard) {
-  let drag = null;
-  plate.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
-    const rect = pedal.getBoundingClientRect();
-    drag = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+// A press must MOVE past this many px before it becomes a drag. Without it,
+// every click on the pedal face instantly lifted the pedal — so a click meant
+// for the small footswitch (or a near-miss) jumped the pedal aside and ate the
+// toggle. Below the threshold the press stays a plain click.
+const PEDAL_DRAG_THRESHOLD = 5;
 
+function enableDrag(pedal, plate, unit, handlers, getBoard) {
+  let drag = null; // { dx, dy, startX, startY, pointerId, rect, active, ph }
+
+  // Promote a pending press into a real drag: lift the pedal + drop a placeholder.
+  function activateDrag() {
+    const rect = drag.rect;
     const ph = document.createElement('div');
     ph.className = 'pedal-placeholder';
     ph.style.width = `${rect.width}px`;
     ph.style.height = `${rect.height}px`;
     pedal.before(ph);
     drag.ph = ph;
-
     pedal.classList.add('lifting');
     pedal.style.width = `${rect.width}px`;
     pedal.style.height = `${rect.height}px`;
     pedal.style.left = `${rect.left}px`;
     pedal.style.top = `${rect.top}px`;
-    try { plate.setPointerCapture(e.pointerId); } catch {}
-    e.preventDefault();
+    try { plate.setPointerCapture(drag.pointerId); } catch {}
+    drag.active = true;
+  }
+
+  plate.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const rect = pedal.getBoundingClientRect();
+    // Record only — don't lift yet. The lift waits for real movement so a plain
+    // click reaches the knob/footswitch/arm handlers underneath.
+    drag = { dx: e.clientX - rect.left, dy: e.clientY - rect.top, startX: e.clientX, startY: e.clientY, pointerId: e.pointerId, rect, active: false, ph: null };
   });
 
   plate.addEventListener('pointermove', (e) => {
     if (!drag) return;
+    if (!drag.active) {
+      if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < PEDAL_DRAG_THRESHOLD) return;
+      activateDrag();
+    }
     pedal.style.left = `${e.clientX - drag.dx}px`;
     pedal.style.top = `${e.clientY - drag.dy}px`;
     const board = getBoard();
@@ -133,10 +149,12 @@ function enableDrag(pedal, plate, unit, handlers, getBoard) {
     board.classList.toggle('removing', outside);
     pedal.classList.toggle('will-delete', outside);
     if (!outside) repositionPlaceholder(board, pedal, drag.ph, e.clientX);
+    e.preventDefault();
   });
 
   plate.addEventListener('pointerup', (e) => {
     if (!drag) return;
+    if (!drag.active) { drag = null; return; } // never moved → it was a click, let it fire
     const board = getBoard();
     const ph = drag.ph;
     const outside = outsideBoard(board, e);
@@ -170,15 +188,31 @@ function enableDrag(pedal, plate, unit, handlers, getBoard) {
 
   plate.addEventListener('pointercancel', () => {
     if (!drag) return;
-    drag.ph.remove();
+    const wasActive = drag.active, ph = drag.ph;
     drag = null;
-    handlers.onMove(unit.instanceId, unit.instanceId); // re-render to reset
+    if (wasActive) { if (ph) ph.remove(); handlers.onMove(unit.instanceId, unit.instanceId); } // re-render to reset
   });
 }
 
 // Pedal knobs are rendered a touch smaller than amp knobs so the control band
 // fits inside the bespoke faceplate (which is sized to the knob count).
 const PEDAL_KNOB_SIZE = 36;
+
+// Knob hardware finishes. Each effect gets ONE finish for its whole knob row
+// (real pedals ship matching knobs) — but different effects get different
+// hardware, picked deterministically from the type name, so the board isn't
+// a wall of identical chrome. Pointer ink always contrasts the cap.
+const KNOB_FINISHES = [
+  { cap: ['#eef2f5', '#aeb4ba', '#40454a'], pointer: '#16181b' },                    // brushed chrome
+  { cap: ['#6d6d75', '#2f2f35', '#111116'], pointer: '#f2f2f4' },                    // black rubber
+  { cap: ['#f6efdc', '#dcd2b6', '#8f8468'], pointer: '#2a2118' },                    // vintage cream
+  { cap: ['#4a4a52', '#242429', '#0c0c0f'], pointer: '#f4e8c8', shape: 'chicken' },  // bakelite chicken-head
+];
+function knobFinishFor(type) {
+  let h = 0;
+  for (const ch of String(type)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return KNOB_FINISHES[h % KNOB_FINISHES.length];
+}
 
 // Mini pedal icon for the "Add Effect" tiles (matches the new CSS pedals).
 function pedalIcon(type, color) {
@@ -203,7 +237,7 @@ function buildPedal(unit, handlers) {
   pedal.style.setProperty('--cols', String(n));
   // Per-effect name font/treatment/ink + shared condensed knob-label ink.
   for (const [k, v] of Object.entries(pedalTypographyVars(type))) pedal.style.setProperty(k, v);
-  pedal.style.width = `${Math.max(126, 44 + n * 34)}px`;
+  pedal.style.width = `${Math.max(132, 44 + n * 40)}px`; // wider slots for the 34px knobs
   if (unit.bypassed) pedal.classList.add('bypassed');
 
   // Recessed faceplate: rotating sunburst (fuzz only) + glow + screen + glass lens.
@@ -239,8 +273,10 @@ function buildPedal(unit, handlers) {
   params.forEach((p) => {
     const slot = document.createElement('div');
     slot.className = 'pedal-knob';
+    const finish = knobFinishFor(type);
     const { el } = createKnob(p, unit.params[p.key] ?? p.default,
-      (v) => handlers.onParamChange(unit.instanceId, p.key, v), 30, { cap: PEDAL_CAP, accent: color, pointer: '#16181b' });
+      (v) => handlers.onParamChange(unit.instanceId, p.key, v), 34,
+      { cap: finish.cap, accent: color, pointer: finish.pointer, shape: finish.shape });
     const lbl = document.createElement('b');
     lbl.textContent = p.label;
     slot.append(el, lbl);

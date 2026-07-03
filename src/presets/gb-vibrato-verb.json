@@ -1,7 +1,48 @@
-{ "name": "Vibrato Verb", "artist": "GarageBand", "song": "Watery vibrato clean", "chain": [
-  { "type": "drive",   "params": { "amount": 0.5, "tone": 6, "level": 5, "blend": 0.3, "midBump": 0 } },
-  { "type": "eq",      "params": { "bass": 5, "mid": 4, "midFreq": 600, "treble": 7 } },
-  { "type": "cabinet", "params": { "brightness": 7, "body": 4, "mix": 1 } },
-  { "type": "vibrato", "params": { "rate": 5, "depth": 4 } },
-  { "type": "reverb",  "params": { "size": 0.6, "mix": 0.22 } }
-] }
+{
+  "name": "Sleepwalk Shimmer",
+  "artist": "GarageBand",
+  "song": "Watery vibrato clean",
+  "chain": [
+    {
+      "type": "drive",
+      "params": {
+        "amount": 0.5,
+        "tone": 6,
+        "level": 5,
+        "blend": 0.3,
+        "midBump": 0
+      }
+    },
+    {
+      "type": "eq",
+      "params": {
+        "bass": 5,
+        "mid": 4,
+        "midFreq": 600,
+        "treble": 7
+      }
+    },
+    {
+      "type": "cabinet",
+      "params": {
+        "brightness": 7,
+        "body": 4,
+        "mix": 1
+      }
+    },
+    {
+      "type": "vibrato",
+      "params": {
+        "rate": 5,
+        "depth": 4
+      }
+    },
+    {
+      "type": "reverb",
+      "params": {
+        "size": 0.6,
+        "mix": 0.22
+      }
+    }
+  ]
+}

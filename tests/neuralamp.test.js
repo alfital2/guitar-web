@@ -83,14 +83,17 @@ describe('neuralamp effect', () => {
     expect(node.messages.some((m) => m.type === 'wasm')).toBe(true);
   });
 
-  it('maps trim/level 0..10 to gain centred on unity at 5', () => {
+  it('maps trim/level 0..10 to gain: 5 = unity, 10 = +5 dB, 0 = TRUE silence', () => {
     const ctx = new FakeAudioContext();
     const fx = create(ctx, { model: 0, trim: 5, level: 5 });
     expect(fx.input.gain.value).toBeCloseTo(1, 6);   // trim 5 → unity
     expect(fx.output.gain.value).toBeCloseTo(1, 6);  // level 5 → unity
     fx.apply({ model: 0, trim: 10, level: 0 });
-    expect(fx.input.gain.value).toBeCloseTo(Math.pow(10, 0.5), 6);   // ≈3.1623
-    expect(fx.output.gain.value).toBeCloseTo(Math.pow(10, -0.5), 6); // ≈0.3162
+    expect(fx.input.gain.value).toBeCloseTo(Math.pow(10, 0.5), 6);   // trim 10 → ≈3.1623
+    expect(fx.output.gain.value).toBe(0);            // level 0 → silence (not −5 dB)
+    fx.apply({ model: 0, trim: 0, level: 1 });
+    expect(fx.input.gain.value).toBe(0);             // trim 0 → silence too
+    expect(fx.output.gain.value).toBeCloseTo(Math.pow(10, -0.4), 6); // level 1 → ≈0.398 (continuous)
   });
 
   describe('wasm → wasm-ready → model handshake', () => {

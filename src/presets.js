@@ -33,8 +33,8 @@ export const GB_CATEGORIES = [
   { id: 'artists', label: '03 Artist Rigs', presets: [mayerEdge, mayerLead, knopflerSultans, asatoClean, hensonClean, hetfieldRhythm, hammettLead] },
   { id: 'showcase', label: '04 Showcase FX', presets: [clean, funkAutowah, fuzzFace, ambientWash, surfTremolo, swirlPhaser, octaveDown] },
   // 05 Professional: real captured amps (NAM WaveNet). Each preset is a single
-  // `neuralamp` amp-head node carrying a fixed, pre-measured normDb (the offline
-  // loudness path can't render the wasm model — see normalize.js / design §7).
+  // `neuralamp` amp-head node; loudness is normalized at load time by the same
+  // offline measurement path as every other preset (see normalize.js).
   { id: 'pro', label: '05 Professional', presets: [proJcm, pro5153, proDeluxe, proAc10, proJc] },
 ];
 

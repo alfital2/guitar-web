@@ -9,7 +9,9 @@
     "test:probe": "node tests/effects-probe.mjs",
     "dev": "python3 -m http.server 8000",
     "neural:build": "bash tools/neural/build.sh",
-    "neural:derisk": "node tools/neural/derisk.mjs"
+    "neural:derisk": "node tools/neural/derisk.mjs",
+    "audit:loudness": "node tests/loudness-audit.mjs",
+    "test:loudness": "node tests/loudness-audit.mjs --gate"
   },
   "devDependencies": {
     "vitest": "^2.1.0",

@@ -1,4 +1,16 @@
-{ "name": "EVH 5153", "artist": "Neural Amp", "song": "Captured amp — EVH 5153 high gain", "category": "pro", "normDb": -5.5,
+{
+  "name": "EVH 5153",
+  "artist": "Neural Amp",
+  "song": "Captured amp \u2014 EVH 5153 high gain",
+  "category": "pro",
   "chain": [
-    { "type": "neuralamp", "params": { "model": 1, "trim": 5, "level": 5 } }
-  ] }
+    {
+      "type": "neuralamp",
+      "params": {
+        "model": 1,
+        "trim": 5,
+        "level": 5
+      }
+    }
+  ]
+}

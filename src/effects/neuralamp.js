@@ -49,8 +49,17 @@ function fetchModelJson(index) {
   return fetch(new URL(`../../assets/neural/${name}.nam`, import.meta.url)).then((r) => r.text());
 }
 
-// 0..10 → linear gain, centred so 5 = unity: 10 ** ((v - 5) * 0.1).
-function gainFor(v) { return Math.pow(10, ((v ?? 5) - 5) * 0.1); }
+// 0..10 knob → gain. 5 = unity (default, so preset loudness is unchanged);
+// each step is ±1 dB up to 10 (+5 dB). The bottom of the range fades to TRUE
+// ZERO so Level/Trim at 0 is silence — the old pure 10**((v-5)*0.1) bottomed
+// out at 0.316 (−5 dB), which is why the amp still sounded at 0.
+function gainFor(v) {
+  v = v == null ? 5 : v;
+  if (v <= 0) return 0;
+  const g1 = Math.pow(10, -0.4);            // gain at v = 1 (≈0.398)
+  if (v < 1) return v * g1;                 // linear fade 0 → g1, continuous at v=1
+  return Math.pow(10, (v - 5) * 0.1);
+}
 
 // Broadcast warm-up lifecycle so the amp head can show a "tube warming up"
 // state while a .nam model loads (masking the model-load dry gap). Guarded so
@@ -64,6 +73,10 @@ function emitNeural(name, detail) {
 }
 
 export function create(ctx, params) {
+  // Offline contexts are silent measurement renders (loudness normalization,
+  // audits) — tag their lifecycle events so the live warm-up UI ignores them
+  // and the measurer can await exactly its own render's readiness.
+  const offline = typeof OfflineAudioContext !== 'undefined' && ctx instanceof OfflineAudioContext;
   const trimGain = ctx.createGain();
   const levelGain = ctx.createGain();
   const node = new AudioWorkletNode(ctx, 'neural-amp-processor', {
@@ -86,7 +99,7 @@ export function create(ctx, params) {
   // lastPostedModel is only set once the fetch+post succeeds, so a failed
   // fetch doesn't permanently dedupe that index — a later apply() can retry it.
   function postModel(idx) {
-    emitNeural('neural-amp-loading', { model: idx });
+    emitNeural('neural-amp-loading', { model: idx, offline, ctx });
     fetchModelJson(idx)
       .then((json) => {
         node.port.postMessage({ type: 'model', json });
@@ -94,7 +107,7 @@ export function create(ctx, params) {
       })
       .catch((err) => {
         console.warn('[neuralamp] model fetch failed; staying passthrough:', err);
-        emitNeural('neural-amp-error', { model: idx, error: String((err && err.message) || err) });
+        emitNeural('neural-amp-error', { model: idx, offline, ctx, error: String((err && err.message) || err) });
       });
   }
 
@@ -107,13 +120,13 @@ export function create(ctx, params) {
       wasmReady = true;
       postModel(wantModel);
     } else if (msg.type === 'ready') {
-      emitNeural('neural-amp-ready', { model: wantModel });
+      emitNeural('neural-amp-ready', { model: wantModel, offline, ctx });
     } else if (msg.type === 'model-error') {
       console.warn('[neuralamp] worklet reported a model error; staying passthrough:', msg.error);
-      emitNeural('neural-amp-error', { model: wantModel, error: msg.error });
+      emitNeural('neural-amp-error', { model: wantModel, offline, ctx, error: msg.error });
     } else if (msg.type === 'wasm-error') {
       console.warn('[neuralamp] worklet reported a wasm error; staying passthrough:', msg.error);
-      emitNeural('neural-amp-error', { model: wantModel, error: msg.error });
+      emitNeural('neural-amp-error', { model: wantModel, offline, ctx, error: msg.error });
     }
   };
 

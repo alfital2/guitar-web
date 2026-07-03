@@ -95,31 +95,16 @@ describe('renderAmp neuralamp head', () => {
     params: { model: 2, trim: 5, level: 5 },
   });
 
-  it('renders a model <select> with a friendly option per amp and Trim/Level as knobs', () => {
+  it('does NOT render a model select (model is chosen from the preset browser) — only Trim/Level knobs', () => {
     const el = document.createElement('div');
     renderAmp(el, [neuralModule()], () => {}, { collapsed: false });
-    const sel = el.querySelector('.amp-model-select');
-    expect(sel).toBeTruthy();
-    expect(sel.tagName).toBe('SELECT');
-    expect(sel.querySelectorAll('option')).toHaveLength(5);
-    expect(sel.querySelectorAll('option')[0].textContent).toBe('Marshall JCM');
-    // 'model' is the <select>, NOT a knob → only Trim + Level are sliders.
+    // The on-amp model <select> was removed — it duplicated the 05 Professional list.
+    expect(el.querySelector('.amp-model-select')).toBeNull();
+    expect(el.querySelector('select')).toBeNull();
+    // 'model' is not a knob either → only Trim + Level are sliders.
     expect(el.querySelectorAll('[role=slider]')).toHaveLength(2);
     const labels = [...el.querySelectorAll('.amp-knob-label')].map((l) => l.textContent);
     expect(labels).toEqual(['Trim', 'Level']);
-    // select reflects the current model index
-    expect(sel.value).toBe('2');
-    expect(sel.selectedOptions[0].textContent).toBe('Fender Deluxe');
-  });
-
-  it('changing the model select fires onParamChange(instanceId, "model", index)', () => {
-    const el = document.createElement('div');
-    const cb = vi.fn();
-    renderAmp(el, [neuralModule()], cb, { collapsed: false });
-    const sel = el.querySelector('.amp-model-select');
-    sel.value = '4';
-    sel.dispatchEvent(new Event('change', { bubbles: true }));
-    expect(cb).toHaveBeenCalledWith(20, 'model', 4);
   });
 
   it('a Trim knob change fires onParamChange(instanceId, "trim", value)', () => {

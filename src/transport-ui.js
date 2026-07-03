@@ -10,7 +10,7 @@ const TP = [
   ['tp-record', '⏺', 'Record'],
 ];
 
-export function mountTransport(container, { getLiveAnalyser, onGain }) {
+export function mountTransport(container, { getLiveAnalyser, onGain, onTempoChange }) {
   container.innerHTML = '';
   container.classList.add('transport-cluster');
 
@@ -102,7 +102,7 @@ export function mountTransport(container, { getLiveAnalyser, onGain }) {
   countWrap.append(countBtn);
 
   // BPM scrub (drag vertical / wheel) + click-to-type.
-  const setBpm = (v) => { const n = clampTempo(v); metronome.setTempo(n); bpmVal.textContent = String(n); };
+  const setBpm = (v) => { const n = clampTempo(v); metronome.setTempo(n); bpmVal.textContent = String(n); onTempoChange?.(n); };
   let dragY = 0, dragV = 0, dragging = false;
   bpm.addEventListener('pointerdown', (e) => { dragging = true; dragY = e.clientY; dragV = metronome.getTempo(); bpm.setPointerCapture(e.pointerId); e.preventDefault(); });
   bpm.addEventListener('pointermove', (e) => { if (!dragging) return; setBpm(dragV + Math.round((dragY - e.clientY) / 4)); });
@@ -112,7 +112,11 @@ export function mountTransport(container, { getLiveAnalyser, onGain }) {
     if (dragging) return;
     const input = el('input', 'metro-bpm-input'); input.type = 'text'; input.inputMode = 'numeric'; input.value = String(metronome.getTempo());
     bpm.replaceWith(input); input.focus(); input.select();
-    const commit = (apply) => { if (apply) setBpm(parseInt(input.value, 10)); input.replaceWith(bpm); };
+    // Guard against a double commit: Enter commits AND blurs the input, and the
+    // blur handler would commit again → replaceWith on an already-detached node
+    // throws. Run exactly once.
+    let done = false;
+    const commit = (apply) => { if (done) return; done = true; if (apply) setBpm(parseInt(input.value, 10)); input.replaceWith(bpm); };
     input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') commit(true); else if (ev.key === 'Escape') commit(false); });
     input.addEventListener('blur', () => commit(true));
   });
@@ -164,6 +168,7 @@ export function mountTransport(container, { getLiveAnalyser, onGain }) {
   // Controller for the record flow (main.js): count-in + record-gated metronome
   // on ONE continuous beat grid (no seam between count-in and the first beat).
   return {
+    getTempo: () => metronome.getTempo(),
     isCountIn: () => countOn,
     isMetroArmed: () => metroArmed,
     isMetroFree: () => metroFree,

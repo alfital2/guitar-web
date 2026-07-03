@@ -44,7 +44,17 @@ const MIN_RMS = 0.003;        // sustained non-silence — ~30x the ~1e-4 noise 
 const RT_LO = 0.9, RT_HI = 1.1;
 const CHANGE_FLOOR = 0.03;    // absolute floor for "output changed"; actual gate is
                               // max(CHANGE_FLOOR, 4 * self-noise), computed at runtime
-const SPREAD_MIN = 1.5;       // max/min of the 5 amps' RMS — proves distinct models
+const HF_RATIO_MIN = 1.5;     // max/min of the 5 amps' HF-energy ratio — proves
+                              // distinct models by SPECTRAL shape (loudness is
+                              // normalized post-fix, so RMS can't discriminate)
+const GAIN_RATIO_MIN = 2.0;   // max/min of the 5 amps' settled normGain — proves
+                              // per-amp loudness normalization actually lands
+                              // (the 2026-07 bug: one stale gain stuck across
+                              // every preset switch). True per-amp gains span
+                              // >20x; a stuck gain gives exactly 1x.
+const TREM_MIN_OVER_AVG = 0.8;// deep tremolo must pull min-RMS well under avg
+                              // within the window (amplitude modulation is
+                              // invariant to the static normalization gain)
 const WARMUP_FIRST_MS = 3000; // first .nam + cold wasm compile/build
 const WARMUP_SWITCH_MS = 1500;// subsequent .nam loads (wasm module cached)
 const WINDOW_MS = 4000;       // sustained-output measurement window
@@ -52,6 +62,21 @@ const SIGNAL_TIMEOUT_MS = 15000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const dist = (a, b) => Math.abs(a.rms - b.rms) / Math.max(b.rms, 1e-6) + Math.abs(a.hf - b.hf);
+
+// Loudness normalization runs as a debounced async offline render (or a
+// synchronous cache hit) after a preset/chain change. "Value looks stable" is
+// racy — it can report the PREVIOUS preset's gain while a 1–3 s neural measure
+// is still in flight — so wait for the apply COUNTER to advance past a
+// baseline captured BEFORE the change, then let the ~50 ms ramp finish.
+const normCount = (page) => page.evaluate(() => window.__neuralE2E.normApplyCount());
+async function waitForNormApply(page, c0, capMs = 15000) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < capMs) {
+    if ((await normCount(page)) > c0) { await sleep(450); return page.evaluate(() => window.__neuralE2E.normGainValue()); }
+    await sleep(150);
+  }
+  return page.evaluate(() => window.__neuralE2E.normGainValue());
+}
 
 async function startServer() {
   const proc = spawn('python3', ['-m', 'http.server', String(PORT)], {
@@ -148,44 +173,84 @@ async function run() {
     console.log(`  settled baseline rms ${b2.rms.toFixed(5)} self-noise ${selfNoise.toFixed(4)} → change gate ${CHANGE.toFixed(4)}`);
 
     // 2) Pedal BEFORE the amp changes the output (vs the settled baseline b2).
+    // Adding a pedal triggers re-normalization (static gain), which compensates
+    // level changes — so accept EITHER rms/hf distance OR a clear shift in
+    // spectral shape (hf ratio), which the static normGain cannot cause.
+    const cFuzz = await normCount(page);
     await page.evaluate(() => window.__neuralE2E.addPedalBefore('fuzz'));
     await sleep(800);
+    await waitForNormApply(page, cFuzz);
     const withBefore = await measure(page, 1500);
     const dBefore = dist(withBefore, b2);
+    const hfShift = Math.max(withBefore.hf, b2.hf) / Math.max(Math.min(withBefore.hf, b2.hf), 1e-6);
     const chainBefore = await page.evaluate(() => window.__neuralE2E.chainTypes());
-    console.log(`  +fuzz BEFORE: rms ${withBefore.rms.toFixed(5)} hf ${withBefore.hf.toFixed(3)} dist ${dBefore.toFixed(3)} chain ${chainBefore.join('>')}`);
+    console.log(`  +fuzz BEFORE: rms ${withBefore.rms.toFixed(5)} hf ${withBefore.hf.toFixed(3)} dist ${dBefore.toFixed(3)} hfShift ${hfShift.toFixed(2)}x chain ${chainBefore.join('>')}`);
     check(chainBefore[0] === 'fuzz' && chainBefore.includes('neuralamp'), `fuzz sits BEFORE the amp (${chainBefore.join('>')})`);
-    check(withBefore.finite && dBefore > CHANGE, `pedal BEFORE amp changes output (dist ${dBefore.toFixed(3)} > ${CHANGE.toFixed(3)})`);
+    check(withBefore.finite && (dBefore > CHANGE || hfShift > 1.3),
+      `pedal BEFORE amp changes output (dist ${dBefore.toFixed(3)} > ${CHANGE.toFixed(3)} or hf shift ${hfShift.toFixed(2)}x > 1.3x)`);
 
     // Reset to a clean Professional chain, then a pedal AFTER the amp changes output.
+    // Loudness normalization compensates static level changes, so the honest
+    // post-amp evidence is MODULATION: deep tremolo drags the window's min-RMS
+    // far below its average — a ratio the static normGain cannot touch.
+    const cReset = await normCount(page);
     await page.evaluate((n) => window.__neuralE2E.loadPresetByName(n), pros[0]);
     await sleep(WARMUP_SWITCH_MS);
     await waitForSignal(page);
+    await waitForNormApply(page, cReset);
     const base2 = await measure(page, 1500);
+    const baseTremRatio = base2.min / Math.max(base2.rms, 1e-9);
     await page.evaluate(() => window.__neuralE2E.addPedalAfter('tremolo'));
+    await page.evaluate(() => window.__neuralE2E.setPedalParam('tremolo', 'depth', 1));
+    await page.evaluate(() => window.__neuralE2E.setPedalParam('tremolo', 'rate', 7));
     await sleep(800);
-    const withAfter = await measure(page, 1500);
-    const dAfter = dist(withAfter, base2);
+    // Sample FAST relative to the 7 Hz (~143 ms) modulation: 130 ms polls drift
+    // ~13 ms of phase per poll, sweeping the whole cycle over ~11 polls — the
+    // default 300 ms cadence aliases against the period and can sample only
+    // near-peak phases, missing the troughs entirely.
+    const withAfter = await (async () => {
+      let min = Infinity, sum = 0, finite = true;
+      for (let i = 0; i < 14; i++) {
+        await sleep(130);
+        const m = await page.evaluate(() => window.__neuralE2E.getOutputMetrics());
+        min = Math.min(min, m.rms); sum += m.rms; finite = finite && m.finite;
+      }
+      return { min, rms: sum / 14, finite };
+    })();
+    const tremRatio = withAfter.min / Math.max(withAfter.rms, 1e-9);
     const chainAfter = await page.evaluate(() => window.__neuralE2E.chainTypes());
-    console.log(`  +tremolo AFTER: rms ${withAfter.rms.toFixed(5)} hf ${withAfter.hf.toFixed(3)} dist ${dAfter.toFixed(3)} chain ${chainAfter.join('>')}`);
+    console.log(`  +tremolo AFTER: rms ${withAfter.rms.toFixed(5)} min/avg ${tremRatio.toFixed(3)} (baseline ${baseTremRatio.toFixed(3)}) chain ${chainAfter.join('>')}`);
     check(chainAfter[chainAfter.indexOf('neuralamp') + 1] === 'tremolo', `tremolo sits AFTER the amp (${chainAfter.join('>')})`);
-    check(withAfter.finite && dAfter > CHANGE, `pedal AFTER amp changes output (dist ${dAfter.toFixed(3)} > ${CHANGE.toFixed(3)})`);
+    check(withAfter.finite && tremRatio < TREM_MIN_OVER_AVG && tremRatio < baseTremRatio - 0.1,
+      `pedal AFTER amp modulates output (min/avg ${tremRatio.toFixed(3)} < ${TREM_MIN_OVER_AVG} and well under baseline ${baseTremRatio.toFixed(3)})`);
 
     // 3) Switch through all 5 amps: each non-silent, finite, no page errors.
-    const switchMins = [];
+    // The tap reads POST loudness-normalization (normGain). Distinctness is
+    // proven by spectral shape (hf ratio) — normalization can't touch it — and
+    // by the per-amp normGain values themselves: five captures with different
+    // inherent levels MUST settle five different gains (the 2026-07 bug was one
+    // stale gain stuck across every switch, gain ratio exactly 1x).
+    const switchHf = [], switchGains = [];
     for (const name of pros) {
+      const cSwitch = await normCount(page);
       await page.evaluate((n) => window.__neuralE2E.loadPresetByName(n), name);
       await sleep(WARMUP_SWITCH_MS);
       await waitForSignal(page);
+      const settledGain = await waitForNormApply(page, cSwitch); // measure (or cache hit) lands the gain
       const m = await measure(page, 1500);
-      switchMins.push(m.min);
-      console.log(`  switch → ${name}: minRMS ${m.min.toFixed(5)} finite ${m.finite}`);
+      switchHf.push(m.hf); switchGains.push(settledGain);
+      console.log(`  switch → ${name}: minRMS ${m.min.toFixed(5)} avgRMS ${m.rms.toFixed(5)} hf ${m.hf.toFixed(3)} normGain ${settledGain == null ? 'null' : settledGain.toFixed(3)} finite ${m.finite}`);
       check(m.finite && m.min >= MIN_RMS, `amp "${name}" produces finite sustained output`);
     }
-    // Distinct models, not uniform dry passthrough (which would give ~identical RMS).
-    const spread = Math.max(...switchMins) / Math.max(Math.min(...switchMins), 1e-6);
-    console.log(`  amp RMS spread ${spread.toFixed(2)}x`);
-    check(spread > SPREAD_MIN, `5 amps process distinctly, not uniform passthrough (spread ${spread.toFixed(2)}x > ${SPREAD_MIN}x)`);
+    // Distinct models, not uniform dry passthrough: spectral shape must differ.
+    const hfRatio = Math.max(...switchHf) / Math.max(Math.min(...switchHf), 1e-6);
+    console.log(`  amp HF-shape ratio ${hfRatio.toFixed(2)}x`);
+    check(hfRatio > HF_RATIO_MIN, `5 amps process distinctly, not uniform passthrough (hf ratio ${hfRatio.toFixed(2)}x > ${HF_RATIO_MIN}x)`);
+    // Loudness normalization is ALIVE per amp (the volume-inconsistency fix):
+    const gains = switchGains.filter((g) => g != null && isFinite(g));
+    const gainRatio = gains.length === 5 ? Math.max(...gains) / Math.max(Math.min(...gains), 1e-6) : 0;
+    console.log(`  per-amp normGain ratio ${gainRatio.toFixed(2)}x (gains: ${gains.map((g) => g.toFixed(2)).join(', ')})`);
+    check(gainRatio > GAIN_RATIO_MIN, `per-amp loudness normalization lands (gain ratio ${gainRatio.toFixed(2)}x > ${GAIN_RATIO_MIN}x)`);
 
     // 4) Input-channel (1/2) selector: switch ch2 then ch1, audio survives, no errors.
     const chanCount = await page.locator('#input-channel').count();

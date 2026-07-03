@@ -45,65 +45,65 @@ const p = (name, song, chain) => ({ name, artist: 'GarageBand', song, chain });
 
 // ── 01 Clean Guitar ─────────────────────────────────────────────────────
 const CLEAN = [
-  p('Amazing Tweed', 'Warm tweed on edge of breakup', [...TWEED(), reverb(0.4, 0.12)]),
-  p('Brit and Clean', 'Chimey Vox-style clean', [...BRITCHIME({ drive: { amount: 1.5, midBump: 1 }, eq: { mid: 6, midFreq: 1800, treble: 6 } }), reverb(0.4, 0.12)]),
-  p('Chicken Pickin\'', 'Snappy bright country twang', [comp(-22, 4, 4), ...BLACKFACE({ cab: { brightness: 7, body: 4 } }), tapeEcho(110, 0.15, 0.12), reverb(0.3, 0.1)]),
+  p('Tears in Tweed', 'Warm tweed on edge of breakup', [...TWEED(), reverb(0.4, 0.12)]),
+  p('Ticket to Chime', 'Chimey Vox-style clean', [...BRITCHIME({ drive: { amount: 1.5, midBump: 1 }, eq: { mid: 6, midFreq: 1800, treble: 6 } }), reverb(0.4, 0.12)]),
+  p('Folsom Twang', 'Snappy bright country twang', [comp(-22, 4, 4), ...BLACKFACE({ cab: { brightness: 7, body: 4 } }), tapeEcho(110, 0.15, 0.12), reverb(0.3, 0.1)]),
   // GB: Small Tweed combo, bright (Tone 0.72), squashed comp, spring verb.
-  p('Clean Echoes', 'Spacious rhythmic stereo echoes', [comp(-20, 4, 4), ...TWEED({ drive: { amount: 4, tone: 7 }, eq: { treble: 6 }, cab: { brightness: 5 } }), pingpong(380, 0.4, 0.28), reverb(0.5, 0.14)]),
-  p('Clean Studio Stack', 'Big full-bodied clean stack', [...BRITCRUNCH({ drive: { amount: 0.5, blend: 0.25 }, eq: { bass: 6 }, cab: { brightness: 5, body: 7 } }), widener(4), reverb(0.4, 0.1)]),
-  p('Cool Jazz Combo', 'Mellow warm neck-pickup jazz', [...BLACKFACE({ drive: { amount: 0 }, eq: { bass: 6, mid: 5, treble: 3 }, cab: { brightness: 2, body: 7 } }), reverb(0.4, 0.1)]),
+  p('Shine On Clean', 'Spacious rhythmic stereo echoes', [comp(-20, 4, 4), ...TWEED({ drive: { amount: 4, tone: 7 }, eq: { treble: 6 }, cab: { brightness: 5 } }), pingpong(380, 0.4, 0.28), reverb(0.5, 0.14)]),
+  p('Every Breath Stack', 'Big full-bodied clean stack', [...BRITCRUNCH({ drive: { amount: 0.5, blend: 0.25 }, eq: { bass: 6 }, cab: { brightness: 5, body: 7 } }), widener(4), reverb(0.4, 0.1)]),
+  p('Kind of Mellow', 'Mellow warm neck-pickup jazz', [...BLACKFACE({ drive: { amount: 0 }, eq: { bass: 6, mid: 5, treble: 3 }, cab: { brightness: 2, body: 7 } }), reverb(0.4, 0.1)]),
   // GB: Small Tweed combo (not blackface), bright twang cab, slapback echo.
-  p('Country Gent', 'Bright twangy rockabilly slapback', [comp(-20, 3, 3), ...TWEED({ drive: { amount: 4.8, tone: 5 }, eq: { treble: 7 }, cab: { brightness: 7, body: 4 } }), tapeEcho(130, 0.2, 0.15), reverb(0.35, 0.12)]),
-  p('Dublin Delay', 'Rhythmic dotted-eighth ambience', [...BRITCHIME(), delay(375, 0.35, 0.4), widener(5), reverb(0.6, 0.18)]),
-  p('Dyna-Trem', 'Pulsing amp tremolo clean', [...BLACKFACE(), tremolo(5, 0.6, 0), reverb(0.4, 0.12)]),
+  p('Mystery Train', 'Bright twangy rockabilly slapback', [comp(-20, 3, 3), ...TWEED({ drive: { amount: 4.8, tone: 5 }, eq: { treble: 7 }, cab: { brightness: 7, body: 4 } }), tapeEcho(130, 0.2, 0.15), reverb(0.35, 0.12)]),
+  p('Streets Have Echoes', 'Rhythmic dotted-eighth ambience', [...BRITCHIME(), delay(375, 0.35, 0.4), widener(5), reverb(0.6, 0.18)]),
+  p('Soon Is Now', 'Pulsing amp tremolo clean', [...BLACKFACE(), tremolo(5, 0.6, 0), reverb(0.4, 0.12)]),
   // GB: Small Tweed combo with heavy tape echo.
-  p('Echo Studio', 'Studio clean with slap echoes', [...TWEED({ drive: { amount: 4, tone: 5 }, eq: { treble: 5 } }), tapeEcho(300, 0.45, 0.3, { tone: 4, flutter: 3 }), reverb(0.45, 0.12)]),
+  p('Sun Studio Slap', 'Studio clean with slap echoes', [...TWEED({ drive: { amount: 4, tone: 5 }, eq: { treble: 5 } }), tapeEcho(300, 0.45, 0.3, { tone: 4, flutter: 3 }), reverb(0.45, 0.12)]),
   // GB: Small Tweed combo, bright, big church reverb (Reverb 0.46).
-  p('Heavenly Tweed', 'Angelic big-reverb clean tweed', [...TWEED({ drive: { amount: 2.5, tone: 6 }, eq: { treble: 5 } }), reverb(0.85, 0.3)]),
+  p('Hallelujah Tweed', 'Angelic big-reverb clean tweed', [...TWEED({ drive: { amount: 2.5, tone: 6 }, eq: { treble: 5 } }), reverb(0.85, 0.3)]),
   // GB: Vintage British Stack mic'd clean (Room/Close mic blend) — clean Marshall.
-  p('Move the Mics', 'Natural room tone, minimal FX', [...BRITCRUNCH({ drive: { amount: 1, blend: 0.3 }, eq: { mid: 5 }, cab: { brightness: 5, body: 6, presence: 6 } }), reverb(0.6, 0.18)]),
+  p('Levee Room', 'Natural room tone, minimal FX', [...BRITCRUNCH({ drive: { amount: 1, blend: 0.3 }, eq: { mid: 5 }, cab: { brightness: 5, body: 6, presence: 6 } }), reverb(0.6, 0.18)]),
   multiPhase,
   // GB: Small Tweed combo, pushed (Gain 0.69), deep chorus + big spring (0.5).
-  p('Mystery Chorus', 'Wide shimmering chorused clean', [...TWEED({ drive: { amount: 5, tone: 5, blend: 0.6 } }), chorus(0.8, 6, 0.45), widener(5), reverb(0.5, 0.16)]),
+  p('Nevermind Shimmer', 'Wide shimmering chorused clean', [...TWEED({ drive: { amount: 5, tone: 5, blend: 0.6 } }), chorus(0.8, 6, 0.45), widener(5), reverb(0.5, 0.16)]),
   // GB: Blackface (Face Amp) with the opto Tremolo pedal, fast rate.
-  p('Old Time Tremolo', 'Choppy old-school opto tremolo', [...BLACKFACE({ drive: { amount: 2, tone: 5 } }), tremolo(6, 0.85, 1), reverb(0.4, 0.12)]),
+  p('Crimson Clover', 'Choppy old-school opto tremolo', [...BLACKFACE({ drive: { amount: 2, tone: 5 } }), tremolo(6, 0.85, 1), reverb(0.4, 0.12)]),
   spinSpeaker,
   surfin,
   vibratoVerb,
-  p('Warm British Combo', 'Rounded warm British clean', [...BRITCHIME({ drive: { amount: 1 }, eq: { treble: 5 }, cab: { brightness: 4, body: 6 } }), reverb(0.4, 0.1)]),
+  p('Norwegian Warmth', 'Rounded warm British clean', [...BRITCHIME({ drive: { amount: 1 }, eq: { treble: 5 }, cab: { brightness: 4, body: 6 } }), reverb(0.4, 0.1)]),
   // GB: British Combo (boxy Vox), deep chorus (0.97) + fuzz, lo-fi.
-  p('Worlds Smallest Amp', 'Boxy lo-fi tiny-Champ breakup', [...BRITCHIME({ drive: { amount: 3.5, blend: 0.6, tone: 4 }, eq: { bass: 3, mid: 6, treble: 5 }, cab: { brightness: 3, body: 4 } }), chorus(0.7, 7, 0.4), reverb(0.25, 0.08)]),
+  p('Chamber Lo-Fi', 'Boxy lo-fi tiny-Champ breakup', [...BRITCHIME({ drive: { amount: 3.5, blend: 0.6, tone: 4 }, eq: { bass: 3, mid: 6, treble: 5 }, cab: { brightness: 3, body: 4 } }), chorus(0.7, 7, 0.4), reverb(0.25, 0.08)]),
 ];
 
 // ── 02 / 03 Crunch & Distorted Guitar ───────────────────────────────────
 const CRUNCH = [
-  p('Amp Switcher', 'Blended clean + crunch amp', [...BRITCRUNCH({ drive: { amount: 4, blend: 0.5, midBump: 2 }, cab: { brightness: 5, body: 6 } }), delay(300, 0.2, 0.12)]),
-  p('Big Brute Blues', 'Thick cranked bluesy crunch', [...TWEED({ drive: { amount: 5, tone: 5, blend: 0.8, midBump: 3 }, eq: { bass: 6, mid: 6, treble: 4 }, cab: { brightness: 4, body: 7 } }), reverb(0.4, 0.12)]),
-  p('British Invasion', '60s jangle-crunch AC30 grind', [...BRITCHIME({ drive: { amount: 4, blend: 0.8, midBump: 2 }, eq: { mid: 6, midFreq: 1800, treble: 6 } }), reverb(0.35, 0.1)]),
+  p('Jekyll & Hyde', 'Blended clean + crunch amp', [...BRITCRUNCH({ drive: { amount: 4, blend: 0.5, midBump: 2 }, cab: { brightness: 5, body: 6 } }), delay(300, 0.2, 0.12)]),
+  p('La Grange Growl', 'Thick cranked bluesy crunch', [...TWEED({ drive: { amount: 5, tone: 5, blend: 0.8, midBump: 3 }, eq: { bass: 6, mid: 6, treble: 4 }, cab: { brightness: 4, body: 7 } }), reverb(0.4, 0.12)]),
+  p('Day Tripper Grind', '60s jangle-crunch AC30 grind', [...BRITCHIME({ drive: { amount: 4, blend: 0.8, midBump: 2 }, eq: { mid: 6, midFreq: 1800, treble: 6 } }), reverb(0.35, 0.1)]),
   // GB: British Combo (Vox AC30, not Marshall) cranked to the edge (Gain 1.0).
-  p('Broken Up Brit', 'Vox AC30 edge-of-breakup crunch', [...BRITCHIME({ drive: { amount: 6, blend: 0.85, midBump: 2 }, eq: { mid: 6, treble: 5 }, cab: { brightness: 5, body: 6 } }), reverb(0.35, 0.12)]),
-  p('Cheap Studio Time', 'Gritty cheap lo-fi grind', [...BRITCRUNCH({ drive: { amount: 5, tone: 4 }, eq: { treble: 4 }, cab: { brightness: 3, body: 4 } }), tremolo(4, 0.4, 0), reverb(0.4, 0.14)]),
-  p('Chord Burner', 'Aggressive chord-driving distortion', [gate(2.5), ...MODERN({ drive: { amount: 7, midBump: 2 }, eq: { bass: 6, mid: 4, treble: 6 }, cab: { brightness: 5, body: 5 } }), delay(250, 0.18, 0.12)]),
-  p('Double Brit Phaser', 'Phase-swirled double-Marshall', [...BRITCRUNCH({ drive: { amount: 5 } }), phaser(0.4, 6, 0.5, 0.5), delay(300, 0.2, 0.12)]),
+  p('Generation Edge', 'Vox AC30 edge-of-breakup crunch', [...BRITCHIME({ drive: { amount: 6, blend: 0.85, midBump: 2 }, eq: { mid: 6, treble: 5 }, cab: { brightness: 5, body: 6 } }), reverb(0.35, 0.12)]),
+  p('Spirit in the Grit', 'Gritty cheap lo-fi grind', [...BRITCRUNCH({ drive: { amount: 5, tone: 4 }, eq: { treble: 4 }, cab: { brightness: 3, body: 4 } }), tremolo(4, 0.4, 0), reverb(0.4, 0.14)]),
+  p('Teen Spirit Burner', 'Aggressive chord-driving distortion', [gate(2.5), ...MODERN({ drive: { amount: 7, midBump: 2 }, eq: { bass: 6, mid: 4, treble: 6 }, cab: { brightness: 5, body: 5 } }), delay(250, 0.18, 0.12)]),
+  p('Eruption Swirl', 'Phase-swirled double-Marshall', [...BRITCRUNCH({ drive: { amount: 5 } }), phaser(0.4, 6, 0.5, 0.5), delay(300, 0.2, 0.12)]),
   // GB: British Combo (Vox) driven hard (Gain 0.91) + stacked boost.
-  p('Double Driven', 'Stacked overdrive saturated lead', [boost(8, 4), ...BRITCHIME({ drive: { amount: 6.5, blend: 0.9, midBump: 3 }, eq: { mid: 6, treble: 5 }, cab: { brightness: 5, body: 6 } }), reverb(0.35, 0.12)]),
+  p('Comfortably Driven', 'Stacked overdrive saturated lead', [boost(8, 4), ...BRITCHIME({ drive: { amount: 6.5, blend: 0.9, midBump: 3 }, eq: { mid: 6, treble: 5 }, cab: { brightness: 5, body: 6 } }), reverb(0.35, 0.12)]),
   // GB: British Combo (Vox) dark crunch, chorus + long delay wash.
-  p('Eighties Goth', 'Dark atmospheric chorused wash', [...BRITCHIME({ drive: { amount: 4.5, blend: 0.8, midBump: 2 }, eq: { treble: 5 } }), chorus(0.6, 6, 0.4), delay(450, 0.4, 0.3), reverb(0.7, 0.28)]),
+  p('Disintegration Wash', 'Dark atmospheric chorused wash', [...BRITCHIME({ drive: { amount: 4.5, blend: 0.8, midBump: 2 }, eq: { treble: 5 } }), chorus(0.6, 6, 0.4), delay(450, 0.4, 0.3), reverb(0.7, 0.28)]),
   // GB: Blackface (Face Amp) pushed fat, bright (Tone 0.69), big body.
-  p('Fat Amp', 'Thick low-heavy fat crunch', [...BLACKFACE({ drive: { amount: 5, blend: 0.7 }, eq: { bass: 7, mid: 6, treble: 6 }, cab: { brightness: 5, body: 7 } }), reverb(0.3, 0.12)]),
-  p('Heartbroken', 'Emotive sustaining lead crunch', [comp(-18, 3, 3), ...BRITCRUNCH({ drive: { amount: 5, midBump: 4 } }), delay(400, 0.35, 0.2), reverb(0.6, 0.2)]),
+  p('Sabbath Lows', 'Thick low-heavy fat crunch', [...BLACKFACE({ drive: { amount: 5, blend: 0.7 }, eq: { bass: 7, mid: 6, treble: 6 }, cab: { brightness: 5, body: 7 } }), reverb(0.3, 0.12)]),
+  p('Parisienne Cry', 'Emotive sustaining lead crunch', [comp(-18, 3, 3), ...BRITCRUNCH({ drive: { amount: 5, midBump: 4 } }), delay(400, 0.35, 0.2), reverb(0.6, 0.2)]),
   // GB: Small Tweed combo cranked (Gain 1.0) + boost + honky midrange.
-  p('Honk n\' Drive', 'Nasal midrange-honky overdrive', [wah(6, 8, 0.5), boost(3, 5), ...TWEED({ drive: { amount: 6, tone: 5, blend: 0.85, midBump: 3 }, eq: { mid: 7, midFreq: 1200 }, cab: { brightness: 5, body: 6 } }), reverb(0.3, 0.1)]),
-  p('Indie Scorcher', 'Scrappy bright lo-fi indie distortion', [fuzz(4, 6, 4), ...BRITCRUNCH({ drive: { amount: 3, blend: 0.7 }, eq: { treble: 6 }, cab: { brightness: 5, body: 5 } }), reverb(0.3, 0.1)]),
-  p('Old School Punk', 'Raw fast buzzsaw punk distortion', [...BRITCRUNCH({ drive: { amount: 6, tone: 7, midBump: 1 }, eq: { bass: 5, mid: 5, treble: 7 }, cab: { brightness: 6, body: 5 } }), reverb(0.25, 0.08)]),
+  p('Voodoo Honk', 'Nasal midrange-honky overdrive', [wah(6, 8, 0.5), boost(3, 5), ...TWEED({ drive: { amount: 6, tone: 5, blend: 0.85, midBump: 3 }, eq: { mid: 7, midFreq: 1200 }, cab: { brightness: 5, body: 6 } }), reverb(0.3, 0.1)]),
+  p('Debaser Fuzz', 'Scrappy bright lo-fi indie distortion', [fuzz(4, 6, 4), ...BRITCRUNCH({ drive: { amount: 3, blend: 0.7 }, eq: { treble: 6 }, cab: { brightness: 5, body: 5 } }), reverb(0.3, 0.1)]),
+  p('Blitzkrieg Buzz', 'Raw fast buzzsaw punk distortion', [...BRITCRUNCH({ drive: { amount: 6, tone: 7, midBump: 1 }, eq: { bass: 5, mid: 5, treble: 7 }, cab: { brightness: 6, body: 5 } }), reverb(0.25, 0.08)]),
   panningSwirl,
-  p('Practice Space', 'Roomy garage practice-amp crunch', [...BRITCRUNCH({ drive: { amount: 4 }, cab: { brightness: 5, body: 5 } }), reverb(0.5, 0.22)]),
+  p('Basement Tapes', 'Roomy garage practice-amp crunch', [...BRITCRUNCH({ drive: { amount: 4 }, cab: { brightness: 5, body: 5 } }), reverb(0.5, 0.22)]),
   // GB: Blackface (Face Amp) platform driven to razor gain (Drive 1.0) + wah.
-  p('Razor Amp', 'Sharp slicing tight high-gain', [gate(3), boost(6, 6), wah(7, 7, 0.4), ...BLACKFACE({ drive: { amount: 6, tone: 7, blend: 0.9, midBump: 1 }, eq: { treble: 7 }, cab: { brightness: 6, body: 5 } }), reverb(0.3, 0.1)]),
+  p('Rage Razor', 'Sharp slicing tight high-gain', [gate(3), boost(6, 6), wah(7, 7, 0.4), ...BLACKFACE({ drive: { amount: 6, tone: 7, blend: 0.9, midBump: 1 }, eq: { treble: 7 }, cab: { brightness: 6, body: 5 } }), reverb(0.3, 0.1)]),
   // GB: British Combo (Vox) cranked (Gain 0.91) arena rock + wah + delay.
-  p('Royal Rock', 'Classic British arena-rock crunch', [...BRITCHIME({ drive: { amount: 6, blend: 0.88, midBump: 3 }, eq: { mid: 6, treble: 5 }, cab: { brightness: 5, body: 6 } }), delay(350, 0.25, 0.12), reverb(0.4, 0.14)]),
-  p('Starlit Cavern', 'Spacious cavernous ambient distortion', [...MODERN({ drive: { amount: 6 } }), chorus(0.5, 4, 0.3), delay(500, 0.45, 0.32), widener(6), reverb(0.9, 0.35)]),
-  p('Swampland', 'Swampy southern tremolo-crunch', [...TWEED({ drive: { amount: 5, tone: 4, blend: 0.8 }, cab: { brightness: 4, body: 7 } }), tremolo(4, 0.6, 0), reverb(0.45, 0.16)]),
+  p('Bohemian Crunch', 'Classic British arena-rock crunch', [...BRITCHIME({ drive: { amount: 6, blend: 0.88, midBump: 3 }, eq: { mid: 6, treble: 5 }, cab: { brightness: 5, body: 6 } }), delay(350, 0.25, 0.12), reverb(0.4, 0.14)]),
+  p('Moonage Cavern', 'Spacious cavernous ambient distortion', [...MODERN({ drive: { amount: 6 } }), chorus(0.5, 4, 0.3), delay(500, 0.45, 0.32), widener(6), reverb(0.9, 0.35)]),
+  p('Bayou Rising', 'Swampy southern tremolo-crunch', [...TWEED({ drive: { amount: 5, tone: 4, blend: 0.8 }, cab: { brightness: 4, body: 7 } }), tremolo(4, 0.6, 0), reverb(0.45, 0.16)]),
   woollyOctave,
 ];
 

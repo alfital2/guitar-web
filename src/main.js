@@ -18,19 +18,20 @@ import { detectPitchMPM } from './pitch/mpm.js';
 import { freqToNote, noteLabel } from './pitch/note.js';
 import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
-import { measureLoudnessGain, isNeuralChain } from './normalize.js';
+import { measureLoudnessGain } from './normalize.js';
 import { mountTransport } from './transport-ui.js';
-import { renderTrackLane, PX_PER_SEC, getSelectedClips, clearClipSelection } from './track-lane.js';
+import { renderTrackLane, PX_PER_SEC, beatPx, getSelectedClips, clearClipSelection, setClipSelection } from './track-lane.js';
 import { punchTakes } from './take-ops.js';
 import { createRecorder } from './recorder.js';
 import { createPlayer } from './player.js';
 import { drawWaveform } from './waveform.js';
-import { cloneTake, splitTakeAt, resolveNoOverlap } from './clip-ops.js';
+import { cloneTake, splitTakeAt, resolveNoOverlap, clampRepeat, planPaste } from './clip-ops.js';
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
 import { connectInputChannel } from './audio/input-channel.js';
+import { maybeShowSafariNotice } from './browser-notice.js';
 
 const $ = id => document.getElementById(id);
 let ctx, stream, source, engine, gainOut, normGain, analyser, rafId;
@@ -135,20 +136,78 @@ document.addEventListener('keydown', (e) => {
   renderTrack(); updateTransport();
 });
 
-// ── Clip clipboard + ops (right-click menu) ──
-let clipboard = null;
-function copyClip(trackId, n) {
-  const t = tracks.find((k) => k.id === trackId); const tk = t && t.takes.find((k) => k.n === n);
-  if (tk) clipboard = cloneTake(tk);
+// ── Clip clipboard + ops (⌘/Ctrl shortcuts + right-click menu) ──
+// Internal only — the OS clipboard is not involved. Entries remember their
+// source track and their x relative to the leftmost copied clip, so paste can
+// keep the arrangement. Samples stay shared (immutable app-wide; clip-ops.js).
+let clipboard = null; // { clips: [{ trackId, dx, take }] } — leftmost dx = 0
+function copyClips(items) {
+  const found = [];
+  for (const it of items) {
+    const t = tracks.find((k) => k.id === it.trackId);
+    const tk = t && t.takes.find((k) => k.n === it.n);
+    if (tk) found.push({ trackId: t.id, take: cloneTake(tk) });
+  }
+  if (!found.length) return false;
+  const minX = Math.min(...found.map((f) => f.take.x || 0));
+  clipboard = { clips: found.map((f) => ({ trackId: f.trackId, dx: (f.take.x || 0) - minX, take: f.take })) };
+  return true;
 }
-function pasteClip(trackId) {
-  if (!clipboard) return;
-  const t = tracks.find((k) => k.id === trackId) || armedTrack();
-  if (!t) return;
+// Paste at the playhead. A single-track clipboard goes to `explicitTrackId`
+// (right-clicked strip), else the armed track, else its source track; a
+// multi-track clipboard pastes each clip back into its ORIGINATING track
+// (GarageBand), keeping the stored arrangement with the leftmost clip landing
+// at the (snapped) playhead. Fresh take numbers; one undo step; the pasted
+// clips become the new selection.
+function pasteClipboard(explicitTrackId) {
+  if (!clipboard || !clipboard.clips.length) return;
+  let clips = clipboard.clips;
+  const srcIds = new Set(clips.map((c) => c.trackId));
+  if (srcIds.size === 1) {
+    const target = (explicitTrackId != null && tracks.find((t) => t.id === explicitTrackId))
+      || armedTrack() || tracks.find((t) => t.id === clips[0].trackId);
+    if (!target) return;
+    clips = clips.map((c) => ({ ...c, trackId: target.id }));
+  } else {
+    clips = clips.filter((c) => tracks.some((t) => t.id === c.trackId)); // a source track may be gone
+    if (!clips.length) return;
+    const minDx = Math.min(...clips.map((c) => c.dx)); // re-anchor: leftmost survivor lands at the playhead
+    if (minDx) clips = clips.map((c) => ({ ...c, dx: c.dx - minDx }));
+  }
+  const occ = new Map(tracks.map((t) => [t.id, t.takes.map((k) => ({ x: k.x, w: clipWidth(k) }))]));
+  const placed = planPaste(clips, snapPx(playheadSec * PX_PER_SEC), occ, clipWidth);
   pushUndo();
-  const w = clipWidth(clipboard);
-  const x = Math.max(0, Math.round(resolveNoOverlap(t.takes.map((k) => ({ x: k.x, w: clipWidth(k) })), snapPx(playheadSec * PX_PER_SEC), w)));
-  t.takes.push({ ...cloneTake(clipboard), n: ++takeSeq, x });
+  const pasted = [];
+  for (const p of placed) {
+    const t = tracks.find((k) => k.id === p.trackId);
+    const nu = { ...cloneTake(p.take), n: ++takeSeq, x: p.x };
+    t.takes.push(nu);
+    pasted.push({ trackId: t.id, n: nu.n });
+  }
+  setClipSelection(pasted); // renderTrack re-applies the highlight
+  renderTrack(); updateTransport();
+}
+// Duplicate each clip onto ITS OWN track, immediately after the original's
+// span end (⌘/Ctrl+D). One undo step; the copies become the new selection.
+function duplicateClips(items) {
+  const clips = [];
+  for (const it of items) {
+    const t = tracks.find((k) => k.id === it.trackId);
+    const tk = t && t.takes.find((k) => k.n === it.n);
+    if (tk) clips.push({ trackId: t.id, dx: (tk.x || 0) + clipWidth(tk), take: cloneTake(tk) });
+  }
+  if (!clips.length) return;
+  const occ = new Map(tracks.map((t) => [t.id, t.takes.map((k) => ({ x: k.x, w: clipWidth(k) }))]));
+  const placed = planPaste(clips, 0, occ, clipWidth); // dx alone = right after each original
+  pushUndo();
+  const dupes = [];
+  for (const p of placed) {
+    const t = tracks.find((k) => k.id === p.trackId);
+    const nu = { ...cloneTake(p.take), n: ++takeSeq, x: p.x };
+    t.takes.push(nu);
+    dupes.push({ trackId: t.id, n: nu.n });
+  }
+  setClipSelection(dupes);
   renderTrack(); updateTransport();
 }
 function splitClip(trackId, n) {
@@ -166,6 +225,36 @@ function deleteClips(items) {
   renderTrack(); updateTransport();
 }
 function deleteClip(trackId, n) { deleteClips([{ trackId, n }]); }
+
+// ── Clipboard shortcuts (Mac ⌘ / Windows Ctrl): C copy, X cut, V paste at
+// playhead, D duplicate in place, A select all clips. Shortcuts fall through
+// to the browser whenever they'd be a no-op here (nothing selected / empty
+// clipboard / no clips at all) and inside text fields.
+document.addEventListener('keydown', (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+  const key = e.key.toLowerCase();
+  if (key !== 'c' && key !== 'x' && key !== 'v' && key !== 'd' && key !== 'a') return;
+  if (/^(INPUT|TEXTAREA)$/.test((e.target.tagName || '')) || e.target.isContentEditable) return;
+  if (key === 'a') {
+    const all = tracks.flatMap((t) => t.takes.map((k) => ({ trackId: t.id, n: k.n })));
+    if (!all.length) return;
+    e.preventDefault();
+    setClipSelection(all, $('track-lane')); // highlight in place, no re-render
+    return;
+  }
+  if (key === 'v') {
+    if (!clipboard) return;
+    e.preventDefault();
+    pasteClipboard();
+    return;
+  }
+  const sel = getSelectedClips();
+  if (!sel.length) return;
+  e.preventDefault();
+  if (key === 'c') copyClips(sel);
+  else if (key === 'x') { if (copyClips(sel)) deleteClips(sel); } // cut = copy + delete (one undo step)
+  else duplicateClips(sel);
+});
 
 let ctxMenu = null;
 function closeCtxMenu() { if (ctxMenu) { ctxMenu.remove(); ctxMenu = null; } }
@@ -192,7 +281,7 @@ let playheadSec = 0;
 function setPlayhead(sec) {
   playheadSec = Math.max(0, sec || 0);
   const ph = $('track-lane') && $('track-lane').querySelector('.track-playhead');
-  if (ph) ph.style.left = `${playheadSec * PX_PER_SEC}px`;
+  if (ph) ph.style.left = `${playheadSec * PX_PER_SEC * zoomLevel}px`;
 }
 // Enable play/skip once there is something to play.
 // Reflect playback state on the play button: ▶ when stopped, ⏸ while playing.
@@ -219,8 +308,12 @@ let currentChain = [];   // array of units (chain-state model) — source of tru
 let nextId = 1;          // monotonic instanceId source
 let normTimer = null;    // debounce handle for loudness re-measure
 let normSig = null;      // last-measured chain structure signature
-let currentNormDb = null; // fixed loudness offset for neural presets — the offline
-                          // measure can't load their wasm+model (design §7)
+let normToken = 0;       // monotonic measure id — only the NEWEST measure may land
+let normRetries = 0;     // bounded retries after an untrustworthy (null) measure
+let normApplyCount = 0;  // how many gains have landed (e2e bridge observes this)
+const normCache = new Map(); // param-inclusive chain key -> measured gain (session-scoped)
+let normMutePending = false; // preset/amp loads: HOLD SILENCE until the measured gain lands
+let normPrevGain = null;     // gain to restore if a muted measure ultimately fails
 
 const isSafari = /^((?!chrome|android|crios|fxios|edg).)*safari/i.test(navigator.userAgent);
 const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype;
@@ -228,6 +321,13 @@ const hasSetSinkId = typeof AudioContext !== 'undefined' && 'setSinkId' in Audio
 // Liquid-glass surfaces use `backdrop-filter: url(#svg-filter)` for refraction,
 // which Safari doesn't support — enable only off Safari (gated by html.liquid).
 if (!isSafari) document.documentElement.classList.add('liquid');
+// Safari compositor relief: drops always-on backdrop-filters + animated-blend
+// composites that WebKit re-renders every frame (see index.html html.safari).
+if (isSafari) document.documentElement.classList.add('safari');
+// One-time honest heads-up that Safari's live-input path is higher-latency than
+// Chrome's (a WebKit limitation below the web layer — can't be fixed here).
+maybeShowSafariNotice(isSafari);
+if (isSafari) { const n = $('safari-latency-note'); if (n) n.hidden = false; }
 
 $('safari-warn').style.display = hasSetSinkId ? 'none' : 'block';
 
@@ -304,6 +404,16 @@ function setParamLive(instanceId, key, value) {
     if (idx >= 0) engine.setParam(idx, key, value);
   }
   chainStore.save(currentChain);
+  // Ordinary knob turns deliberately DON'T re-normalize (a volume/drive knob is
+  // supposed to change loudness). The neural `model` param is not a knob — it
+  // swaps the whole captured amp, whose inherent level varies by 10+ dB — so
+  // treat it like a preset change and re-measure.
+  const unit = currentChain.find((u) => u.instanceId === instanceId);
+  if (unit && unit.type === 'neuralamp' && key === 'model') {
+    normMutePending = true; // an amp swap holds silence until its gain lands
+    normSig = null;
+    scheduleNormalize();
+  }
 }
 
 // Amp knob changes. The reverb group routes to the amp reverb stage; all other
@@ -378,8 +488,10 @@ function loadPreset(preset) {
   const r = chainState.fromPreset(rest, nextId);
   currentChain = r.chain; nextId = r.nextId;
   activePresetName = preset.name;
-  // Neural presets ship a fixed, pre-measured normDb (applied in scheduleNormalize).
-  currentNormDb = typeof preset.normDb === 'number' ? preset.normDb : null;
+  normMutePending = true; // hold silence until this preset's gain is measured
+  normSig = null; // a preset load ALWAYS re-measures loudness — two presets can
+                  // share a chain signature (same types, different params) yet
+                  // differ hugely in level (e.g. the five neural amp models)
   rebuildGraph();
   saveTrackPatch(armedTrack()); // the armed track now owns this preset
   renderBrowser();
@@ -405,10 +517,72 @@ function loadTrackPatch(track) {
   const r = chainState.fromPreset(p.chain.filter((e) => registry[e.type]), nextId);
   currentChain = r.chain; nextId = r.nextId;
   activePresetName = p.name || null;
-  currentNormDb = null; // track patches don't persist normDb; neural falls back to unity
+  normMutePending = true; // hold silence until the patch's gain is measured
+  normSig = null; // patch loads re-measure like preset loads (params differ)
   rebuildGraph();
   renderBrowser();
   return true;
+}
+
+// Deep-clone a track's sound patch (chain + amp reverb + preset name). Sample
+// buffers are shared (immutable); everything else is copied so the duplicate is
+// fully independent.
+function clonePatch(p) {
+  if (!p) return null;
+  return {
+    chain: (p.chain || []).map((u) => ({ type: u.type, params: { ...u.params }, bypassed: !!u.bypassed })),
+    reverb: p.reverb ? { ...p.reverb } : null,
+    name: p.name || null,
+  };
+}
+
+// Duplicate an ENTIRE track: its recorded takes (with every edit — position,
+// trim window, loop repeat), its mixer state (volume/pan/mute/solo), and its
+// full amp + effects patch. The copy lands directly beneath the source. The
+// armed track is untouched, so the live audio graph isn't disturbed.
+function duplicateTrack(trackId) {
+  const src = tracks.find((t) => t.id === trackId);
+  if (!src) return;
+  pushUndo();
+  // Make sure the armed track's patch reflects the LIVE chain before we clone
+  // (a non-armed track's patch is already current from when it was left).
+  saveTrackPatch(armedTrack());
+  const copy = {
+    id: nextTrackId++,
+    name: `${src.name || 'Track'} copy`,
+    armed: false,
+    takes: src.takes.map((tk) => ({ ...cloneTake(tk), n: ++takeSeq })),
+    volume: src.volume == null ? 0.8 : src.volume,
+    pan: src.pan || 0,
+    mute: !!src.mute,
+    solo: !!src.solo,
+    patch: clonePatch(src.patch),
+  };
+  const i = tracks.findIndex((t) => t.id === trackId);
+  tracks.splice(i + 1, 0, copy); // insert right below the source
+  renderTrack(); updateTransport(); syncMix();
+}
+
+// Remove a track (shared by the header ✕ button and the right-click menu).
+function removeTrack(id) {
+  pushUndo();
+  const removingArmed = armedId === id;
+  tracks = tracks.filter((t) => t.id !== id);
+  if (removingArmed) {
+    armedId = tracks.length ? tracks[tracks.length - 1].id : null;
+    loadTrackPatch(armedTrack()); // restore the newly-armed track's patch
+  }
+  tracks.forEach((t) => { t.armed = t.id === armedId; });
+  renderTrack(); updateTransport();
+}
+
+// Right-click track menu. One place to add future per-track actions (color,
+// freeze, export, reorder …) — the contextmenu wiring just calls this.
+function trackMenuItems(trackId) {
+  return [
+    ctxItem('Duplicate Track', () => duplicateTrack(trackId)),
+    ctxItem('Delete Track', () => removeTrack(trackId)),
+  ];
 }
 
 function renderBrowser() {
@@ -417,12 +591,22 @@ function renderBrowser() {
 }
 
 let snapOn = true;
-const SNAP_PX = 16; // one beat (0.5s @ 120 BPM 4/4) at 32 px/sec
+// Current tempo mirrored from the transport (updated via onTempoChange). A plain
+// module var — NOT read off `transport`, which is a const declared later and
+// would be in its temporal dead zone during the initial renderTrack().
+let uiBpm = 120;
+// Timeline view zoom (persisted). A pure view multiplier — take positions stay
+// in base px, so zooming never moves audio (see track-lane.js).
+let zoomLevel = chainStore.loadZoom();
+// Snap to the BEAT grid at the current tempo (one beat = 60/bpm sec × PX_PER_SEC
+// → 16px @120, 24px @80). Was a hardcoded 16px, which only matched 120 BPM.
 // Hold Ctrl to bypass snapping entirely (free, sub-pixel-precise placement).
-function snapPx(x, free) { return (snapOn && !free) ? Math.round(x / SNAP_PX) * SNAP_PX : x; }
-// Visible/played length of a take in seconds — `len` once trimmed, else the full
-// recorded `duration`. `offset` is how far into the samples playback starts.
-const clipLen = (tk) => (tk.len != null ? tk.len : (tk.duration || 0));
+function snapPx(x, free) { if (!snapOn || free) return x; const b = beatPx(uiBpm); return Math.round(x / b) * b; }
+// Visible/played SPAN of a take in seconds — the trim window (`len` once
+// trimmed, else the full recorded `duration`) times its loop `repeat`
+// (GarageBand loop-drag; absent/1 = no loop). `offset` is how far into the
+// samples playback starts. All overlap/width math sees the full looped span.
+const clipLen = (tk) => (tk.len != null ? tk.len : (tk.duration || 0)) * (tk.repeat > 1 ? tk.repeat : 1);
 const clipWidth = (tk) => Math.max(8, Math.round(clipLen(tk) * PX_PER_SEC));
 
 // Overwrite the audio under a new take [newStart, newEnd] on its track.
@@ -441,6 +625,16 @@ function renderTrack() {
     armedId,
     snap: snapOn,
     playheadSec,
+    bpm: uiBpm,
+    zoom: zoomLevel,
+    onZoom: (z, anchor) => {
+      zoomLevel = z; chainStore.saveZoom(z); renderTrack();
+      // Wheel/pinch zoom: keep the time under the cursor stationary.
+      if (anchor) {
+        const tl = $('track-lane')?.querySelector('.track-timeline');
+        if (tl) tl.scrollLeft = Math.max(0, anchor.anchorSec * PX_PER_SEC * z - anchor.cursorPx);
+      }
+    },
     onToggleSnap: () => { snapOn = !snapOn; renderTrack(); },
     onAddTrack: () => {
       pushUndo();
@@ -455,17 +649,7 @@ function renderTrack() {
     onSolo: (id) => { const t = tracks.find((k) => k.id === id); if (t) { pushUndo(); t.solo = !t.solo; syncMix(); renderTrack(); } },
     onVolume: (id, v) => { const t = tracks.find((k) => k.id === id); if (t) { t.volume = v; if (player.isPlaying()) { const anySolo = tracks.some((k) => k.solo); player.setTrackGain(id, trackGain(t, anySolo)); } } },
     onPan: (id, p) => { const t = tracks.find((k) => k.id === id); if (t) { t.pan = p; if (player.isPlaying()) player.setTrackPan(id, p); } },
-    onRemoveTrack: (id) => {
-      pushUndo();
-      const removingArmed = armedId === id;
-      tracks = tracks.filter((t) => t.id !== id);
-      if (removingArmed) {
-        armedId = tracks.length ? tracks[tracks.length - 1].id : null;
-        loadTrackPatch(armedTrack()); // restore the newly-armed track's patch
-      }
-      tracks.forEach((t) => { t.armed = t.id === armedId; });
-      renderTrack(); updateTransport();
-    },
+    onRemoveTrack: (id) => removeTrack(id),
     // Switching tracks saves the current track's patch and restores the target's.
     onArm: (id) => {
       if (id === armedId) return;
@@ -484,6 +668,18 @@ function renderTrack() {
     onTrimClip: (trackId, n, offset, len, x) => {
       const t = tracks.find((k) => k.id === trackId); const tk = t && t.takes.find((k) => k.n === n);
       if (tk) { pushUndo(); tk.offset = Math.max(0, offset); tk.len = Math.max(0.05, len); tk.x = Math.max(0, Math.round(x)); renderTrack(); }
+    },
+    // Loop a clip (GarageBand loop handle): `repeat` window repetitions, the
+    // last possibly partial. Non-destructive — only the repeat field changes.
+    // Clamped so the extended span never runs into the next clip on the track.
+    onLoopClip: (trackId, n, repeat) => {
+      const t = tracks.find((k) => k.id === trackId); const tk = t && t.takes.find((k) => k.n === n);
+      if (!tk) return;
+      const len = tk.len != null ? tk.len : (tk.duration || 0);
+      if (!(len > 0)) return;
+      pushUndo();
+      tk.repeat = clampRepeat(occupiedExcept(t, n), tk.x || 0, len, repeat, PX_PER_SEC);
+      renderTrack(); updateTransport();
     },
     // Group move: each clip avoids overlapping the clips that AREN'T moving, but
     // moving clips don't fight each other. One undo, one re-render.
@@ -519,35 +715,76 @@ function loadStoredChain(data) {
   const valid = rest.filter((e) => registry[e.type]); // drop unknown types defensively
   const r = chainState.fromPreset(valid, nextId);
   currentChain = r.chain; nextId = r.nextId;
-  currentNormDb = null; // persisted chains don't carry normDb; neural falls back to unity
+  normMutePending = true; // hold silence until the restored chain's gain is measured
+  normSig = null; // restored chains re-measure like preset loads
   rebuildGraph();
+}
+
+// Apply a normalization gain with a short ramp (~50 ms) instead of a hard step
+// — a step is audible and lands in recordings (the recorder taps normGain).
+function applyNormGain(g) {
+  if (!normGain) return;
+  if (ctx && normGain.gain.setTargetAtTime) normGain.gain.setTargetAtTime(g, ctx.currentTime, 0.05);
+  else normGain.gain.value = g;
+  normApplyCount++;
+}
+
+// Param-inclusive cache key: two presets can share a structure signature yet
+// need very different gains (params!), and repeat visits to the same preset
+// should get their gain INSTANTLY (no multi-second wrong-gain window while the
+// offline measure — wasm compile included, for neural — runs).
+function normCacheKey() {
+  return JSON.stringify(chainState.toEngineChain(currentChain)) + `|rv${ampReverb.size},${ampReverb.mix}`;
 }
 
 // Re-measure loudness normalization whenever the chain STRUCTURE changes
 // (debounced). Param-only edits keep the signature, so they don't re-measure.
+// One unified path: neural chains render offline too (their wasm/model
+// handshake completes before startRendering — see normalize.js).
 function scheduleNormalize() {
   if (!normGain) return;
-  // Neural presets: skip the offline render entirely — their AudioWorklet wasm +
-  // .nam model can't be loaded/awaited in an OfflineAudioContext (design §7).
-  // Apply the preset's fixed, pre-measured normDb directly (0 dB / unity if the
-  // chain arrived without one, e.g. restored via a track patch).
-  if (isNeuralChain(currentChain)) {
-    normGain.gain.value = 10 ** ((currentNormDb ?? 0) / 20);
-    normSig = null;          // force a fresh measure when a normal preset loads next
-    clearTimeout(normTimer);
-    return;
-  }
   // Reverb wet mix affects output loudness, so fold it into the signature.
   const sig = chainState.signature(currentChain) + `|rv${ampReverb.size},${ampReverb.mix}`;
   if (sig === normSig) return;
   normSig = sig;
   clearTimeout(normTimer);
+  const my = ++normToken; // any older in-flight measure is now void
+  const key = normCacheKey();
+  const cached = normCache.get(key);
+  if (cached != null) { normRetries = 0; normMutePending = false; normPrevGain = null; applyNormGain(cached); return; }
+  // Preset/amp loads hold SILENCE until the measured gain lands, so the user
+  // never hears the brief unmatched level while the offline measure runs. The
+  // debounce is skipped too — start measuring immediately.
+  const muted = normMutePending;
+  if (muted) {
+    normMutePending = false;
+    if (normPrevGain == null) normPrevGain = normGain.gain.value; // restore point if the measure fails
+    try { normGain.gain.cancelScheduledValues(ctx ? ctx.currentTime : 0); } catch {}
+    normGain.gain.value = 0;
+  }
   normTimer = setTimeout(async () => {
     try {
       const g = await measureLoudnessGain(chainState.toEngineChain(currentChain), { sampleRate: ctx ? ctx.sampleRate : 48000, reverb: ampReverb });
-      if (normGain && chainState.signature(currentChain) === sig) normGain.gain.value = g;
+      // Only the newest measure may land — a monotonic token, not a signature
+      // compare (all five neural amp presets share one signature, and the old
+      // suffix-mismatched compare silently disabled normalization for months).
+      if (normToken !== my || !normGain) return;
+      if (g == null) {
+        // Untrustworthy measure (handshake timeout / worklet failure / silent
+        // render): retry a bounded number of times. If we were holding silence
+        // and ran out of retries, restore the pre-load gain — a wrong level
+        // beats a dead rig.
+        if (normRetries < 2) { normRetries++; normSig = null; normTimer = setTimeout(scheduleNormalize, 2500); }
+        else if (normPrevGain != null) { applyNormGain(normPrevGain); normPrevGain = null; }
+        return;
+      }
+      normRetries = 0;
+      normPrevGain = null;
+      normCache.set(key, g);
+      if (normCache.size > 60) normCache.delete(normCache.keys().next().value);
+      applyNormGain(g); // ramps up from silence on muted loads (~50 ms)
     } catch (e) { console.warn('loudness normalize failed:', e); }
-  }, 150);
+  }, muted ? 0 : 150);
 }
 
 function showStats() {
@@ -731,7 +968,24 @@ async function start() {
         echoCancellation: false, noiseSuppression: false, autoGainControl: false, latency: 0 },
       video: false,
     });
-    ctx = new AudioContext({ latencyHint: 'interactive' });
+    // Safari: 'interactive' still yields a conservative buffer; an explicit
+    // numeric hint (seconds) asks for the hardware minimum — WebKit clamps it
+    // to what the device can do, so 0.005 is safe. Chrome already gives its
+    // minimum for 'interactive'.
+    //
+    // Safari + rate mismatch: WebKit's AudioContext follows the OUTPUT device
+    // rate (often 44.1k), while an audio interface capturing at 48k then goes
+    // through WebKit's slow input resampler — a known chunk of Safari's extra
+    // input latency (Chromium resamples in small buffers). Pin the context to
+    // the INPUT track's real rate so the capture path is 1:1; any resample
+    // moves to the output side, which CoreAudio handles cheaply.
+    const trackRate = (() => {
+      try { return stream.getAudioTracks()[0].getSettings().sampleRate || 0; } catch { return 0; }
+    })();
+    ctx = new AudioContext({
+      latencyHint: isSafari ? 0.005 : 'interactive',
+      ...(isSafari && trackRate ? { sampleRate: trackRate } : {}),
+    });
     await ctx.resume();
 
     // Preload AudioWorklet processors (pitch shift, looper) before any chain is
@@ -739,6 +993,11 @@ async function start() {
     try { await loadWorklets(ctx); } catch (e) { console.warn('worklet load failed:', e); }
 
     $('sr').textContent = ctx.sampleRate + ' Hz';
+    // Diagnose the input path: a track-vs-context rate mismatch means an input
+    // resampler sits in the capture path (extra latency, worst on Safari).
+    { const d = $('diag');
+      if (d) d.textContent = `${isSafari ? 'Safari' : 'Chrome'} · in ${trackRate || '?'} Hz → ctx ${ctx.sampleRate} Hz${trackRate && trackRate !== ctx.sampleRate ? ' (RESAMPLING)' : ''} · buf ${Math.round((ctx.baseLatency || 0) * ctx.sampleRate)} frames (${((ctx.baseLatency || 0) * 1000).toFixed(1)} ms)`;
+    }
 
     const outId = $('output').value;
     if (outId && outId !== 'default' && hasSetSinkId) { try { await ctx.setSinkId(outId); } catch {} }
@@ -827,6 +1086,8 @@ function installE2EBridge() {
   const api = {
     booted: () => !!ctx && ctx.state === 'running',
     sampleRate: () => ctx.sampleRate,
+    normGainValue: () => (normGain ? normGain.gain.value : null),
+    normApplyCount: () => normApplyCount,
     clock: () => ({ ctxTime: ctx.currentTime, wall: performance.now() }),
     proPresetNames: () => (proCat() ? proCat().presets.map((p) => p.name) : []),
     chainTypes: () => currentChain.map((u) => u.type),
@@ -890,6 +1151,12 @@ function stop() {
   { const c = $('note-circle'); if (c) { c.textContent = '—'; c.classList.remove('active'); } }
   if (stream) stream.getTracks().forEach(t => t.stop());
   if (ctx) ctx.close();
+  // Reset normalization bookkeeping: the next power-on rebuilds normGain at
+  // unity, so the same chain MUST re-measure (or re-apply from cache) — a stale
+  // normSig would skip that and leave the chain un-normalized (~15 dB hot on a
+  // loud amp). Bump the token so any in-flight measure can't land on the new
+  // graph.
+  normSig = null; normToken++; normRetries = 0; clearTimeout(normTimer);
   ctx = stream = source = engine = gainOut = normGain = analyser = calibrationEq = reverbStage = inputSplitter = null;
   chMeters = null; vuLevel = 0;
   { const n = $('amp')?.querySelector('.amp-vu-needle'); if (n) n.style.transform = 'rotate(-50deg)'; }
@@ -1012,6 +1279,8 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
 const transport = mountTransport($('transport-cluster'), {
   getLiveAnalyser: () => analyser,
   onGain: (v) => { if (gainOut) gainOut.gain.value = v; },
+  // Tempo drives the ruler grid + beat snap — re-render the lane on change.
+  onTempoChange: (n) => { uiBpm = n; renderTrack(); },
 });
 
 // Record: capture the live processed output into a take, append it as a clip.
@@ -1025,6 +1294,7 @@ const transport = mountTransport($('transport-cluster'), {
     if (recorder.isRecording()) {
       clearLiveClip();
       const t = recorder.stop();
+      if (player.isPlaying()) player.stop(); // stop the overdub backing playback
       transport.endSession();
       recBtn.classList.remove('recording');
       restoreFoldIfIdle(); // transport idle again — un-fold to the pre-record state
@@ -1045,16 +1315,24 @@ const transport = mountTransport($('transport-cluster'), {
         if (!ctx || recorder.isRecording()) return;
         recorder.start();
         recBtn.classList.add('recording');
+        // Recording starts AT the playhead (where the user parked it), not at
+        // the end of the track. The clip + the stored take share this anchor.
+        const startSec = Math.max(0, playheadSec);
+        // Overdub: play back every OTHER track from the same anchor so you can
+        // record along to what's already there. The armed track is excluded —
+        // its audio in this region is about to be overwritten (punchOver). The
+        // record loop below owns the playhead, so the player gets no-op
+        // tick/end callbacks and never fights it or resets it on backing-end.
+        const backing = buildGroups().filter((g) => g.id !== track.id);
+        if (backing.some((g) => (g.takes || []).length)) player.play(backing, startSec, () => {}, () => {});
         // Grow a purple clip in real time in the armed track's strip.
         const area = $('track-lane') && $('track-lane').querySelector(`.track-strip[data-track-id="${track.id}"]`);
         if (area) {
-          // Recording starts AT the playhead (where the user parked it), not at
-          // the end of the track. The clip + the stored take share this anchor.
-          const startT = ctx.currentTime, startSec = Math.max(0, playheadSec);
-          const x = Math.round(startSec * PX_PER_SEC); recStartX = x;
+          const startT = ctx.currentTime;
+          const x = Math.round(startSec * PX_PER_SEC); recStartX = x; // BASE px (model)
           liveClip = document.createElement('div');
           liveClip.className = 'track-clip recording-clip';
-          liveClip.style.cssText = `left:${x}px;top:6px;height:80px;width:0px`;
+          liveClip.style.cssText = `left:${Math.round(x * zoomLevel)}px;top:6px;height:80px;width:0px`;
           const lbl = document.createElement('div'); lbl.className = 'clip-label'; lbl.textContent = `${track.name || 'Take'} #${takeSeq + 1}`;
           const canvas = document.createElement('canvas'); canvas.className = 'clip-wave'; canvas.height = 80;
           liveClip.append(lbl, canvas);
@@ -1063,7 +1341,7 @@ const transport = mountTransport($('transport-cluster'), {
           const grow = () => {
             if (!liveClip) return;
             const elapsed = ctx.currentTime - startT;
-            const w = Math.max(0, elapsed * PX_PER_SEC);
+            const w = Math.max(0, elapsed * PX_PER_SEC * zoomLevel); // view px
             liveClip.style.width = `${w}px`;
             setPlayhead(startSec + elapsed); // playhead rides the leading edge while recording
             const now = performance.now();
@@ -1112,7 +1390,7 @@ const transport = mountTransport($('transport-cluster'), {
   function seekToClientX(clientX, free) {
     const tl = lane.querySelector('.track-timeline');
     if (!tl) return;
-    const x = e_x(clientX, tl);
+    const x = e_x(clientX, tl) / zoomLevel; // view px → base (model) px
     player.stop(); reflectPlay(); restoreFoldIfIdle();
     setPlayhead(snapPx(Math.max(0, x), free) / PX_PER_SEC);
   }
@@ -1124,8 +1402,15 @@ const transport = mountTransport($('transport-cluster'), {
       if (!tl || !tl.contains(e.target)) return;
       seekToClientX(e.clientX, e.ctrlKey);
     });
-    // Right-click: clip → Copy/Paste/Split/Delete; empty strip → Paste.
+    // Right-click: track header → track menu; clip → Copy/Paste/Split/Delete;
+    // empty strip → Paste.
     lane.addEventListener('contextmenu', (e) => {
+      const header = e.target.closest('.track-header');
+      if (header && header.dataset.trackId) {
+        e.preventDefault();
+        openCtxMenu(e.clientX, e.clientY, trackMenuItems(Number(header.dataset.trackId)));
+        return;
+      }
       const clip = e.target.closest('.track-clip');
       if (clip && clip.dataset.takeId) {
         e.preventDefault();
@@ -1135,10 +1420,14 @@ const transport = mountTransport($('transport-cluster'), {
         const sel = getSelectedClips();
         const inSel = sel.some((s) => s.trackId === tid && s.n === n);
         const targets = inSel && sel.length > 1 ? sel : [{ trackId: tid, n }];
+        // Looped clips don't split (v1) — splitTakeAt rejects them — so grey
+        // the item out rather than leave a silent no-op.
+        const ctxTrack = tracks.find((k) => k.id === tid);
+        const ctxTake = ctxTrack && ctxTrack.takes.find((k) => k.n === n);
         openCtxMenu(e.clientX, e.clientY, [
-          ctxItem('Copy', () => copyClip(tid, n)),
-          ctxItem('Paste at playhead', () => pasteClip(tid), !clipboard),
-          ctxItem('Split at playhead', () => splitClip(tid, n)),
+          ctxItem(targets.length > 1 ? `Copy ${targets.length} clips` : 'Copy', () => copyClips(targets)),
+          ctxItem('Paste at playhead', () => pasteClipboard(tid), !clipboard),
+          ctxItem('Split at playhead', () => splitClip(tid, n), !!(ctxTake && ctxTake.repeat > 1)),
           ctxItem(targets.length > 1 ? `Delete ${targets.length} clips` : 'Delete', () => deleteClips(targets)),
         ]);
         return;
@@ -1146,7 +1435,7 @@ const transport = mountTransport($('transport-cluster'), {
       const strip = e.target.closest('.track-strip');
       if (strip && strip.dataset.trackId) {
         e.preventDefault();
-        openCtxMenu(e.clientX, e.clientY, [ctxItem('Paste at playhead', () => pasteClip(Number(strip.dataset.trackId)), !clipboard)]);
+        openCtxMenu(e.clientX, e.clientY, [ctxItem('Paste at playhead', () => pasteClipboard(Number(strip.dataset.trackId)), !clipboard)]);
       }
     });
     lane.addEventListener('pointerdown', (e) => {

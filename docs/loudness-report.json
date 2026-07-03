@@ -1,0 +1,609 @@
+{
+  "date": "2026-07-02T21:24:45.578Z",
+  "targetLufs": -18,
+  "medianLufs": -19.46,
+  "spreadLu": 1.8299999999999983,
+  "toleranceLu": 1.5,
+  "rows": [
+    {
+      "name": "Amazing Tweed",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": -5.37,
+      "unclampedGainDb": -5.37,
+      "lufs": -19.64,
+      "peak": 0.4095,
+      "error": null
+    },
+    {
+      "name": "Brit and Clean",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": -3.2,
+      "unclampedGainDb": -3.2,
+      "lufs": -19.64,
+      "peak": 0.4934,
+      "error": null
+    },
+    {
+      "name": "Chicken Pickin'",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": -0.58,
+      "unclampedGainDb": -0.58,
+      "lufs": -19.48,
+      "peak": 0.5383,
+      "error": null
+    },
+    {
+      "name": "Clean Echoes",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": -13.5,
+      "unclampedGainDb": -13.5,
+      "lufs": -19.69,
+      "peak": 0.2913,
+      "error": null
+    },
+    {
+      "name": "Clean Studio Stack",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": 5.21,
+      "unclampedGainDb": 5.21,
+      "lufs": -19.97,
+      "peak": 0.545,
+      "error": null
+    },
+    {
+      "name": "Cool Jazz Combo",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": 9.86,
+      "unclampedGainDb": 9.86,
+      "lufs": -19.83,
+      "peak": 0.5457,
+      "error": null
+    },
+    {
+      "name": "Country Gent",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": -13.41,
+      "unclampedGainDb": -13.41,
+      "lufs": -19.47,
+      "peak": 0.3128,
+      "error": null
+    },
+    {
+      "name": "Dublin Delay",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": -5.7,
+      "unclampedGainDb": -5.7,
+      "lufs": -19.86,
+      "peak": 0.4264,
+      "error": null
+    },
+    {
+      "name": "Dyna-Trem",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": 8.16,
+      "unclampedGainDb": 8.16,
+      "lufs": -19.34,
+      "peak": 0.6811,
+      "error": null
+    },
+    {
+      "name": "Echo Studio",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": -9.55,
+      "unclampedGainDb": -9.55,
+      "lufs": -19.66,
+      "peak": 0.342,
+      "error": null
+    },
+    {
+      "name": "Heavenly Tweed",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": -6.1,
+      "unclampedGainDb": -6.1,
+      "lufs": -19.66,
+      "peak": 0.4217,
+      "error": null
+    },
+    {
+      "name": "Move the Mics",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": 2.44,
+      "unclampedGainDb": 2.44,
+      "lufs": -19.65,
+      "peak": 0.5078,
+      "error": null
+    },
+    {
+      "name": "Multi-Phase Amp",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": 4.25,
+      "unclampedGainDb": 4.25,
+      "lufs": -19.99,
+      "peak": 0.5499,
+      "error": null
+    },
+    {
+      "name": "Mystery Chorus",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": -12.99,
+      "unclampedGainDb": -12.99,
+      "lufs": -19.55,
+      "peak": 0.3661,
+      "error": null
+    },
+    {
+      "name": "Old Time Tremolo",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": 2.67,
+      "unclampedGainDb": 2.67,
+      "lufs": -19.56,
+      "peak": 0.7249,
+      "error": null
+    },
+    {
+      "name": "Spin Speaker Blues",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": -6.89,
+      "unclampedGainDb": -6.89,
+      "lufs": -19.78,
+      "peak": 0.5245,
+      "error": null
+    },
+    {
+      "name": "Surfin' in Stereo",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": 11.3,
+      "unclampedGainDb": 11.3,
+      "lufs": -19.55,
+      "peak": 0.9799,
+      "error": null
+    },
+    {
+      "name": "Vibrato Verb",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": 5.07,
+      "unclampedGainDb": 5.07,
+      "lufs": -19.4,
+      "peak": 0.6092,
+      "error": null
+    },
+    {
+      "name": "Warm British Combo",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": 0.08,
+      "unclampedGainDb": 0.08,
+      "lufs": -19.74,
+      "peak": 0.5013,
+      "error": null
+    },
+    {
+      "name": "Worlds Smallest Amp",
+      "category": "01 Clean Guitar",
+      "neural": false,
+      "appGainDb": -11.12,
+      "unclampedGainDb": -11.12,
+      "lufs": -19.78,
+      "peak": 0.4529,
+      "error": null
+    },
+    {
+      "name": "Amp Switcher",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -9.98,
+      "unclampedGainDb": -9.98,
+      "lufs": -19.46,
+      "peak": 0.3609,
+      "error": null
+    },
+    {
+      "name": "Big Brute Blues",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -15.34,
+      "unclampedGainDb": -15.34,
+      "lufs": -19.46,
+      "peak": 0.3133,
+      "error": null
+    },
+    {
+      "name": "British Invasion",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -15.37,
+      "unclampedGainDb": -15.37,
+      "lufs": -19.63,
+      "peak": 0.3587,
+      "error": null
+    },
+    {
+      "name": "Broken Up Brit",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -17.52,
+      "unclampedGainDb": -17.52,
+      "lufs": -19.6,
+      "peak": 0.3068,
+      "error": null
+    },
+    {
+      "name": "Cheap Studio Time",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -13.28,
+      "unclampedGainDb": -13.28,
+      "lufs": -19.29,
+      "peak": 0.3813,
+      "error": null
+    },
+    {
+      "name": "Chord Burner",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -11.07,
+      "unclampedGainDb": -11.07,
+      "lufs": -18.67,
+      "peak": 0.6041,
+      "error": null
+    },
+    {
+      "name": "Double Brit Phaser",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -17.47,
+      "unclampedGainDb": -17.47,
+      "lufs": -19.42,
+      "peak": 0.3839,
+      "error": null
+    },
+    {
+      "name": "Double Driven",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -22.15,
+      "unclampedGainDb": -22.15,
+      "lufs": -19.42,
+      "peak": 0.2159,
+      "error": null
+    },
+    {
+      "name": "Eighties Goth",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -16.54,
+      "unclampedGainDb": -16.54,
+      "lufs": -19.66,
+      "peak": 0.3793,
+      "error": null
+    },
+    {
+      "name": "Fat Amp",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -14.72,
+      "unclampedGainDb": -14.72,
+      "lufs": -19.51,
+      "peak": 0.3524,
+      "error": null
+    },
+    {
+      "name": "Heartbroken",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -18.79,
+      "unclampedGainDb": -18.79,
+      "lufs": -19.23,
+      "peak": 0.2704,
+      "error": null
+    },
+    {
+      "name": "Honk n' Drive",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -17.11,
+      "unclampedGainDb": -17.11,
+      "lufs": -19.59,
+      "peak": 0.3013,
+      "error": null
+    },
+    {
+      "name": "Indie Scorcher",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -21.84,
+      "unclampedGainDb": -21.84,
+      "lufs": -19.35,
+      "peak": 0.1938,
+      "error": null
+    },
+    {
+      "name": "Old School Punk",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -17.27,
+      "unclampedGainDb": -17.27,
+      "lufs": -19.35,
+      "peak": 0.3495,
+      "error": null
+    },
+    {
+      "name": "Panning Swirl",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -12.41,
+      "unclampedGainDb": -12.41,
+      "lufs": -19.44,
+      "peak": 0.5121,
+      "error": null
+    },
+    {
+      "name": "Practice Space",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -14.59,
+      "unclampedGainDb": -14.59,
+      "lufs": -19.34,
+      "peak": 0.3561,
+      "error": null
+    },
+    {
+      "name": "Razor Amp",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -11.03,
+      "unclampedGainDb": -11.03,
+      "lufs": -18.16,
+      "peak": 0.7477,
+      "error": null
+    },
+    {
+      "name": "Royal Rock",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -18.03,
+      "unclampedGainDb": -18.03,
+      "lufs": -19.54,
+      "peak": 0.3058,
+      "error": null
+    },
+    {
+      "name": "Starlit Cavern",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -18.05,
+      "unclampedGainDb": -18.05,
+      "lufs": -19.85,
+      "peak": 0.3386,
+      "error": null
+    },
+    {
+      "name": "Swampland",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -11.72,
+      "unclampedGainDb": -11.72,
+      "lufs": -19.32,
+      "peak": 0.4594,
+      "error": null
+    },
+    {
+      "name": "Woolly Octave",
+      "category": "02 Crunch Guitar",
+      "neural": false,
+      "appGainDb": -8.84,
+      "unclampedGainDb": -8.84,
+      "lufs": -18.96,
+      "peak": 0.2598,
+      "error": null
+    },
+    {
+      "name": "Mayer — Edge of Breakup",
+      "category": "03 Artist Rigs",
+      "neural": false,
+      "appGainDb": -12.65,
+      "unclampedGainDb": -12.65,
+      "lufs": -19.48,
+      "peak": 0.3694,
+      "error": null
+    },
+    {
+      "name": "Mayer — Lead Boost",
+      "category": "03 Artist Rigs",
+      "neural": false,
+      "appGainDb": -22.44,
+      "unclampedGainDb": -22.44,
+      "lufs": -19.12,
+      "peak": 0.2575,
+      "error": null
+    },
+    {
+      "name": "Knopfler — Sultans Clean",
+      "category": "03 Artist Rigs",
+      "neural": false,
+      "appGainDb": -4.38,
+      "unclampedGainDb": -4.38,
+      "lufs": -19.73,
+      "peak": 0.5286,
+      "error": null
+    },
+    {
+      "name": "Asato — Edge of Breakup",
+      "category": "03 Artist Rigs",
+      "neural": false,
+      "appGainDb": -18.59,
+      "unclampedGainDb": -18.59,
+      "lufs": -19.46,
+      "peak": 0.396,
+      "error": null
+    },
+    {
+      "name": "Henson — Sparkle Clean",
+      "category": "03 Artist Rigs",
+      "neural": false,
+      "appGainDb": -23.02,
+      "unclampedGainDb": -23.02,
+      "lufs": -19.55,
+      "peak": 0.3649,
+      "error": null
+    },
+    {
+      "name": "Hetfield — Puppets Rhythm",
+      "category": "03 Artist Rigs",
+      "neural": false,
+      "appGainDb": -21.34,
+      "unclampedGainDb": -21.34,
+      "lufs": -19.46,
+      "peak": 0.312,
+      "error": null
+    },
+    {
+      "name": "Hammett — Singing Lead",
+      "category": "03 Artist Rigs",
+      "neural": false,
+      "appGainDb": -24.44,
+      "unclampedGainDb": -24.82,
+      "lufs": -18.82,
+      "peak": 0.2701,
+      "error": null
+    },
+    {
+      "name": "Clean (bypass)",
+      "category": "04 Showcase FX",
+      "neural": false,
+      "appGainDb": 7.29,
+      "unclampedGainDb": 7.29,
+      "lufs": -19.21,
+      "peak": 0.638,
+      "error": null
+    },
+    {
+      "name": "Funk — Auto-Wah",
+      "category": "04 Showcase FX",
+      "neural": false,
+      "appGainDb": 15.11,
+      "unclampedGainDb": 15.11,
+      "lufs": -18.96,
+      "peak": 0.6528,
+      "error": null
+    },
+    {
+      "name": "Fuzz Face",
+      "category": "04 Showcase FX",
+      "neural": false,
+      "appGainDb": -7.54,
+      "unclampedGainDb": -7.54,
+      "lufs": -19.46,
+      "peak": 0.4112,
+      "error": null
+    },
+    {
+      "name": "Ambient Wash",
+      "category": "04 Showcase FX",
+      "neural": false,
+      "appGainDb": 1.14,
+      "unclampedGainDb": 1.14,
+      "lufs": -19.61,
+      "peak": 0.5319,
+      "error": null
+    },
+    {
+      "name": "Surf — Tremolo",
+      "category": "04 Showcase FX",
+      "neural": false,
+      "appGainDb": -1.03,
+      "unclampedGainDb": -1.03,
+      "lufs": -18.96,
+      "peak": 0.6626,
+      "error": null
+    },
+    {
+      "name": "Swirl — Phaser/Flanger",
+      "category": "04 Showcase FX",
+      "neural": false,
+      "appGainDb": -14.36,
+      "unclampedGainDb": -14.36,
+      "lufs": -19.6,
+      "peak": 0.4038,
+      "error": null
+    },
+    {
+      "name": "Octave Down",
+      "category": "04 Showcase FX",
+      "neural": false,
+      "appGainDb": 6.67,
+      "unclampedGainDb": 6.67,
+      "lufs": -19.05,
+      "peak": 0.5594,
+      "error": null
+    },
+    {
+      "name": "Marshall JCM",
+      "category": "05 Professional",
+      "neural": true,
+      "appGainDb": -15.4,
+      "unclampedGainDb": -15.4,
+      "lufs": -19.23,
+      "peak": 0.1225,
+      "error": null
+    },
+    {
+      "name": "EVH 5153",
+      "category": "05 Professional",
+      "neural": true,
+      "appGainDb": 0.2,
+      "unclampedGainDb": 0.2,
+      "lufs": -18.63,
+      "peak": 0.2149,
+      "error": null
+    },
+    {
+      "name": "Fender Deluxe",
+      "category": "05 Professional",
+      "neural": true,
+      "appGainDb": -14.54,
+      "unclampedGainDb": -14.54,
+      "lufs": -19.09,
+      "peak": 0.1188,
+      "error": null
+    },
+    {
+      "name": "Vox AC10",
+      "category": "05 Professional",
+      "neural": true,
+      "appGainDb": -8.52,
+      "unclampedGainDb": -8.52,
+      "lufs": -18.65,
+      "peak": 0.1123,
+      "error": null
+    },
+    {
+      "name": "Roland JC",
+      "category": "05 Professional",
+      "neural": true,
+      "appGainDb": 10.96,
+      "unclampedGainDb": 10.96,
+      "lufs": -19.35,
+      "peak": 0.7829,
+      "error": null
+    }
+  ]
+}

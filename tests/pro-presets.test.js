@@ -13,11 +13,12 @@ describe('05 Professional category', () => {
     expect(pro.presets).toHaveLength(5);
   });
 
-  it('every preset is a single neuralamp amp-head with a fixed normDb and valid model index', () => {
+  it('every preset is a single neuralamp amp-head with a valid model index', () => {
     for (const p of pro.presets) {
       expect(p.category).toBe('pro');
-      expect(typeof p.normDb).toBe('number');
-      expect(Number.isFinite(p.normDb)).toBe(true);
+      // normDb is dead: loudness is normalized at load time by the same
+      // offline measurement path as every other preset (normalize.js).
+      expect(p.normDb).toBeUndefined();
       expect(p.chain).toHaveLength(1);
       const node = p.chain[0];
       expect(node.type).toBe('neuralamp');
@@ -36,7 +37,7 @@ describe('05 Professional category', () => {
   });
 });
 
-describe('loudness normalize skips neural presets (design §7)', () => {
+describe('loudness normalization is unified across engines', () => {
   it('isNeuralChain detects a neuralamp node anywhere in the chain', () => {
     expect(isNeuralChain([{ type: 'neuralamp', params: {} }])).toBe(true);
     expect(isNeuralChain([{ type: 'drive', params: {} }, { type: 'neuralamp', params: {} }])).toBe(true);
@@ -45,10 +46,10 @@ describe('loudness normalize skips neural presets (design §7)', () => {
     expect(isNeuralChain(null)).toBe(false);
   });
 
-  it('measureLoudnessGain short-circuits to null for neural chains (not the offline-fallback 1)', async () => {
-    // Neural → null: skipped, caller applies the preset's fixed normDb.
-    await expect(measureLoudnessGain([{ type: 'neuralamp', params: {} }])).resolves.toBeNull();
-    // Non-neural under jsdom (no OfflineAudioContext) → 1: the measurable path was entered.
+  it('measureLoudnessGain treats neural chains like any other (unity under jsdom)', async () => {
+    // jsdom has no OfflineAudioContext, so BOTH engines take the same safe
+    // fallback (1 = unity) — neural is no longer special-cased to null.
+    await expect(measureLoudnessGain([{ type: 'neuralamp', params: {} }])).resolves.toBe(1);
     await expect(measureLoudnessGain([{ type: 'drive', params: {} }])).resolves.toBe(1);
   });
 });

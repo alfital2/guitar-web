@@ -1,8 +1,60 @@
-{ "name": "Panning Swirl", "artist": "GarageBand", "song": "Auto-panned crunch", "chain": [
-  { "type": "drive",   "params": { "amount": 5, "tone": 5, "level": 5, "blend": 0.7, "midBump": 3 } },
-  { "type": "eq",      "params": { "bass": 5, "mid": 6, "midFreq": 750, "treble": 5 } },
-  { "type": "cabinet", "params": { "brightness": 5, "body": 6, "mix": 1 } },
-  { "type": "phaser",  "params": { "rate": 0.4, "depth": 6, "feedback": 0.5, "mix": 0.4 } },
-  { "type": "autopan", "params": { "rate": 1.5, "depth": 0.9, "shape": 0 } },
-  { "type": "delay",   "params": { "time": 300, "feedback": 0.2, "tone": 4, "mix": 0.12 } }
-] }
+{
+  "name": "Axis Swirl",
+  "artist": "GarageBand",
+  "song": "Auto-panned crunch",
+  "chain": [
+    {
+      "type": "drive",
+      "params": {
+        "amount": 5,
+        "tone": 5,
+        "level": 5,
+        "blend": 0.7,
+        "midBump": 3
+      }
+    },
+    {
+      "type": "eq",
+      "params": {
+        "bass": 5,
+        "mid": 6,
+        "midFreq": 750,
+        "treble": 5
+      }
+    },
+    {
+      "type": "cabinet",
+      "params": {
+        "brightness": 5,
+        "body": 6,
+        "mix": 1
+      }
+    },
+    {
+      "type": "phaser",
+      "params": {
+        "rate": 0.4,
+        "depth": 6,
+        "feedback": 0.5,
+        "mix": 0.4
+      }
+    },
+    {
+      "type": "autopan",
+      "params": {
+        "rate": 1.5,
+        "depth": 0.9,
+        "shape": 0
+      }
+    },
+    {
+      "type": "delay",
+      "params": {
+        "time": 300,
+        "feedback": 0.2,
+        "tone": 4,
+        "mix": 0.12
+      }
+    }
+  ]
+}

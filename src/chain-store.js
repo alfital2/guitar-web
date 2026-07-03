@@ -73,3 +73,15 @@ export function saveBoardCollapsed(collapsed) {
 export function loadBoardCollapsed() {
   try { return localStorage.getItem(BOARD_COLLAPSED_KEY) === '1'; } catch { return false; }
 }
+
+// ── Timeline zoom (view multiplier; model px are never rescaled) ──
+const ZOOM_KEY = 'gs-timeline-zoom';
+export function saveZoom(z) {
+  try { localStorage.setItem(ZOOM_KEY, String(z)); } catch {}
+}
+export function loadZoom() {
+  try {
+    const v = parseFloat(localStorage.getItem(ZOOM_KEY));
+    return Number.isFinite(v) ? Math.max(0.5, Math.min(4, v)) : 1;
+  } catch { return 1; }
+}

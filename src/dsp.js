@@ -122,12 +122,18 @@ export function makeReverbImpulse(ctx, seconds, decay) {
   const rate = ctx.sampleRate;
   const length = Math.round(seconds * rate);
   const buffer = ctx.createBuffer(2, length, rate);
+  // Seeded RNG (per-channel seeds → decorrelated stereo) so the IR is
+  // DETERMINISTIC: offline loudness measures match the live reverb exactly
+  // and don't wobble a few tenths of a dB between renders.
+  let seed = 0;
+  const rand = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return (seed / 0x7fffffff) * 2 - 1; };
   for (let ch = 0; ch < 2; ch++) {
     const data = buffer.getChannelData(ch);
+    seed = ch ? 987654321 : 13579;
     let last = 0;
     for (let i = 0; i < length; i++) {
       const env = Math.pow(1 - i / length, decay);
-      const white = Math.random() * 2 - 1;
+      const white = rand();
       // simple low-pass to darken the tail
       last = last * 0.4 + white * 0.6;
       data[i] = last * env;

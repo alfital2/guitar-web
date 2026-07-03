@@ -7,9 +7,36 @@ const AC = typeof AudioContext !== 'undefined' ? AudioContext
   : (typeof webkitAudioContext !== 'undefined' ? webkitAudioContext : null);
 
 const takeLen = (t) => (t.len != null ? t.len : (t.duration || 0));
+const takeRep = (t) => (t.repeat && t.repeat > 1 ? t.repeat : 1);
+// Full visible span in seconds: the trim window times its loop repetitions.
+const takeSpan = (t) => takeLen(t) * takeRep(t);
 
 export function playbackDuration(takes) {
-  return takes.reduce((max, t) => Math.max(max, (t.x || 0) / PX_PER_SEC + takeLen(t)), 0);
+  return takes.reduce((max, t) => Math.max(max, (t.x || 0) / PX_PER_SEC + takeSpan(t)), 0);
+}
+
+// Pure: buffer-source schedule for a take when playback starts at transport
+// second `fromSec`. One entry per (partial) repetition still ahead: `when` is
+// seconds after playback start (≥ 0), `offset`/`dur` the buffer window to play.
+// A looped take (repeat > 1) replays its window back to back; the final
+// repetition is truncated when `repeat` is fractional, and a start that lands
+// mid-repetition begins that repetition further into its window.
+export function takeSchedule(tk, fromSec = 0) {
+  const len = takeLen(tk);
+  const offset = tk.offset || 0;
+  const start = (tk.x || 0) / PX_PER_SEC;
+  const out = [];
+  if (!(len > 0)) return out;
+  const rep = takeRep(tk);
+  const n = Math.ceil(rep - 1e-9);
+  for (let i = 0; i < n; i++) {
+    const dur = Math.min(len, (rep - i) * len);  // last repetition may be partial
+    const rel = start + i * len - fromSec;
+    if (rel + dur <= 0) continue;                // this repetition already passed
+    if (rel >= 0) out.push({ when: rel, offset, dur });
+    else out.push({ when: 0, offset: offset - rel, dur: dur + rel }); // start mid-repetition
+  }
+  return out;
 }
 
 export function createPlayer() {
@@ -40,20 +67,18 @@ export function createPlayer() {
       }
       for (const tk of (g.takes || [])) {
         if (!tk.samples || !tk.samples.length) continue;
-        const len = takeLen(tk);
-        const offset = tk.offset || 0; // seconds into the samples where the clip starts
-        const start = (tk.x || 0) / PX_PER_SEC;
-        const end = start + len;
-        if (end <= fromSec) continue;
+        // One buffer per take, one source per (partial) repetition: a looped
+        // take replays its trimmed window [offset, offset+len) back to back.
+        const windows = takeSchedule(tk, fromSec);
+        if (!windows.length) continue;
         const buf = ctx.createBuffer(1, tk.samples.length, tk.sampleRate);
         if (buf.copyToChannel) buf.copyToChannel(tk.samples, 0); else buf.getChannelData(0).set(tk.samples);
-        const s = ctx.createBufferSource();
-        s.buffer = buf; s.connect(gain);
-        const rel = start - fromSec;
-        // Play only the trimmed window [offset, offset+len) of the buffer.
-        if (rel >= 0) s.start(t0 + rel, offset, len);
-        else s.start(t0, offset - rel, len + rel); // started mid-clip → skip further in
-        sources.push(s);
+        for (const w of windows) {
+          const s = ctx.createBufferSource();
+          s.buffer = buf; s.connect(gain);
+          s.start(t0 + w.when, w.offset, w.dur);
+          sources.push(s);
+        }
       }
     }
     playing = true;
