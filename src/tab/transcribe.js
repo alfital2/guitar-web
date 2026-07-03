@@ -109,3 +109,128 @@ export function quantizeToGrid(tSec, bpm, subdiv = 4) {
   const spb = 60 / (bpm || 120);
   return Math.max(0, Math.round((tSec / spb) * subdiv));
 }
+
+
+// ── v2: onset-driven tracking ───────────────────────────────────────────────
+// The v1 tracker only split notes on PITCH CHANGE or SILENCE — a re-picked
+// same note never changes pitch, and fast transitions smear the analyser
+// window so the agreement vote never settles ("plays two nearby notes, misses
+// them"). v2 is attack-driven: an energy-flux onset FORCES a boundary and
+// opens a median pitch vote over the post-attack ticks.
+
+// Energy-flux onset detector with an adaptive floor + refractory period.
+// Feed one rms per analysis tick; returns true on the tick an attack starts.
+export function createOnsetDetector({
+  hopSec = 0.008, gateRms = 0.006, riseRatio = 1.9, floorRatio = 2.2, refractorySec = 0.055,
+} = {}) {
+  let floor = 0.003;          // slow EMA of the quiet level
+  let prev = 0;
+  let lastOnset = -1;
+  return {
+    push(rms, tSec) {
+      // floor tracks DOWNWARD fast, upward slowly (so sustains don't raise it
+      // enough to mask the next attack, but silence resets quickly)
+      floor = rms < floor ? floor * 0.7 + rms * 0.3 : floor * 0.995 + rms * 0.005;
+      const rose = rms > Math.max(gateRms, prev * riseRatio, floor * floorRatio);
+      prev = rms;
+      if (rose && (lastOnset < 0 || tSec - lastOnset >= refractorySec)) {
+        lastOnset = tSec;
+        return true;
+      }
+      return false;
+    },
+  };
+}
+
+const median = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+
+// Attack-driven note tracker. push({freq, clarity, rms, tSec, onset}) → events.
+//  - onset  → close the active note, open a VOTE window; after `voteTicks`
+//    valid pitch ticks (or `voteTimeoutSec`), the median midi becomes the new
+//    note, timestamped at the onset. Robust to noisy attack frames.
+//  - legato → no onset, but `jumpTicks` consecutive ticks agreeing on a
+//    different midi retrigger (hammer-on / pull-off).
+//  - silence (`offTicks` below the gate) releases the active note.
+export function createNoteTracker2({
+  voteTicks = 7, voteTimeoutSec = 0.12, jumpTicks = 5, offTicks = 14,
+  gateRms = 0.005, minClarity = 0.8, minMidi = 36, maxMidi = 88,
+} = {}) {
+  let active = null;              // { midi, startSec }
+  let vote = null;                // { tOnset, midis: [] }
+  let jumpMidi = null, jumpCount = 0;
+  let offCount = 0;
+
+  const validMidi = (freq, clarity, rms) => {
+    if (!freq || !(rms > gateRms) || !(clarity >= minClarity)) return null;
+    const m = Math.round(freqToMidiFloat(freq));
+    return m >= minMidi && m <= maxMidi ? m : null;
+  };
+
+  return {
+    push({ freq, clarity, rms, tSec, onset }) {
+      const events = [];
+      const m = validMidi(freq, clarity, rms);
+
+      if (onset) {
+        // A pick attack ALWAYS starts a fresh note — even at the same pitch.
+        if (active) { events.push({ type: 'off', midi: active.midi, tSec }); active = null; }
+        vote = { tOnset: tSec, midis: [] };
+        jumpMidi = null; jumpCount = 0; offCount = 0;
+      }
+
+      if (vote) {
+        if (m != null) vote.midis.push(m);
+        const done = vote.midis.length >= voteTicks || (tSec - vote.tOnset >= voteTimeoutSec && vote.midis.length >= 2);
+        if (done) {
+          const midi = median(vote.midis);
+          active = { midi, startSec: vote.tOnset };
+          events.push({ type: 'on', midi, tSec: vote.tOnset });
+          vote = null;
+        } else if (tSec - vote.tOnset >= voteTimeoutSec) {
+          vote = null; // attack turned out to be noise — no pitch emerged
+        }
+        return events;
+      }
+
+      if (m == null) {
+        jumpMidi = null; jumpCount = 0;
+        if (active && ++offCount >= offTicks) {
+          events.push({ type: 'off', midi: active.midi, tSec });
+          active = null; offCount = 0;
+        }
+        return events;
+      }
+      offCount = 0;
+
+      if (active && m !== active.midi) {
+        // legato retrigger: sustained agreement on a new midi with no attack
+        if (m === jumpMidi) jumpCount++; else { jumpMidi = m; jumpCount = 1; }
+        if (jumpCount >= jumpTicks) {
+          events.push({ type: 'off', midi: active.midi, tSec });
+          active = { midi: m, startSec: tSec };
+          events.push({ type: 'on', midi: m, tSec });
+          jumpMidi = null; jumpCount = 0;
+        }
+      } else {
+        jumpMidi = null; jumpCount = 0;
+        if (!active && m != null) {
+          // pitch without a detected onset (soft start): begin after agreement
+          if (m === jumpMidi) jumpCount++; else { jumpMidi = m; jumpCount = 1; }
+          if (jumpCount >= jumpTicks) {
+            active = { midi: m, startSec: tSec };
+            events.push({ type: 'on', midi: m, tSec });
+            jumpMidi = null; jumpCount = 0;
+          }
+        }
+      }
+      return events;
+    },
+    end(tSec) {
+      const events = [];
+      if (active) { events.push({ type: 'off', midi: active.midi, tSec }); active = null; }
+      vote = null; jumpMidi = null; jumpCount = 0; offCount = 0;
+      return events;
+    },
+    activeMidi: () => (active ? active.midi : null),
+  };
+}

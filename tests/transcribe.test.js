@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  createNoteTracker, assignFret, positionsFor, quantizeToGrid, freqToMidiFloat, TUNING_MIDI,
+  createNoteTracker, createNoteTracker2, createOnsetDetector,
+  assignFret, positionsFor, quantizeToGrid, freqToMidiFloat, TUNING_MIDI,
 } from '../src/tab/transcribe.js';
 
 const A2 = 110, C3 = 130.81, E2 = 82.41, G3 = 196;
@@ -76,5 +77,97 @@ describe('quantizeToGrid', () => {
   });
   it('never returns negative columns (lag compensation can go below zero)', () => {
     expect(quantizeToGrid(-0.2, 120)).toBe(0);
+  });
+});
+
+// ── v2: onset-driven tracker ────────────────────────────────────────────────
+// tick helper: one push in tracker2 shape (8 ms hop).
+function ticks2(tr, freq, n, t0, { onsetFirst = false, dt = 0.008, clarity = 0.95, rms = 0.05 } = {}) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push(...tr.push({ freq, clarity, rms, tSec: t0 + i * dt, onset: onsetFirst && i === 0 }));
+  }
+  return out;
+}
+
+describe('createOnsetDetector', () => {
+  it('fires on an attack rising from silence', () => {
+    const od = createOnsetDetector();
+    let fired = 0;
+    for (let i = 0; i < 20; i++) if (od.push(0.001, i * 0.008)) fired++;
+    expect(fired).toBe(0);
+    expect(od.push(0.08, 0.2)).toBe(true);         // attack
+    expect(od.push(0.07, 0.208)).toBe(false);      // sustain — no retrigger
+  });
+  it('fires again on a repick over a decaying sustain', () => {
+    const od = createOnsetDetector();
+    od.push(0.001, 0);
+    expect(od.push(0.09, 0.008)).toBe(true);       // first pick
+    let t = 0.016, lvl = 0.09;
+    for (let i = 0; i < 30; i++) { od.push(lvl *= 0.93, t); t += 0.008; } // decay ~0.01
+    expect(od.push(0.09, t)).toBe(true);           // repick punches through
+  });
+  it('refractory blocks double-fires inside one attack', () => {
+    const od = createOnsetDetector({ refractorySec: 0.055 });
+    od.push(0.001, 0);
+    expect(od.push(0.05, 0.008)).toBe(true);
+    expect(od.push(0.12, 0.016)).toBe(false);      // still the same attack
+  });
+});
+
+describe('createNoteTracker2 (onset-driven)', () => {
+  it('same-pitch REPICK yields two separate notes (the v1 blind spot)', () => {
+    const tr = createNoteTracker2({ voteTicks: 4 });
+    const ev1 = ticks2(tr, A2, 8, 0, { onsetFirst: true });
+    const ev2 = ticks2(tr, A2, 8, 0.25, { onsetFirst: true });   // repicked SAME note
+    const ons = [...ev1, ...ev2].filter((e) => e.type === 'on');
+    expect(ons.length).toBe(2);
+    expect(ons.map((e) => e.midi)).toEqual([45, 45]);
+    expect(ons[1].tSec).toBeCloseTo(0.25, 5);      // stamped at the onset
+  });
+  it('fast consecutive different notes both land, stamped at their onsets', () => {
+    const tr = createNoteTracker2({ voteTicks: 4 });
+    const ev1 = ticks2(tr, A2, 6, 0, { onsetFirst: true });
+    const ev2 = ticks2(tr, C3, 6, 0.12, { onsetFirst: true });   // 120 ms later (fast 16ths)
+    const ons = [...ev1, ...ev2].filter((e) => e.type === 'on');
+    expect(ons.map((e) => e.midi)).toEqual([45, 48]);
+    expect(ons[1].tSec).toBeCloseTo(0.12, 5);
+  });
+  it('vote survives noisy attack frames (median wins)', () => {
+    const tr = createNoteTracker2({ voteTicks: 5 });
+    const out = [];
+    // attack frame reads garbage (octave error), then settles on A2
+    out.push(...tr.push({ freq: A2 * 2, clarity: 0.9, rms: 0.09, tSec: 0, onset: true }));
+    for (let i = 1; i < 6; i++) out.push(...tr.push({ freq: A2, clarity: 0.95, rms: 0.06, tSec: i * 0.008 }));
+    const ons = out.filter((e) => e.type === 'on');
+    expect(ons.length).toBe(1);
+    expect(ons[0].midi).toBe(45);                  // median beat the octave glitch
+  });
+  it('noise onset with no pitch evaporates (no ghost notes)', () => {
+    const tr = createNoteTracker2({ voteTicks: 5, voteTimeoutSec: 0.05 });
+    const out = [];
+    out.push(...tr.push({ freq: null, clarity: 0, rms: 0.09, tSec: 0, onset: true })); // thump
+    for (let i = 1; i < 12; i++) out.push(...tr.push({ freq: null, clarity: 0, rms: 0.002, tSec: i * 0.008 }));
+    expect(out.filter((e) => e.type === 'on').length).toBe(0);
+  });
+  it('legato (pitch jump, NO onset) still retriggers', () => {
+    const tr = createNoteTracker2({ voteTicks: 4, jumpTicks: 3 });
+    ticks2(tr, A2, 6, 0, { onsetFirst: true });
+    const ev = ticks2(tr, C3, 5, 0.2);             // hammer-on: no attack spike
+    const ons = ev.filter((e) => e.type === 'on');
+    expect(ons.length).toBe(1);
+    expect(ons[0].midi).toBe(48);
+  });
+  it('silence releases the active note', () => {
+    const tr = createNoteTracker2({ voteTicks: 4, offTicks: 5 });
+    ticks2(tr, A2, 6, 0, { onsetFirst: true });
+    const ev = ticks2(tr, null, 6, 0.3, { clarity: 0, rms: 0 });
+    expect(ev[ev.length - 1]).toMatchObject({ type: 'off', midi: 45 });
+  });
+  it('end() flushes and resets vote state', () => {
+    const tr = createNoteTracker2({ voteTicks: 4 });
+    ticks2(tr, A2, 6, 0, { onsetFirst: true });
+    expect(tr.end(1)).toEqual([{ type: 'off', midi: 45, tSec: 1 }]);
+    expect(tr.end(2)).toEqual([]);
   });
 });

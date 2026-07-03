@@ -32,7 +32,7 @@ import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
 import { connectInputChannel } from './audio/input-channel.js';
 import { maybeShowSafariNotice } from './browser-notice.js';
-import { createNoteTracker, assignFret, quantizeToGrid } from './tab/transcribe.js';
+import { createNoteTracker2, createOnsetDetector, assignFret, quantizeToGrid } from './tab/transcribe.js';
 import { mountTabLane } from './tab/tab-lane.js';
 import { initJamUI } from './jam-ui.js';
 
@@ -1230,7 +1230,9 @@ let tabState = null;      // listening session: { tracker, raf, t0, buf, prevPos
 // Stop LISTENING but keep the tab on screen (the point is reading it back).
 function stopTabListening() {
   if (!tabState) return;
-  cancelAnimationFrame(tabState.raf);
+  clearInterval(tabState.timer);
+  cancelAnimationFrame(tabState.cursorRaf);
+  try { tabState.an && analyser && analyser.disconnect(tabState.an); } catch {}
   tabState.tracker.end((performance.now() - tabState.t0) / 1000);
   if (!tabState.metroWasFree) transport.setMetroFree(false); // leave things as we found them
   tabState = null;
@@ -1260,25 +1262,37 @@ function toggleTabMode() {
   const lane = tabLane;
   lane.setLive(true);
   lane.setBpm(uiBpm);
-  const tracker = createNoteTracker();
-  const buf = new Float32Array(analyser.fftSize);
+  // v2 analysis chain: a DEDICATED small-window analyser (1024 ≈ 21 ms — half
+  // the transition smear of the tuner's 2048) chained off the main input
+  // analyser (a pass-through, so it always follows the selected channel), on a
+  // FIXED 8 ms interval (rAF jitters/throttles). Attack-driven segmentation:
+  // the onset detector forces a boundary on every pick — re-picked SAME notes
+  // and fast runs register — and the tracker votes the median pitch over the
+  // post-attack ticks instead of trusting the noisy first frames.
+  if (!tabState || !tabState.an || tabState.anCtx !== ctx) { /* fresh below */ }
+  const an = ctx.createAnalyser(); an.fftSize = 1024;
+  analyser.connect(an);
+  const tracker = createNoteTracker2();
+  const onsets = createOnsetDetector();
+  const buf = new Float32Array(an.fftSize);
   const metroWasFree = transport.isMetroFree();
   if (!metroWasFree) transport.setMetroFree(true); // the grid needs an audible click
   const t0 = performance.now();
-  tabState = { tracker, raf: 0, t0, buf, prevPos: null, metroWasFree };
+  tabState = { tracker, timer: 0, cursorRaf: 0, t0, buf, prevPos: null, metroWasFree, an };
   $('tab-toggle')?.classList.add('on');
 
-  const loop = () => {
+  const tick = () => {
     if (!tabState) return;
     if (!ctx || !analyser) { stopTabListening(); return; }
     const nowSec = (performance.now() - t0) / 1000;
-    analyser.getFloatTimeDomainData(buf);
+    an.getFloatTimeDomainData(buf);
     let rms = 0;
     for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
     rms = Math.sqrt(rms / buf.length);
+    const onset = onsets.push(rms, nowSec);
     const det = detectPitchMPM(buf, ctx.sampleRate) || {};
-    if (window.__tabDebug) window.__tabDebug.probe = { rms: +rms.toFixed(4), freq: det.freq ? +det.freq.toFixed(1) : null, clarity: det.clarity ? +det.clarity.toFixed(2) : 0 };
-    const events = tracker.push(det.freq || null, det.clarity || 0, rms, nowSec);
+    if (window.__tabDebug) window.__tabDebug.probe = { rms: +rms.toFixed(4), freq: det.freq ? +det.freq.toFixed(1) : null, clarity: det.clarity ? +det.clarity.toFixed(2) : 0, onset };
+    const events = tracker.push({ freq: det.freq || null, clarity: det.clarity || 0, rms, tSec: nowSec, onset });
     for (const ev of events) {
       if (ev.type !== 'on') continue;
       const pos = assignFret(ev.midi, tabState.prevPos);
@@ -1286,10 +1300,14 @@ function toggleTabMode() {
       tabState.prevPos = pos;
       lane.noteOn(pos.string, pos.fret, quantizeToGrid(ev.tSec - TAB_LAG_SEC, uiBpm));
     }
-    lane.setCursor(Math.max(0, (nowSec - TAB_LAG_SEC) * (uiBpm / 60)));
-    tabState.raf = requestAnimationFrame(loop);
   };
-  loop();
+  tabState.timer = setInterval(tick, 8);
+  const sweep = () => {
+    if (!tabState) return;
+    lane.setCursor(Math.max(0, ((performance.now() - t0) / 1000 - TAB_LAG_SEC) * (uiBpm / 60)));
+    tabState.cursorRaf = requestAnimationFrame(sweep);
+  };
+  sweep();
 }
 if ($('diag')) window.__tabDebug = {
   count: () => (tabLane ? tabLane.noteCount() : -1),
@@ -1298,12 +1316,13 @@ if ($('diag')) window.__tabDebug = {
   // test device emits unpitched pulses that MPM rightly rejects, so e2e proves
   // the segmentation→fret→quantize→render path this way; the analyser→MPM leg
   // is proven daily by the tuner, which shares it).
-  sim(freq, frames = 6) {
+  sim(freq, frames = 8) {
     if (!tabState) return 0;
     const nowSec = (performance.now() - tabState.t0) / 1000;
     const events = [];
-    for (let i = 0; i < frames; i++) events.push(...tabState.tracker.push(freq, 0.95, 0.05, nowSec + i * 0.016));
-    events.push(...(freq == null ? [] : tabState.tracker.push(null, 0, 0, nowSec + frames * 0.016)));
+    for (let i = 0; i < frames; i++) {
+      events.push(...tabState.tracker.push({ freq, clarity: 0.95, rms: 0.05, tSec: nowSec + i * 0.008, onset: i === 0 && freq != null }));
+    }
     for (const ev of events) {
       if (ev.type !== 'on') continue;
       const pos = assignFret(ev.midi, tabState.prevPos);
