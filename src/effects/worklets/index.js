@@ -6,6 +6,7 @@ const URLS = [
   new URL('./looper-processor.js', import.meta.url).href,
   new URL('./neural-amp-processor.js', import.meta.url).href,
   new URL('./capture-processor.js', import.meta.url).href,
+  new URL('./jam-audio-processors.js', import.meta.url).href,
 ];
 
 const loaded = new WeakSet();

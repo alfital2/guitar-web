@@ -11,7 +11,8 @@
     "neural:build": "bash tools/neural/build.sh",
     "neural:derisk": "node tools/neural/derisk.mjs",
     "audit:loudness": "node tests/loudness-audit.mjs",
-    "test:loudness": "node tests/loudness-audit.mjs --gate"
+    "test:loudness": "node tests/loudness-audit.mjs --gate",
+    "test:jam": "node tools/jam-e2e.mjs"
   },
   "devDependencies": {
     "vitest": "^2.1.0",
