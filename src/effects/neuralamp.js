@@ -18,9 +18,16 @@ export const schema = {
   type: 'neuralamp',
   label: 'Neural Amp',
   params: [
-    { key: 'model', label: 'Amp',   min: 0, max: 4,  default: 0, step: 1 },
-    { key: 'trim',  label: 'Trim',  min: 0, max: 10, default: 5, step: 0.1 },
-    { key: 'level', label: 'Level', min: 0, max: 10, default: 5, step: 0.1 },
+    { key: 'model',    label: 'Amp',      min: 0, max: 4,  default: 0, step: 1 },
+    { key: 'trim',     label: 'Trim',     min: 0, max: 10, default: 5, step: 0.1 },
+    // Post-model analog tone stack (REAL biquads, not decoration): standard
+    // NAM-player practice — the capture nails the amp's character, the stack
+    // gives you the front-panel voicing controls the real amp had. 5 = flat.
+    { key: 'bass',     label: 'Bass',     min: 0, max: 10, default: 5, step: 0.1 },
+    { key: 'mid',      label: 'Mid',      min: 0, max: 10, default: 5, step: 0.1 },
+    { key: 'treble',   label: 'Treble',   min: 0, max: 10, default: 5, step: 0.1 },
+    { key: 'presence', label: 'Presence', min: 0, max: 10, default: 5, step: 0.1 },
+    { key: 'level',    label: 'Level',    min: 0, max: 10, default: 5, step: 0.1 },
   ],
 };
 
@@ -87,8 +94,20 @@ export function create(ctx, params) {
     outputChannelCount: [1],
   });
 
+  // Post-model tone stack: model → bass shelf → mid peak → treble shelf →
+  // presence shelf → level. All biquads, ±dB around flat at 5 — zero cost at
+  // defaults, real voicing when turned.
+  const bassEq = ctx.createBiquadFilter(); bassEq.type = 'lowshelf'; bassEq.frequency.value = 190; // guitar-band low shelf (100 Hz sat below the cab rolloff — inaudible)
+  const midEq = ctx.createBiquadFilter(); midEq.type = 'peaking'; midEq.frequency.value = 650; midEq.Q.value = 0.8;
+  const trebleEq = ctx.createBiquadFilter(); trebleEq.type = 'highshelf'; trebleEq.frequency.value = 3000;
+  const presenceEq = ctx.createBiquadFilter(); presenceEq.type = 'highshelf'; presenceEq.frequency.value = 6500;
+
   trimGain.connect(node);
-  node.connect(levelGain);
+  node.connect(bassEq);
+  bassEq.connect(midEq);
+  midEq.connect(trebleEq);
+  trebleEq.connect(presenceEq);
+  presenceEq.connect(levelGain);
 
   let wasmReady = false;       // true once the worklet OUT {type:'wasm-ready'}
   let wantModel = Math.round(Number.isFinite(params.model) ? params.model : 0);
@@ -136,10 +155,16 @@ export function create(ctx, params) {
     .then((bytes) => node.port.postMessage({ type: 'wasm', bytes }))
     .catch((err) => console.warn('[neuralamp] wasm fetch failed; staying passthrough:', err));
 
+  // 0..10 knob → ±dB around flat at 5.
+  const dbFor = (v, span) => (((v ?? 5) - 5) / 5) * span;
   const apply = (p) => {
     const idx = Math.round(Number.isFinite(p.model) ? p.model : 0);
     wantModel = idx;
     trimGain.gain.value = gainFor(p.trim);
+    bassEq.gain.value = dbFor(p.bass, 12);        // ±12 dB @ 100 Hz shelf
+    midEq.gain.value = dbFor(p.mid, 9);           // ±9 dB @ 650 Hz peak
+    trebleEq.gain.value = dbFor(p.treble, 12);    // ±12 dB @ 3 kHz shelf
+    presenceEq.gain.value = dbFor(p.presence, 8); // ±8 dB @ 6.5 kHz shelf
     levelGain.gain.value = gainFor(p.level);
     if (wasmReady && idx !== lastPostedModel) postModel(idx);
     // If not wasmReady yet, do nothing else — the wasm-ready handler above
@@ -156,7 +181,7 @@ export function create(ctx, params) {
     destroyed = true;
     try { node.port.postMessage({ type: 'destroy' }); } catch {}
     try { node.port.onmessage = null; } catch {}
-    for (const n of [trimGain, node, levelGain]) { try { n.disconnect(); } catch {} }
+    for (const n of [trimGain, node, bassEq, midEq, trebleEq, presenceEq, levelGain]) { try { n.disconnect(); } catch {} }
   };
 
   return { input: trimGain, output: levelGain, apply, destroy };

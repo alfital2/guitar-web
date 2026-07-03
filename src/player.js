@@ -39,19 +39,29 @@ export function takeSchedule(tk, fromSec = 0) {
   return out;
 }
 
-export function createPlayer() {
-  let ctx = null, sources = [], playing = false, raf = null;
+// `getContext` (optional) supplies the LIVE app AudioContext. Sharing it puts
+// playback, the live chain and the recorder on ONE clock and one output-latency
+// domain — critical for overdubbing: with the old private context (default
+// latency) plus a fat 60 ms pre-delay, the backing a player heard ran ~60-90 ms
+// behind the take anchor, so overdubbed leads landed audibly late.
+export function createPlayer({ getContext } = {}) {
+  let own = null, sources = [], playing = false, raf = null;
+  let ctx = null;
   let nodes = new Map(); // trackId -> { gain, pan }
+  const SCHED_AHEAD = 0.03; // just enough to schedule race-free
 
   // groups: [{ id, takes, gain, pan }] — one mixer strip per track.
+  // Returns the exact ctx time playback was scheduled at (t0) — the overdub
+  // recorder aligns its take against it — or null if nothing played.
   function play(groups, fromSec = 0, onTick, onEnd) {
-    if (playing || !AC) return;
+    if (playing || !AC) return null;
     const flat = groups.flatMap((g) => g.takes || []);
     const dur = playbackDuration(flat);
-    if (dur <= 0 || fromSec >= dur) return;
-    if (!ctx) ctx = new AC();
+    if (dur <= 0 || fromSec >= dur) return null;
+    const live = getContext && getContext();
+    ctx = live || own || (own = new AC());
     if (ctx.state === 'suspended') ctx.resume();
-    const t0 = ctx.currentTime + 0.06;
+    const t0 = ctx.currentTime + SCHED_AHEAD;
     sources = []; nodes = new Map();
     for (const g of groups) {
       const gain = ctx.createGain();
@@ -89,6 +99,7 @@ export function createPlayer() {
       raf = requestAnimationFrame(tick);
     };
     tick();
+    return t0;
   }
 
   function setTrackGain(id, g) { const n = nodes.get(id); if (n) n.gain.gain.setTargetAtTime(g, ctx.currentTime, 0.01); }

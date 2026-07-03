@@ -20,8 +20,8 @@ import { fingerprintToStats, archetype } from './profile-card/attributes.js';
 import { renderProfileCard } from './profile-card/ui.js';
 import { measureLoudnessGain } from './normalize.js';
 import { mountTransport } from './transport-ui.js';
-import { renderTrackLane, PX_PER_SEC, beatPx, getSelectedClips, clearClipSelection, setClipSelection } from './track-lane.js';
-import { punchTakes } from './take-ops.js';
+import { renderTrackLane, PX_PER_SEC, beatPx, ensureRulerBars, getSelectedClips, clearClipSelection, setClipSelection } from './track-lane.js';
+import { punchTakes, recordHeadTrimSec } from './take-ops.js';
 import { createRecorder } from './recorder.js';
 import { createPlayer } from './player.js';
 import { drawWaveform } from './waveform.js';
@@ -57,10 +57,12 @@ let armedId = null;      // the record-armed track
 let takeSeq = 0;         // running take number for clip labels (global)
 let liveRAF = null, liveClip = null; // in-progress (growing) recording clip
 let recStartX = 0;                   // px x-position where the current take began
+let recBackingT0 = null;             // ctx time the overdub backing was scheduled at
+let recCapStart = 0;                 // ctx time capture began (same clock as recBackingT0)
 // Tap normGain (post loudness-normalization, pre Vol) so the take matches what
 // you hear and is independent of the master Vol slider.
 const recorder = createRecorder({ getSource: () => normGain, getContext: () => ctx });
-const player = createPlayer();
+const player = createPlayer({ getContext: () => ctx }); // one clock with the live graph + recorder
 
 // ── Transport auto-fold ──
 // While recording/playing the tracks deserve the vertical space: fold the amp
@@ -621,11 +623,17 @@ const occupiedExcept = (track, n) => track.takes.filter((k) => k.n !== n).map((k
 function renderTrack() {
   const el = $('track-lane');
   if (!el) return;
+  // ENDLESS timeline: the grid grows with the content (old hardcoded 16 bars
+  // meant long takes ran off the ruler). Min 16 bars, content + 8 headroom.
+  const secPerBar = (60 / uiBpm) * 4;
+  const contentEnd = Math.max(playheadSec,
+    ...tracks.flatMap((t) => t.takes.map((tk) => (tk.x || 0) / PX_PER_SEC + clipLen(tk))), 0);
   renderTrackLane(el, {
     tracks,
     armedId,
     snap: snapOn,
     playheadSec,
+    bars: Math.max(16, Math.ceil(contentEnd / secPerBar) + 8),
     bpm: uiBpm,
     zoom: zoomLevel,
     onZoom: (z, anchor) => {
@@ -1301,9 +1309,20 @@ const transport = mountTransport($('transport-cluster'), {
       restoreFoldIfIdle(); // transport idle again — un-fold to the pre-record state
       if (t && t.samples.length) {
         pushUndo();
+        // Recording-latency compensation: drop the monitoring-delay head so the
+        // performance sits ON the grid instead of behind it (see take-ops.js).
+        const trimSec = recordHeadTrimSec({
+          playerT0: recBackingT0, capStart: recCapStart,
+          baseLatency: ctx && ctx.baseLatency, outputLatency: ctx && ctx.outputLatency,
+        });
+        const cut = Math.min(t.samples.length, Math.round(trimSec * t.sampleRate));
+        const samples = cut > 0 ? t.samples.subarray(cut) : t.samples;
+        const duration = samples.length / t.sampleRate;
+        if ($('diag')) window.__lastRecordDebug = { t0: recBackingT0, capStart: recCapStart, trimSec, sr: t.sampleRate }; // e2e/inspection
+        recBackingT0 = null;
         const newStart = recStartX / PX_PER_SEC;
-        punchOver(track, newStart, newStart + (t.duration || 0)); // overwrite overlapped audio
-        track.takes.push({ ...t, n: ++takeSeq, name: track.name, x: recStartX, offset: 0, len: t.duration });
+        punchOver(track, newStart, newStart + duration); // overwrite overlapped audio
+        track.takes.push({ ...t, samples, duration, n: ++takeSeq, name: track.name, x: recStartX, offset: 0, len: duration });
         renderTrack();
         updateTransport();
       }
@@ -1325,7 +1344,9 @@ const transport = mountTransport($('transport-cluster'), {
         // record loop below owns the playhead, so the player gets no-op
         // tick/end callbacks and never fights it or resets it on backing-end.
         const backing = buildGroups().filter((g) => g.id !== track.id);
-        if (backing.some((g) => (g.takes || []).length)) player.play(backing, startSec, () => {}, () => {});
+        recBackingT0 = null;
+        if (backing.some((g) => (g.takes || []).length)) recBackingT0 = player.play(backing, startSec, () => {}, () => {});
+        recCapStart = ctx.currentTime; // recorder capture begins ~now (same clock)
         // Grow a purple clip in real time in the armed track's strip.
         const area = $('track-lane') && $('track-lane').querySelector(`.track-strip[data-track-id="${track.id}"]`);
         if (area) {
@@ -1345,6 +1366,7 @@ const transport = mountTransport($('transport-cluster'), {
             const w = Math.max(0, elapsed * PX_PER_SEC * zoomLevel); // view px
             liveClip.style.width = `${w}px`;
             setPlayhead(startSec + elapsed); // playhead rides the leading edge while recording
+            ensureRulerBars($('track-lane'), startSec + elapsed, uiBpm, zoomLevel); // grid never ends
             const now = performance.now();
             if (now - lastDraw > 50) { // redraw the live waveform ~20fps
               lastDraw = now;

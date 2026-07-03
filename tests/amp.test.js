@@ -89,22 +89,26 @@ describe('renderAmp neuralamp head', () => {
       params: [
         { key: 'model', label: 'Amp', min: 0, max: 4, default: 0, step: 1 },
         { key: 'trim', label: 'Trim', min: 0, max: 10, default: 5, step: 0.1 },
+        { key: 'bass', label: 'Bass', min: 0, max: 10, default: 5, step: 0.1 },
+        { key: 'mid', label: 'Mid', min: 0, max: 10, default: 5, step: 0.1 },
+        { key: 'treble', label: 'Treble', min: 0, max: 10, default: 5, step: 0.1 },
+        { key: 'presence', label: 'Presence', min: 0, max: 10, default: 5, step: 0.1 },
         { key: 'level', label: 'Level', min: 0, max: 10, default: 5, step: 0.1 },
       ],
     },
-    params: { model: 2, trim: 5, level: 5 },
+    params: { model: 2, trim: 5, bass: 5, mid: 5, treble: 5, presence: 5, level: 5 },
   });
 
-  it('does NOT render a model select (model is chosen from the preset browser) — only Trim/Level knobs', () => {
+  it('does NOT render a model select (model is chosen from the preset browser) — Trim/tone-stack/Level knobs', () => {
     const el = document.createElement('div');
     renderAmp(el, [neuralModule()], () => {}, { collapsed: false });
     // The on-amp model <select> was removed — it duplicated the 05 Professional list.
     expect(el.querySelector('.amp-model-select')).toBeNull();
     expect(el.querySelector('select')).toBeNull();
-    // 'model' is not a knob either → only Trim + Level are sliders.
-    expect(el.querySelectorAll('[role=slider]')).toHaveLength(2);
+    // 'model' is not a knob either → Trim + tone stack + Level are sliders.
+    expect(el.querySelectorAll('[role=slider]')).toHaveLength(6);
     const labels = [...el.querySelectorAll('.amp-knob-label')].map((l) => l.textContent);
-    expect(labels).toEqual(['Trim', 'Level']);
+    expect(labels).toEqual(['Trim', 'Bass', 'Mid', 'Treble', 'Presence', 'Level']);
   });
 
   it('a Trim knob change fires onParamChange(instanceId, "trim", value)', () => {

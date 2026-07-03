@@ -71,3 +71,18 @@ export function punchTakes(takes, newStart, newEnd, nextN) {
   }
   return { takes: out, nextN };
 }
+
+// Recording-latency compensation (classic DAW behavior). What lands in a take
+// is what the player HEARD, delayed by the monitoring chain: the backing/click
+// reaches the ears outputLatency late (plus, for overdubs, however long after
+// capture start the backing was actually scheduled), and the response takes
+// the input path back in. Trimming that head realigns the content to the grid
+// — without it, overdubbed leads sit audibly behind the backing track.
+//   playerT0/capStart: same-clock ctx times (0/null when no backing played).
+//   base/output: AudioContext.baseLatency / outputLatency (undefined-safe).
+// Clamped to [0, 0.12s] — a wild estimate must never eat real audio.
+export function recordHeadTrimSec({ playerT0 = null, capStart = 0, baseLatency = 0, outputLatency = 0 } = {}) {
+  const sched = playerT0 != null ? Math.max(0, playerT0 - capStart) : 0;
+  const monitor = (baseLatency || 0) + (outputLatency || 0);
+  return Math.min(0.12, Math.max(0, sched + monitor));
+}

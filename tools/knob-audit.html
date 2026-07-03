@@ -1,0 +1,334 @@
+<!doctype html>
+<!-- KNOB-TRUTH audit harness: does every knob on the analytic amp actually
+     change the sound? For each amp knob (drive/eq/cabinet + amp reverb stage)
+     the SAME deterministic guitar reference (src/normalize.js
+     makeGuitarReference) is rendered through the full amp chain with the knob
+     at min / default / max (all other params at schema defaults), then render
+     pairs are compared with (a) integrated-LUFS delta and (b) a mean
+     log-spectral distance over 4 windowed slices. The self-noise floor is
+     measured FIRST by rendering the identical config twice. Everything renders
+     silently in an OfflineAudioContext — nothing touches speakers.
+     Driven by tools/knob-audit.mjs via window.__knobAudit.run(opts). -->
+<meta charset="utf-8">
+<title>knob audit</title>
+<body>
+<script type="module">
+import { registry } from '../src/effects/index.js';
+import { buildChain } from '../src/engine.js';
+import { loadWorklets } from '../src/effects/worklets/index.js';
+import * as reverbFx from '../src/effects/reverb.js';
+import { makeGuitarReference, integratedLufs, REF_SECONDS } from '../src/normalize.js';
+
+const SR = 48000;
+const LEN = Math.floor(SR * REF_SECONDS);
+
+const schemaDefaults = (type) =>
+  Object.fromEntries(registry[type].schema.params.map((p) => [p.key, p.default]));
+const schemaParam = (type, key) =>
+  registry[type].schema.params.find((p) => p.key === key);
+
+// ── Spectral analysis ───────────────────────────────────────────────────────
+// 2048-sample Hann-windowed slices at fixed times during signal activity
+// (strums at 0.05/1.05 s, plucks at 1.9/2.3/2.6 s), radix-2 FFT, power
+// spectrum in dB over ~47 Hz–12 kHz. Distance between two renders =
+// mean |dB difference| per bin, averaged over slices and both channels
+// ("spec", includes level shifts) plus the mean-removed version ("shape",
+// level-independent EQ-tilt detector). Bins are clamped to (pair peak − 80 dB)
+// so empty ultrasonic bins can't manufacture distance out of eps noise.
+const SLICE_T = [0.30, 1.20, 2.05, 2.70];
+const NFFT = 2048;
+const K_LO = 2, K_HI = 512; // bin 2 ≈ 47 Hz, bin 512 = 12 kHz @ 48 kHz / 2048
+const NBINS = K_HI - K_LO;
+const hann = new Float32Array(NFFT);
+for (let i = 0; i < NFFT; i++) hann[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (NFFT - 1));
+
+function fft(re, im) { // in-place radix-2
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) {
+      let t = re[i]; re[i] = re[j]; re[j] = t;
+      t = im[i]; im[i] = im[j]; im[j] = t;
+    }
+  }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (-2 * Math.PI) / len;
+    const wr = Math.cos(ang), wi = Math.sin(ang);
+    const half = len >> 1;
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let k = 0; k < half; k++) {
+        const ar = re[i + k], ai = im[i + k];
+        const br = re[i + k + half] * cr - im[i + k + half] * ci;
+        const bi = re[i + k + half] * ci + im[i + k + half] * cr;
+        re[i + k] = ar + br; im[i + k] = ai + bi;
+        re[i + k + half] = ar - br; im[i + k + half] = ai - bi;
+        const ncr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = ncr;
+      }
+    }
+  }
+}
+
+function sliceSpectrumDb(ch, t0) {
+  const start = Math.min(ch.length - NFFT, Math.max(0, Math.round(t0 * SR)));
+  const re = new Float32Array(NFFT), im = new Float32Array(NFFT);
+  for (let i = 0; i < NFFT; i++) re[i] = ch[start + i] * hann[i];
+  fft(re, im);
+  const db = new Float32Array(NBINS);
+  for (let k = K_LO; k < K_HI; k++) {
+    db[k - K_LO] = 10 * Math.log10(re[k] * re[k] + im[k] * im[k] + 1e-20);
+  }
+  return db;
+}
+
+function analyse(rendered) {
+  const chans = [rendered.getChannelData(0), rendered.getChannelData(1)];
+  let peak = 0;
+  for (const ch of chans) for (let i = 0; i < ch.length; i++) { const a = Math.abs(ch[i]); if (a > peak) peak = a; }
+  const spectra = SLICE_T.map((t) => chans.map((ch) => sliceSpectrumDb(ch, t)));
+  return { lufs: integratedLufs(chans, SR), peak, spectra };
+}
+
+// spec = mean |ΔdB| per bin (level-inclusive); shape = mean |ΔdB − mean(ΔdB)|
+// (level-removed: pure volume knobs → shape ≈ 0, EQ knobs → shape > 0).
+function specDistance(A, B) {
+  let spec = 0, shape = 0, cnt = 0;
+  for (let s = 0; s < SLICE_T.length; s++) {
+    for (let c = 0; c < 2; c++) {
+      const x = A[s][c], y = B[s][c];
+      let pk = -Infinity;
+      for (let i = 0; i < NBINS; i++) { if (x[i] > pk) pk = x[i]; if (y[i] > pk) pk = y[i]; }
+      const floor = pk - 80;
+      let mean = 0;
+      const diffs = new Float32Array(NBINS);
+      for (let i = 0; i < NBINS; i++) {
+        const d = Math.max(x[i], floor) - Math.max(y[i], floor);
+        diffs[i] = d; mean += d;
+      }
+      mean /= NBINS;
+      let r = 0, sh = 0;
+      for (let i = 0; i < NBINS; i++) { r += Math.abs(diffs[i]); sh += Math.abs(diffs[i] - mean); }
+      spec += r / NBINS; shape += sh / NBINS; cnt++;
+    }
+  }
+  return { spec: spec / cnt, shape: shape / cnt };
+}
+
+const clampLufs = (v) => (isFinite(v) ? v : -100); // silence → −100 for deltas
+function compare(a, b) {
+  const d = specDistance(a.spectra, b.spectra);
+  return {
+    lufsD: Math.abs(clampLufs(a.lufs) - clampLufs(b.lufs)),
+    spec: d.spec,
+    shape: d.shape,
+  };
+}
+const num = (v, digits = 3) => (v == null || !isFinite(v) ? null : +v.toFixed(digits));
+
+// ── Amp chain render ────────────────────────────────────────────────────────
+// Locked analytic amp modules drive → eq → cabinet (built via buildChain, full
+// schema defaults spread per module) + the amp reverb stage wired the way
+// src/main.js does live (engine.output → reverbStage → out; the stage is
+// ALWAYS in the graph, mix is just a wet gain).
+function ampConfig(overrides = {}) {
+  const cfg = {
+    drive: schemaDefaults('drive'),
+    eq: schemaDefaults('eq'),
+    cabinet: schemaDefaults('cabinet'),
+    reverb: schemaDefaults('reverb'),
+  };
+  for (const [path, v] of Object.entries(overrides)) {
+    const [fx, key] = path.split('.');
+    if (!cfg[fx] || !(key in cfg[fx])) throw new Error(`bad override ${path}`);
+    cfg[fx] = { ...cfg[fx], [key]: v };
+  }
+  return cfg;
+}
+
+async function renderAmp(cfg) {
+  const oc = new OfflineAudioContext(2, LEN, SR);
+  await loadWorklets(oc); // parity with normalize.js (no-op for the analytic amp)
+  const buf = oc.createBuffer(1, LEN, SR);
+  buf.getChannelData(0).set(makeGuitarReference(SR));
+  const src = oc.createBufferSource(); src.buffer = buf;
+  const chain = ['drive', 'eq', 'cabinet'].map((t) => ({ type: t, params: { ...cfg[t] } }));
+  const engine = buildChain(oc, chain, registry);
+  src.connect(engine.input);
+  const rv = reverbFx.create(oc, { ...cfg.reverb });
+  engine.output.connect(rv.input);
+  rv.output.connect(oc.destination);
+  src.start();
+  return analyse(await oc.startRendering());
+}
+
+const ampCache = new Map(); // config JSON -> analysed (renders are deterministic; the floor pair PROVES it before the cache is ever trusted)
+async function renderAmpCached(overrides) {
+  const cfg = ampConfig(overrides);
+  const key = JSON.stringify(cfg);
+  if (!ampCache.has(key)) ampCache.set(key, await renderAmp(cfg));
+  return ampCache.get(key);
+}
+
+// ── Test plan ───────────────────────────────────────────────────────────────
+const CONTEXTS = {
+  base:      { label: 'defaults (amount=2.5)', ov: {} },
+  clean:     { label: 'clean (amount=1)',      ov: { 'drive.amount': 1 } },
+  hot:       { label: 'hot (amount=8)',        ov: { 'drive.amount': 8 } },
+  cleanMid8: { label: 'clean, eq.mid=8',       ov: { 'drive.amount': 1, 'eq.mid': 8 } },
+  hotMid8:   { label: 'hot, eq.mid=8',         ov: { 'drive.amount': 8, 'eq.mid': 8 } },
+  cleanWet:  { label: 'clean, rev.mix=0.5',    ov: { 'drive.amount': 1, 'reverb.mix': 0.5 } },
+};
+
+const AMP_PLAN = [
+  // drive.amount IS the context variable — sweep it once over otherwise-pure defaults.
+  { fx: 'drive', key: 'amount', contexts: ['base'] },
+  ...['tone', 'level', 'master', 'blend', 'midBump'].map((key) => ({ fx: 'drive', key, contexts: ['clean', 'hot'] })),
+  ...['bass', 'mid', 'treble'].map((key) => ({ fx: 'eq', key, contexts: ['clean', 'hot'] })),
+  // midFreq moves a peaking filter whose GAIN is set by eq.mid (default 5 → 0 dB),
+  // so it is also tested with the mid band boosted to show interaction masking.
+  { fx: 'eq', key: 'midFreq', contexts: ['clean', 'hot', 'cleanMid8', 'hotMid8'] },
+  ...['brightness', 'body', 'presence', 'mix'].map((key) => ({ fx: 'cabinet', key, contexts: ['clean', 'hot'] })),
+  // reverb size at the schema-default mix (0.12) plus a wetter context to
+  // separate "subtle at 12% wet" from "not implemented".
+  { fx: 'reverb', key: 'size', contexts: ['clean', 'hot', 'cleanWet'] },
+  { fx: 'reverb', key: 'mix', contexts: ['clean', 'hot'] },
+];
+
+function verdictFor(pair, floor) {
+  const dLufs = Math.max(0.15, 3 * floor.lufsD);
+  const dSpec = Math.max(0.05, 3 * floor.spec);
+  if (pair.lufsD < dLufs && pair.spec < dSpec) return { verdict: 'DEAD', dLufs, dSpec };
+  if (pair.lufsD < 0.5 && pair.spec < 0.75) return { verdict: 'WEAK', dLufs, dSpec };
+  return { verdict: 'ALIVE', dLufs, dSpec };
+}
+
+async function runAmp() {
+  // 1) Self-noise floor per context: render the IDENTICAL config twice, compare.
+  const contexts = {};
+  for (const [ctxKey, ctx] of Object.entries(CONTEXTS)) {
+    console.log(`[knob] floor: ${ctxKey}`);
+    const r1 = await renderAmp(ampConfig(ctx.ov));
+    const r2 = await renderAmp(ampConfig(ctx.ov));
+    const floor = compare(r1, r2);
+    ampCache.set(JSON.stringify(ampConfig(ctx.ov)), r1); // seed cache with a floor render
+    contexts[ctxKey] = {
+      label: ctx.label,
+      floor: { lufsD: num(floor.lufsD, 6), spec: num(floor.spec, 6), shape: num(floor.shape, 6) },
+      defLufs: num(r1.lufs, 2),
+      defPeak: num(r1.peak, 3),
+    };
+  }
+
+  // 2) Knob sweeps.
+  const rows = [];
+  for (const t of AMP_PLAN) {
+    const p = schemaParam(t.fx, t.key);
+    for (const ctxKey of t.contexts) {
+      const ctx = CONTEXTS[ctxKey];
+      console.log(`[knob] ${t.fx}.${t.key} @ ${ctxKey}`);
+      const path = `${t.fx}.${t.key}`;
+      const def = await renderAmpCached(ctx.ov);
+      const lo = await renderAmpCached({ ...ctx.ov, [path]: p.min });
+      const hi = await renderAmpCached({ ...ctx.ov, [path]: p.max });
+      const minMax = compare(lo, hi);
+      const minDef = compare(lo, def);
+      const defMax = compare(def, hi);
+      const floorRaw = contexts[ctxKey].floor;
+      const { verdict, dLufs, dSpec } = verdictFor(minMax, { lufsD: floorRaw.lufsD, spec: floorRaw.spec });
+      rows.push({
+        fx: t.fx, key: t.key, context: ctxKey, ctxLabel: ctx.label,
+        sweep: { min: p.min, def: p.default, max: p.max },
+        lufs: { lo: num(lo.lufs, 2), def: num(def.lufs, 2), hi: num(hi.lufs, 2) },
+        silent: { lo: !isFinite(lo.lufs), def: !isFinite(def.lufs), hi: !isFinite(hi.lufs) },
+        minMax: { lufsD: num(minMax.lufsD), spec: num(minMax.spec), shape: num(minMax.shape) },
+        minDef: { lufsD: num(minDef.lufsD), spec: num(minDef.spec), shape: num(minDef.shape) },
+        defMax: { lufsD: num(defMax.lufsD), spec: num(defMax.spec), shape: num(defMax.shape) },
+        thresholds: { dLufs: num(dLufs), dSpec: num(dSpec) },
+        verdict,
+      });
+    }
+  }
+
+  // 3) Roll up: a knob is as alive as its liveliest context.
+  const rank = { DEAD: 0, WEAK: 1, ALIVE: 2 };
+  const byKnob = new Map();
+  for (const r of rows) {
+    const k = `${r.fx}.${r.key}`;
+    const cur = byKnob.get(k);
+    if (!cur || rank[r.verdict] > rank[cur.verdict]) byKnob.set(k, { knob: k, verdict: r.verdict, bestContext: r.context });
+  }
+  return { contexts, rows, rollup: [...byKnob.values()] };
+}
+
+// ── Brief pedal sweep ───────────────────────────────────────────────────────
+// The probe suite (tests/effects-probe.mjs) proves each pedal's FAMILY
+// behavior at default params; it does not sweep individual params. This sweep
+// renders each pedal alone (min/default/max per param) with the same metrics.
+const PEDAL_SKIP = {
+  neuralamp: 'non-analytic (network wasm + .nam handshake) — out of scope',
+  looper: 'transport-driven (params select record/play state); needs time-varying automation, not static renders',
+};
+const AMP_TYPES = new Set(['drive', 'eq', 'cabinet', 'reverb']);
+
+async function renderPedal(type, params) {
+  const oc = new OfflineAudioContext(2, LEN, SR);
+  await loadWorklets(oc);
+  const buf = oc.createBuffer(1, LEN, SR);
+  buf.getChannelData(0).set(makeGuitarReference(SR));
+  const src = oc.createBufferSource(); src.buffer = buf;
+  const engine = buildChain(oc, [{ type, params: { ...params } }], registry);
+  src.connect(engine.input);
+  engine.output.connect(oc.destination);
+  src.start();
+  return analyse(await oc.startRendering());
+}
+
+async function runPedals() {
+  const out = [];
+  for (const type of Object.keys(registry)) {
+    if (AMP_TYPES.has(type)) continue;
+    if (PEDAL_SKIP[type]) { out.push({ type, skipped: PEDAL_SKIP[type] }); continue; }
+    const defs = schemaDefaults(type);
+    let d1, d2, floor;
+    try {
+      console.log(`[knob] pedal floor: ${type}`);
+      d1 = await renderPedal(type, defs);
+      d2 = await renderPedal(type, defs);
+      floor = compare(d1, d2);
+    } catch (e) {
+      out.push({ type, error: `default render: ${e && e.message || e}` });
+      continue;
+    }
+    for (const p of registry[type].schema.params) {
+      try {
+        console.log(`[knob] pedal ${type}.${p.key}`);
+        const lo = await renderPedal(type, { ...defs, [p.key]: p.min });
+        const hi = await renderPedal(type, { ...defs, [p.key]: p.max });
+        const minMax = compare(lo, hi);
+        const { verdict } = verdictFor(minMax, floor);
+        out.push({
+          type, param: p.key, sweep: { min: p.min, def: p.default, max: p.max },
+          lufs: { lo: num(lo.lufs, 2), hi: num(hi.lufs, 2) },
+          minMax: { lufsD: num(minMax.lufsD), spec: num(minMax.spec), shape: num(minMax.shape) },
+          floor: { lufsD: num(floor.lufsD, 6), spec: num(floor.spec, 6) },
+          verdict,
+        });
+      } catch (e) {
+        out.push({ type, param: p.key, error: String(e && e.message || e) });
+      }
+    }
+  }
+  return out;
+}
+
+async function run(opts = {}) {
+  const amp = await runAmp();
+  const pedals = opts.pedals ? await runPedals() : null;
+  return { sampleRate: SR, refSeconds: REF_SECONDS, slices: SLICE_T, nfft: NFFT, band: [K_LO, K_HI], ...amp, pedals };
+}
+
+window.__knobAudit = { run };
+</script>
+</body>

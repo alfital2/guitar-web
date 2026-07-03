@@ -101,3 +101,23 @@ describe('punchTakes over looped takes', () => {
     expect(nextN).toBe(11);
   });
 });
+
+// ── recording-latency compensation ──
+import { recordHeadTrimSec } from '../src/take-ops.js';
+
+describe('recordHeadTrimSec', () => {
+  it('no backing → monitoring latency only', () => {
+    expect(recordHeadTrimSec({ playerT0: null, capStart: 10, baseLatency: 0.005, outputLatency: 0.012 })).toBeCloseTo(0.017, 6);
+  });
+  it('overdub adds the backing schedule gap (t0 - capStart)', () => {
+    expect(recordHeadTrimSec({ playerT0: 10.03, capStart: 10.0, baseLatency: 0.005, outputLatency: 0.012 })).toBeCloseTo(0.047, 6);
+  });
+  it('backing scheduled before capture start contributes nothing negative', () => {
+    expect(recordHeadTrimSec({ playerT0: 9.9, capStart: 10.0, baseLatency: 0.01, outputLatency: 0 })).toBeCloseTo(0.01, 6);
+  });
+  it('clamps to 120 ms and to ≥ 0, tolerates missing latencies', () => {
+    expect(recordHeadTrimSec({ playerT0: 12, capStart: 10 })).toBe(0.12);
+    expect(recordHeadTrimSec({})).toBe(0);
+    expect(recordHeadTrimSec({ baseLatency: undefined, outputLatency: undefined })).toBe(0);
+  });
+});

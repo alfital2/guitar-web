@@ -53,7 +53,7 @@ describe('neuralamp effect', () => {
   it('exposes the neuralamp schema and the 5 model ids', () => {
     expect(schema.type).toBe('neuralamp');
     expect(schema.label).toBe('Neural Amp');
-    expect(schema.params.map((p) => p.key)).toEqual(['model', 'trim', 'level']);
+    expect(schema.params.map((p) => p.key)).toEqual(['model', 'trim', 'bass', 'mid', 'treble', 'presence', 'level']);
     const model = schema.params.find((p) => p.key === 'model');
     expect([model.min, model.max, model.default, model.step]).toEqual([0, 4, 0, 1]);
     expect(MODELS).toEqual(['jcm', '5153', 'deluxe', 'ac10', 'jc']);
@@ -77,8 +77,16 @@ describe('neuralamp effect', () => {
     expect(node.name).toBe('neural-amp-processor');
     expect(ctx.connections).toContainEqual(
       expect.objectContaining({ from: fx.input.id, to: node.id }));
-    expect(ctx.connections).toContainEqual(
-      expect.objectContaining({ from: node.id, to: fx.output.id }));
+    // node → 4-biquad tone stack → levelGain: walk the chain from the worklet
+    // to the output through biquads only.
+    let cur = node.id, hops = 0;
+    while (cur !== fx.output.id && hops < 6) {
+      const edge = ctx.connections.find((c) => c.from === cur);
+      expect(edge).toBeTruthy();
+      cur = edge.to; hops++;
+    }
+    expect(cur).toBe(fx.output.id);
+    expect(hops).toBe(5); // bass, mid, treble, presence, level
     await flush();
     expect(node.messages.some((m) => m.type === 'wasm')).toBe(true);
   });

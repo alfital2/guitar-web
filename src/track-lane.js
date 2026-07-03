@@ -16,6 +16,25 @@ export const BEATS_PER_BAR = 4; // 4/4 time
 export function beatPx(bpm) { return (60 / (bpm || 120)) * PX_PER_SEC; }
 export function barPx(bpm) { return BEATS_PER_BAR * beatPx(bpm); }
 
+// Live ruler extension: while recording, the playhead must never run off the
+// end of the grid. Cheap DOM appends — no re-render, so the growing live clip
+// is untouched. Returns the new bar count.
+export function ensureRulerBars(container, uptoSec, bpm, zoom) {
+  const ruler = container.querySelector('.track-ruler');
+  if (!ruler) return 0;
+  const secPerBar = BEATS_PER_BAR * 60 / (bpm || 120);
+  const need = Math.ceil(uptoSec / secPerBar) + 2;      // 2 bars of headroom
+  const have = ruler.children.length;
+  if (need <= have) return have;
+  const bw = barPx(bpm) * (zoom || 1);
+  for (let i = have + 1; i <= need; i++) {
+    const c = el('div', 'track-bar'); c.textContent = String(i);
+    c.style.width = `${bw}px`; c.style.flex = `0 0 ${bw}px`;
+    ruler.appendChild(c);
+  }
+  return need;
+}
+
 // ── View zoom ───────────────────────────────────────────────────────────────
 // A pure VIEW multiplier for precise editing: every rendered px is model-px ×
 // Z, every pointer delta is divided by Z on the way back in. Take positions

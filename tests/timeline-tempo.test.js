@@ -40,3 +40,35 @@ describe('timeline zoom', () => {
     expect(loadZoom()).toBe(1);
   });
 });
+
+// ── endless timeline: live ruler extension ──
+import { ensureRulerBars } from '../src/track-lane.js';
+
+describe('ensureRulerBars (endless timeline)', () => {
+  function laneWith(bars, bw = 64) {
+    const c = document.createElement('div');
+    const r = document.createElement('div'); r.className = 'track-ruler';
+    for (let i = 1; i <= bars; i++) { const b = document.createElement('div'); b.className = 'track-bar'; b.style.width = `${bw}px`; r.appendChild(b); }
+    c.appendChild(r);
+    return c;
+  }
+  it('appends bars to cover the playhead + 2 headroom', () => {
+    const lane = laneWith(16);
+    // 120 BPM → 2 s/bar; playhead at 40 s → needs ceil(40/2)+2 = 22 bars
+    const n = ensureRulerBars(lane, 40, 120, 1);
+    expect(n).toBe(22);
+    expect(lane.querySelectorAll('.track-bar')).toHaveLength(22);
+    expect(lane.querySelectorAll('.track-bar')[21].textContent).toBe('22');
+  });
+  it('new bars carry tempo- and zoom-scaled widths', () => {
+    const lane = laneWith(16);
+    ensureRulerBars(lane, 60, 80, 2); // 80 BPM bar = 96 base px, ×2 zoom = 192; 60s → 22 bars
+    const cells = lane.querySelectorAll('.track-bar');
+    expect(cells[cells.length - 1].style.width).toBe('192px');
+  });
+  it('no-op when the grid already covers the time', () => {
+    const lane = laneWith(16);
+    expect(ensureRulerBars(lane, 10, 120, 1)).toBe(16);
+    expect(lane.querySelectorAll('.track-bar')).toHaveLength(16);
+  });
+});

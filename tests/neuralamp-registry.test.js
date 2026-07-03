@@ -14,9 +14,9 @@ describe('neuralamp registration (src/effects/index.js)', () => {
     expect(def.schema.label).toBe('Neural Amp');
     expect(typeof def.create).toBe('function');
   });
-  it('schema declares the model/trim/level params from the contract', () => {
+  it('schema declares the model/trim/tone-stack/level params from the contract', () => {
     const keys = registry['neuralamp'].schema.params.map((p) => p.key);
-    expect(keys).toEqual(['model', 'trim', 'level']);
+    expect(keys).toEqual(['model', 'trim', 'bass', 'mid', 'treble', 'presence', 'level']);
   });
   it('ships 5 model ids that map to assets/neural/<name>.nam', () => {
     expect(MODELS).toEqual(['jcm', '5153', 'deluxe', 'ac10', 'jc']);

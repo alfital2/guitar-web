@@ -1,12 +1,12 @@
 {
-  "date": "2026-07-02T21:24:45.578Z",
+  "date": "2026-07-03T13:51:47.759Z",
   "targetLufs": -18,
   "medianLufs": -19.46,
   "spreadLu": 1.8299999999999983,
   "toleranceLu": 1.5,
   "rows": [
     {
-      "name": "Amazing Tweed",
+      "name": "Tears in Tweed",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": -5.37,
@@ -16,7 +16,7 @@
       "error": null
     },
     {
-      "name": "Brit and Clean",
+      "name": "Ticket to Chime",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": -3.2,
@@ -26,7 +26,7 @@
       "error": null
     },
     {
-      "name": "Chicken Pickin'",
+      "name": "Folsom Twang",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": -0.58,
@@ -36,7 +36,7 @@
       "error": null
     },
     {
-      "name": "Clean Echoes",
+      "name": "Shine On Clean",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": -13.5,
@@ -46,7 +46,7 @@
       "error": null
     },
     {
-      "name": "Clean Studio Stack",
+      "name": "Every Breath Stack",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": 5.21,
@@ -56,7 +56,7 @@
       "error": null
     },
     {
-      "name": "Cool Jazz Combo",
+      "name": "Kind of Mellow",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": 9.86,
@@ -66,7 +66,7 @@
       "error": null
     },
     {
-      "name": "Country Gent",
+      "name": "Mystery Train",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": -13.41,
@@ -76,7 +76,7 @@
       "error": null
     },
     {
-      "name": "Dublin Delay",
+      "name": "Streets Have Echoes",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": -5.7,
@@ -86,7 +86,7 @@
       "error": null
     },
     {
-      "name": "Dyna-Trem",
+      "name": "Soon Is Now",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": 8.16,
@@ -96,7 +96,7 @@
       "error": null
     },
     {
-      "name": "Echo Studio",
+      "name": "Sun Studio Slap",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": -9.55,
@@ -106,7 +106,7 @@
       "error": null
     },
     {
-      "name": "Heavenly Tweed",
+      "name": "Hallelujah Tweed",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": -6.1,
@@ -116,7 +116,7 @@
       "error": null
     },
     {
-      "name": "Move the Mics",
+      "name": "Levee Room",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": 2.44,
@@ -126,7 +126,7 @@
       "error": null
     },
     {
-      "name": "Multi-Phase Amp",
+      "name": "Phase of the Moon",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": 4.25,
@@ -136,7 +136,7 @@
       "error": null
     },
     {
-      "name": "Mystery Chorus",
+      "name": "Nevermind Shimmer",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": -12.99,
@@ -146,7 +146,7 @@
       "error": null
     },
     {
-      "name": "Old Time Tremolo",
+      "name": "Crimson Clover",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": 2.67,
@@ -156,7 +156,7 @@
       "error": null
     },
     {
-      "name": "Spin Speaker Blues",
+      "name": "Little Wing Spin",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": -6.89,
@@ -166,7 +166,7 @@
       "error": null
     },
     {
-      "name": "Surfin' in Stereo",
+      "name": "Wipeout Stereo",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": 11.3,
@@ -176,7 +176,7 @@
       "error": null
     },
     {
-      "name": "Vibrato Verb",
+      "name": "Sleepwalk Shimmer",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": 5.07,
@@ -186,7 +186,7 @@
       "error": null
     },
     {
-      "name": "Warm British Combo",
+      "name": "Norwegian Warmth",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": 0.08,
@@ -196,7 +196,7 @@
       "error": null
     },
     {
-      "name": "Worlds Smallest Amp",
+      "name": "Chamber Lo-Fi",
       "category": "01 Clean Guitar",
       "neural": false,
       "appGainDb": -11.12,
@@ -206,7 +206,7 @@
       "error": null
     },
     {
-      "name": "Amp Switcher",
+      "name": "Jekyll & Hyde",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -9.98,
@@ -216,7 +216,7 @@
       "error": null
     },
     {
-      "name": "Big Brute Blues",
+      "name": "La Grange Growl",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -15.34,
@@ -226,7 +226,7 @@
       "error": null
     },
     {
-      "name": "British Invasion",
+      "name": "Day Tripper Grind",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -15.37,
@@ -236,7 +236,7 @@
       "error": null
     },
     {
-      "name": "Broken Up Brit",
+      "name": "Generation Edge",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -17.52,
@@ -246,7 +246,7 @@
       "error": null
     },
     {
-      "name": "Cheap Studio Time",
+      "name": "Spirit in the Grit",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -13.28,
@@ -256,7 +256,7 @@
       "error": null
     },
     {
-      "name": "Chord Burner",
+      "name": "Teen Spirit Burner",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -11.07,
@@ -266,7 +266,7 @@
       "error": null
     },
     {
-      "name": "Double Brit Phaser",
+      "name": "Eruption Swirl",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -17.47,
@@ -276,7 +276,7 @@
       "error": null
     },
     {
-      "name": "Double Driven",
+      "name": "Comfortably Driven",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -22.15,
@@ -286,7 +286,7 @@
       "error": null
     },
     {
-      "name": "Eighties Goth",
+      "name": "Disintegration Wash",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -16.54,
@@ -296,7 +296,7 @@
       "error": null
     },
     {
-      "name": "Fat Amp",
+      "name": "Sabbath Lows",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -14.72,
@@ -306,7 +306,7 @@
       "error": null
     },
     {
-      "name": "Heartbroken",
+      "name": "Parisienne Cry",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -18.79,
@@ -316,7 +316,7 @@
       "error": null
     },
     {
-      "name": "Honk n' Drive",
+      "name": "Voodoo Honk",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -17.11,
@@ -326,7 +326,7 @@
       "error": null
     },
     {
-      "name": "Indie Scorcher",
+      "name": "Debaser Fuzz",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -21.84,
@@ -336,7 +336,7 @@
       "error": null
     },
     {
-      "name": "Old School Punk",
+      "name": "Blitzkrieg Buzz",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -17.27,
@@ -346,7 +346,7 @@
       "error": null
     },
     {
-      "name": "Panning Swirl",
+      "name": "Axis Swirl",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -12.41,
@@ -356,7 +356,7 @@
       "error": null
     },
     {
-      "name": "Practice Space",
+      "name": "Basement Tapes",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -14.59,
@@ -366,7 +366,7 @@
       "error": null
     },
     {
-      "name": "Razor Amp",
+      "name": "Rage Razor",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -11.03,
@@ -376,7 +376,7 @@
       "error": null
     },
     {
-      "name": "Royal Rock",
+      "name": "Bohemian Crunch",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -18.03,
@@ -386,7 +386,7 @@
       "error": null
     },
     {
-      "name": "Starlit Cavern",
+      "name": "Moonage Cavern",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -18.05,
@@ -396,7 +396,7 @@
       "error": null
     },
     {
-      "name": "Swampland",
+      "name": "Bayou Rising",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -11.72,
@@ -406,7 +406,7 @@
       "error": null
     },
     {
-      "name": "Woolly Octave",
+      "name": "Hazy Purple",
       "category": "02 Crunch Guitar",
       "neural": false,
       "appGainDb": -8.84,
