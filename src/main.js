@@ -32,6 +32,8 @@ import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
 import { connectInputChannel } from './audio/input-channel.js';
 import { maybeShowSafariNotice } from './browser-notice.js';
+import { createNoteTracker, assignFret, quantizeToGrid } from './tab/transcribe.js';
+import { mountTabLane } from './tab/tab-lane.js';
 import { initJamUI } from './jam-ui.js';
 
 const $ = id => document.getElementById(id);
@@ -1211,8 +1213,91 @@ const transport = mountTransport($('transport-cluster'), {
   getLiveAnalyser: () => analyser,
   onGain: (v) => { if (gainOut) gainOut.gain.value = v; },
   // Tempo drives the ruler grid + beat snap — re-render the lane on change.
-  onTempoChange: (n) => { uiBpm = n; renderTrack(); },
+  onTempoChange: (n) => { uiBpm = n; renderTrack(); if (tabState) tabState.lane.setBpm(n); },
+  onToggleTab: () => toggleTabMode(),
 });
+
+// ── Live TAB transcription (Phase 1: mono, standard tuning, 16th grid) ─────
+// Launch: TAB chip in the toolbar. The metronome free-runs (you play to the
+// click), pitch comes from the same pre-FX input tap the tuner uses, notes are
+// segmented + fret-assigned live and land on a beat-quantized tab lane above
+// the amp. Detection/monitoring lag is compensated by a fixed offset so notes
+// played ON the click land ON the column.
+const TAB_LAG_SEC = 0.11; // click output latency + analysis window + onset frames
+let tabState = null;      // { lane, tracker, raf, t0, buf, prevPos, metroWasFree }
+
+function stopTabMode() {
+  if (!tabState) return;
+  cancelAnimationFrame(tabState.raf);
+  tabState.tracker.end((performance.now() - tabState.t0) / 1000);
+  if (!tabState.metroWasFree) transport.setMetroFree(false); // leave things as we found them
+  tabState.lane.destroy();
+  tabState = null;
+  $('tab-toggle')?.classList.remove('on');
+}
+
+function toggleTabMode() {
+  if (tabState) { stopTabMode(); return; }
+  if (!ctx || !analyser) { $('error').textContent = 'Power on first — live TAB listens to your guitar input.'; return; }
+  const laneEl = $('tab-lane');
+  if (!laneEl) return;
+  const lane = mountTabLane(laneEl, { bpm: uiBpm });
+  const tracker = createNoteTracker();
+  const buf = new Float32Array(analyser.fftSize);
+  const metroWasFree = transport.isMetroFree();
+  if (!metroWasFree) transport.setMetroFree(true); // the grid needs an audible click
+  const t0 = performance.now();
+  tabState = { lane, tracker, raf: 0, t0, buf, prevPos: null, metroWasFree };
+  lane.onClear(() => { lane.clear(); tabState.prevPos = null; });
+  lane.onClose(() => stopTabMode());
+  $('tab-toggle')?.classList.add('on');
+
+  const loop = () => {
+    if (!tabState) return;
+    if (!ctx || !analyser) { stopTabMode(); return; }
+    const nowSec = (performance.now() - t0) / 1000;
+    analyser.getFloatTimeDomainData(buf);
+    let rms = 0;
+    for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+    rms = Math.sqrt(rms / buf.length);
+    const det = detectPitchMPM(buf, ctx.sampleRate) || {};
+    if (window.__tabDebug) window.__tabDebug.probe = { rms: +rms.toFixed(4), freq: det.freq ? +det.freq.toFixed(1) : null, clarity: det.clarity ? +det.clarity.toFixed(2) : 0 };
+    const events = tracker.push(det.freq || null, det.clarity || 0, rms, nowSec);
+    for (const ev of events) {
+      if (ev.type !== 'on') continue;
+      const pos = assignFret(ev.midi, tabState.prevPos);
+      if (!pos) continue;
+      tabState.prevPos = pos;
+      lane.noteOn(pos.string, pos.fret, quantizeToGrid(ev.tSec - TAB_LAG_SEC, uiBpm));
+    }
+    lane.setCursor(Math.max(0, (nowSec - TAB_LAG_SEC) * (uiBpm / 60)));
+    tabState.raf = requestAnimationFrame(loop);
+  };
+  loop();
+}
+if ($('diag')) window.__tabDebug = {
+  count: () => (tabState ? tabState.lane.noteCount() : -1),
+  active: () => !!tabState,
+  // Test-only: drive the tracker with synthetic pitch frames (the fake-mic
+  // test device emits unpitched pulses that MPM rightly rejects, so e2e proves
+  // the segmentation→fret→quantize→render path this way; the analyser→MPM leg
+  // is proven daily by the tuner, which shares it).
+  sim(freq, frames = 6) {
+    if (!tabState) return 0;
+    const nowSec = (performance.now() - tabState.t0) / 1000;
+    const events = [];
+    for (let i = 0; i < frames; i++) events.push(...tabState.tracker.push(freq, 0.95, 0.05, nowSec + i * 0.016));
+    events.push(...(freq == null ? [] : tabState.tracker.push(null, 0, 0, nowSec + frames * 0.016)));
+    for (const ev of events) {
+      if (ev.type !== 'on') continue;
+      const pos = assignFret(ev.midi, tabState.prevPos);
+      if (!pos) continue;
+      tabState.prevPos = pos;
+      tabState.lane.noteOn(pos.string, pos.fret, quantizeToGrid(ev.tSec - TAB_LAG_SEC, uiBpm));
+    }
+    return tabState.lane.noteCount();
+  },
+};
 
 // Record: capture the live processed output into a take, append it as a clip.
 {
