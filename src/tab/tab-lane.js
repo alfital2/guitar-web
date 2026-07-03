@@ -93,10 +93,10 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
     noteCount: () => notes,
     // Listening vs stopped: stopping KEEPS the transcription on screen (the
     // whole point is reading it back) — only the cursor/live-dot pause.
-    setLive(on) {
+    setLive(on, label) {
       container.classList.toggle('paused', !on);
       const st = head.querySelector('.tab-state');
-      if (st) st.textContent = on ? 'live transcription' : 'stopped — TAB records a fresh take';
+      if (st) st.textContent = label || (on ? 'live transcription' : 'stopped — TAB records a fresh take');
     },
     onClear(cb) { head.querySelector('.tab-clear').addEventListener('click', cb); },
     onClose(cb) { head.querySelector('.tab-close').addEventListener('click', cb); },

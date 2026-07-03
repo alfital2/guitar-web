@@ -33,6 +33,7 @@ import * as reverbFx from './effects/reverb.js';
 import { connectInputChannel } from './audio/input-channel.js';
 import { maybeShowSafariNotice } from './browser-notice.js';
 import { createNoteTracker2, createOnsetDetector, assignFret, quantizeToGrid } from './tab/transcribe.js';
+import { transcribeTake } from './tab/offline-transcribe.js';
 import { mountTabLane } from './tab/tab-lane.js';
 import { initJamUI } from './jam-ui.js';
 
@@ -1247,18 +1248,57 @@ function closeTabLane() {
   tabLane = null;
 }
 
-function toggleTabMode() {
-  if (tabState) { stopTabListening(); return; }
-  if (!ctx || !analyser) { $('error').textContent = 'Power on first — live TAB listens to your guitar input.'; return; }
+function ensureTabLane() {
   const laneEl = $('tab-lane');
-  if (!laneEl) return;
+  if (!laneEl) return false;
   if (!tabLane) {
     tabLane = mountTabLane(laneEl, { bpm: uiBpm });
     tabLane.onClear(() => { tabLane.clear(); if (tabState) tabState.prevPos = null; });
     tabLane.onClose(() => closeTabLane());
-  } else {
-    tabLane.clear(); // re-arming records a fresh take on a fresh grid
   }
+  return true;
+}
+
+// Offline path: right-click a recorded clip → Transcribe. The whole take is
+// analysed at once (spectral-flux onsets + sustain pitch votes + ring-over
+// cancellation — see src/tab/offline-transcribe.js), which beats the live
+// tracker on fast runs and repicked notes. Renders into the same TAB lane;
+// col 0 = clip start.
+function transcribeSamplesToLane(samples, sampleRate, label) {
+  if (!ensureTabLane()) return 0;
+  if (tabState) stopTabListening();          // offline result replaces a live session
+  const { notes } = transcribeTake(samples, sampleRate);
+  tabLane.clear();
+  tabLane.setBpm(uiBpm);
+  let prev = null;
+  for (const nt of notes) {
+    const pos = assignFret(nt.midi, prev);
+    if (!pos) continue;
+    prev = pos;
+    tabLane.noteOn(pos.string, pos.fret, quantizeToGrid(nt.tSec, uiBpm));
+  }
+  tabLane.setLive(false, `${label || 'transcribed clip'} — ${notes.length} notes · TAB re-arms fresh`);
+  return notes.length;
+}
+
+function transcribeClipToLane(trackId, n) {
+  const tr = tracks.find((k) => k.id === trackId);
+  const tk = tr && tr.takes.find((k) => k.n === n);
+  if (!tk || !tk.samples || !tk.samples.length) return;
+  // transcribe the TRIMMED window — what the clip actually plays
+  const sr = tk.sampleRate;
+  const from = Math.max(0, Math.floor((tk.offset || 0) * sr));
+  const len = Math.floor(((tk.len != null ? tk.len : tk.duration) || 0) * sr);
+  const seg = tk.samples.subarray(from, Math.min(tk.samples.length, from + Math.max(1, len)));
+  transcribeSamplesToLane(seg, sr, `clip ${n}`);
+  $('tab-lane')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function toggleTabMode() {
+  if (tabState) { stopTabListening(); return; }
+  if (!ctx || !analyser) { $('error').textContent = 'Power on first — live TAB listens to your guitar input.'; return; }
+  if (!ensureTabLane()) return;
+  tabLane.clear(); // re-arming records a fresh take on a fresh grid
   const lane = tabLane;
   lane.setLive(true);
   lane.setBpm(uiBpm);
@@ -1316,6 +1356,8 @@ if ($('diag')) window.__tabDebug = {
   // test device emits unpitched pulses that MPM rightly rejects, so e2e proves
   // the segmentation→fret→quantize→render path this way; the analyser→MPM leg
   // is proven daily by the tuner, which shares it).
+  // Test-only: run the OFFLINE pipeline on synthesized samples and render.
+  offline(arr, sr) { return transcribeSamplesToLane(Float32Array.from(arr), sr, 'e2e'); },
   sim(freq, frames = 8) {
     if (!tabState) return 0;
     const nowSec = (performance.now() - tabState.t0) / 1000;
@@ -1493,6 +1535,7 @@ if ($('diag')) window.__tabDebug = {
           ctxItem(targets.length > 1 ? `Copy ${targets.length} clips` : 'Copy', () => copyClips(targets)),
           ctxItem('Paste at playhead', () => pasteClipboard(tid), !clipboard),
           ctxItem('Split at playhead', () => splitClip(tid, n), !!(ctxTake && ctxTake.repeat > 1)),
+          ctxItem('Transcribe → TAB', () => transcribeClipToLane(tid, n)),
           ctxItem(targets.length > 1 ? `Delete ${targets.length} clips` : 'Delete', () => deleteClips(targets)),
         ]);
         return;
