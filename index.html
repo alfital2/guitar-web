@@ -1282,11 +1282,21 @@
     background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb),0.6); will-change: transform; }
   .tab-note { position: absolute; transform: translate(-50%, -55%) scale(.6); opacity: 0;
     font: 700 12px var(--mono); color: #eaeaf2; background: #17171d; padding: 0 3px; border-radius: 3px;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8); cursor: grab; user-select: none;
+    min-width: 10px; text-align: center; border: 1px solid transparent; }
   .tab-note.in { transform: translate(-50%, -55%) scale(1); opacity: 1; transition: transform .12s ease, opacity .12s ease; }
-  #tab-toggle.on { color: var(--accent); border-color: rgba(var(--accent-rgb),0.55); background: rgba(var(--accent-rgb),0.12); }
-  .tab-lane.paused .tab-live-dot { animation: none; background: var(--very-muted); box-shadow: none; }
-  .tab-lane.paused .tab-cursor { opacity: 0; }
+  .tab-note:hover { border-color: rgba(var(--accent-rgb),0.5); }
+  .tab-note.dragging { cursor: grabbing; z-index: 5; transition: none;
+    transform: translate(-50%, -55%) scale(1.12); box-shadow: 0 3px 10px rgba(0,0,0,0.6); }
+  .tab-note.edited { color: var(--accent); background: #14140e; }
+  .tab-note.invalid { animation: tab-shake .28s ease; }
+  @keyframes tab-shake { 0%,100%{margin-left:0} 20%{margin-left:-4px} 40%{margin-left:4px} 60%{margin-left:-3px} 80%{margin-left:3px} }
+  .tab-note-input { width: 22px; font: 700 12px var(--mono); text-align: center; color: var(--accent);
+    background: #0c0c10; border: 1px solid rgba(var(--accent-rgb),0.6); border-radius: 3px; padding: 0; outline: none; }
+  .tab-hint { font-weight: 600; color: var(--very-muted); letter-spacing: .03em; }
+  .tab-export { font: 700 10px var(--font); color: var(--accent); background: rgba(var(--accent-rgb),0.1);
+    border: 1px solid rgba(var(--accent-rgb),0.4); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+  .tab-export:hover { background: rgba(var(--accent-rgb),0.18); }
   .tab-lane.paused .tab-title { color: var(--text-secondary); }
 
   /* ── Safari compositor relief ─────────────────────────────
