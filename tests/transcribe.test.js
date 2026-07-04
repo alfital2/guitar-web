@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   assignFret, positionsFor, quantizeToGrid, freqToMidiFloat, TUNING_MIDI,
-  midiForPosition, fretForString, MAX_FRET,
+  midiForPosition, fretForString, MAX_FRET, tabTimeForTransport,
 } from '../src/tab/transcribe.js';
 
 const G3 = 196;
@@ -62,5 +62,20 @@ describe('quantizeToGrid', () => {
   });
   it('never returns negative columns', () => {
     expect(quantizeToGrid(-0.2, 120)).toBe(0);
+  });
+});
+
+describe('tabTimeForTransport (cursor sync)', () => {
+  it('maps transport time into the clip window to tab-local time', () => {
+    // clip starts at 2 s on the timeline, lasts 3 s
+    expect(tabTimeForTransport(2.0, 2, 3)).toBeCloseTo(0, 5);
+    expect(tabTimeForTransport(3.5, 2, 3)).toBeCloseTo(1.5, 5);
+  });
+  it('returns null before the clip and past its end (cursor hidden)', () => {
+    expect(tabTimeForTransport(1.0, 2, 3)).toBeNull();   // before
+    expect(tabTimeForTransport(5.5, 2, 3)).toBeNull();   // well past end+pad
+  });
+  it('clamps a hair before the start to 0 (scheduling slop)', () => {
+    expect(tabTimeForTransport(1.99, 2, 3)).toBe(0);
   });
 });

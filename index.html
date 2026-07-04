@@ -1289,7 +1289,14 @@
   .tab-note.dragging { cursor: grabbing; z-index: 5; transition: none;
     transform: translate(-50%, -55%) scale(1.12); box-shadow: 0 3px 10px rgba(0,0,0,0.6); }
   .tab-note.edited { color: var(--accent); background: #14140e; }
+  .tab-note.playing { background: var(--accent); color: #0c0c10; box-shadow: 0 0 8px rgba(var(--accent-rgb),0.7); }
   .tab-note.invalid { animation: tab-shake .28s ease; }
+  .tab-cursor { transition: transform .05s linear; }
+  .tab-play { font: 700 11px var(--font); color: var(--accent); background: rgba(var(--accent-rgb),0.12);
+    border: 1px solid rgba(var(--accent-rgb),0.45); border-radius: 6px; width: 24px; height: 20px;
+    display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; line-height: 1; }
+  .tab-play:hover { background: rgba(var(--accent-rgb),0.2); }
+  .tab-play.on { background: var(--accent); color: #0c0c10; }
   @keyframes tab-shake { 0%,100%{margin-left:0} 20%{margin-left:-4px} 40%{margin-left:4px} 60%{margin-left:-3px} 80%{margin-left:3px} }
   .tab-note-input { width: 22px; font: 700 12px var(--mono); text-align: center; color: var(--accent);
     background: #0c0c10; border: 1px solid rgba(var(--accent-rgb),0.6); border-radius: 3px; padding: 0; outline: none; }

@@ -90,3 +90,49 @@ describe('tab-lane editor model', () => {
     expect(lane.getNotes()).toEqual([]);
   });
 });
+
+describe('tab-lane playhead + note highlight', () => {
+  it('setPlayhead shows the cursor and highlights the sounding note', () => {
+    const lane = mountTabLane(container, { bpm: 120 });
+    // note at 0.5 s lasting 0.4 s
+    lane.noteOn(3, 5, 4, { midi: 55, tSec: 0.5, durSec: 0.4 });
+    const cursor = container.querySelector('.tab-cursor');
+    const note = container.querySelector('.tab-note');
+
+    lane.setPlayhead(0.6);                        // inside the note's window
+    expect(cursor.style.opacity).toBe('1');
+    expect(note.classList.contains('playing')).toBe(true);
+
+    lane.setPlayhead(2.0);                        // well past it
+    expect(note.classList.contains('playing')).toBe(false);
+  });
+
+  it('hidePlayhead hides the cursor and clears highlights', () => {
+    const lane = mountTabLane(container, { bpm: 120 });
+    lane.noteOn(3, 5, 4, { midi: 55, tSec: 0.5, durSec: 0.4 });
+    lane.setPlayhead(0.6);
+    lane.hidePlayhead();
+    const cursor = container.querySelector('.tab-cursor');
+    expect(cursor.style.opacity).toBe('0');
+    expect(container.querySelector('.tab-note').classList.contains('playing')).toBe(false);
+  });
+
+  it('cursor x tracks time on the 16th-column geometry', () => {
+    const lane = mountTabLane(container, { bpm: 120 });   // 1 beat = 0.5 s = 4 cols = 104 px
+    lane.noteOn(5, 0, 0, { midi: 40, tSec: 0, durSec: 0.2 });
+    const cursor = container.querySelector('.tab-cursor');
+    lane.setPlayhead(0.5);                          // one beat → colF 4 → x = 4*26 + 13
+    expect(cursor.style.transform).toBe('translateX(117px)');
+  });
+
+  it('setPlaying toggles the strip play button glyph', () => {
+    const lane = mountTabLane(container, { bpm: 120 });
+    const btn = container.querySelector('.tab-play');
+    expect(btn.textContent).toBe('▶');
+    lane.setPlaying(true);
+    expect(btn.textContent).toBe('⏸');
+    expect(btn.classList.contains('on')).toBe(true);
+    lane.setPlaying(false);
+    expect(btn.textContent).toBe('▶');
+  });
+});

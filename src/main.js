@@ -32,10 +32,11 @@ import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
 import { connectInputChannel } from './audio/input-channel.js';
 import { maybeShowSafariNotice } from './browser-notice.js';
-import { assignFret, quantizeToGrid } from './tab/transcribe.js';
+import { assignFret, quantizeToGrid, tabTimeForTransport } from './tab/transcribe.js';
 import { encodeWav } from './wav.js';
 import { transcribeTake } from './tab/offline-transcribe.js';
 import { mountTabLane } from './tab/tab-lane.js';
+import { createTabMidiPlayer } from './tab/tab-midi-player.js';
 import { initJamUI } from './jam-ui.js';
 
 const $ = id => document.getElementById(id);
@@ -67,6 +68,7 @@ let recCapStart = 0;                 // ctx time capture began (same clock as re
 // you hear and is independent of the master Vol slider.
 const recorder = createRecorder({ getSource: () => normGain, getContext: () => ctx });
 const player = createPlayer({ getContext: () => ctx }); // one clock with the live graph + recorder
+const tabMidi = createTabMidiPlayer({ getContext: () => ctx }); // plays the TAB itself as MIDI notes
 
 // ── Transport auto-fold ──
 // While recording/playing the tracks deserve the vertical space: fold the amp
@@ -1230,7 +1232,7 @@ let tabLane = null;        // persists until ✕ — the transcription stays rea
 let tabAudio = null;       // { samples, sampleRate, label } of the shown clip, for export
 let tabTake = null;        // take whose `.tab` we keep in sync with edits (in-memory)
 
-function closeTabLane() { tabLane?.destroy(); tabLane = null; tabAudio = null; tabTake = null; }
+function closeTabLane() { tabMidi.stop(); tabLane?.destroy(); tabLane = null; tabAudio = null; tabTake = null; }
 
 function ensureTabLane() {
   const laneEl = $('tab-lane');
@@ -1241,9 +1243,38 @@ function ensureTabLane() {
     tabLane.onClose(() => closeTabLane());
     tabLane.onChange((model) => { if (tabTake) tabTake.tab = model; });   // corrections persist on the take
     tabLane.onExport(() => exportTabTraining());
+    tabLane.onPlay(() => toggleTabMidi());                                // strip Play → hear the TAB as MIDI
   }
   return true;
 }
+
+// Play the TAB itself as synthesized notes (independent of the recording).
+// The lane cursor rides along. Toggles; stops any transport playback first so
+// you don't hear both at once.
+function toggleTabMidi() {
+  if (!tabLane) return;
+  if (tabMidi.isPlaying()) { tabMidi.stop(); tabLane.hidePlayhead(); tabLane.setPlaying(false); return; }
+  const notes = tabLane.getNotes();
+  if (!notes.length) return;
+  if (player.isPlaying()) { player.stop(); reflectPlay(); tabLane.hidePlayhead(); }
+  tabLane.setPlaying(true);
+  tabMidi.play(notes, {
+    onTick: (t) => tabLane.setPlayhead(t),
+    onEnd: () => { tabLane.hidePlayhead(); tabLane.setPlaying(false); },
+  });
+}
+
+// While the TRANSPORT plays the real recording, ride the tab cursor in sync.
+// The tab is anchored to its source clip: transport second `pos` maps to tab
+// second `pos − clipStart`; show the cursor only across the clip's span.
+function tabCursorFromTransport(pos) {
+  if (!tabLane || !tabTake) return;
+  const start = (tabTake.x || 0) / PX_PER_SEC;
+  const dur = (tabTake.len != null ? tabTake.len : tabTake.duration) || 0;
+  const t = tabTimeForTransport(pos, start, dur);
+  if (t == null) tabLane.hidePlayhead(); else tabLane.setPlayhead(t);
+}
+function transportTick(pos) { setPlayhead(pos); tabCursorFromTransport(pos); }
 
 function renderNotesToLane(notes) {
   tabLane.clear();
@@ -1261,6 +1292,7 @@ function renderNotesToLane(notes) {
 
 function transcribeSamplesToLane(samples, sampleRate, label, take) {
   if (!ensureTabLane()) return 0;
+  tabMidi.stop(); tabLane.hidePlayhead(); tabLane.setPlaying(false);
   const { notes } = transcribeTake(samples, sampleRate);
   renderNotesToLane(notes);
   tabAudio = { samples, sampleRate, label: label || 'clip' };
@@ -1331,6 +1363,11 @@ if ($('diag')) window.__tabDebug = {
   moveToString(idx, string) { if (!tabLane) return false; const n = tabLane.getNotes()[idx]; return n ? tabLane.moveNoteToString(n.id, string) : false; },
   setFret(idx, fret) { if (!tabLane) return false; const n = tabLane.getNotes()[idx]; return n ? tabLane.setNoteFret(n.id, fret) : false; },
   export: () => exportTabTraining(),
+  // Test-only: playback state — MIDI player + cursor visibility.
+  playMidi: () => toggleTabMidi(),
+  midiPlaying: () => tabMidi.isPlaying(),
+  cursorShown: () => { const c = document.querySelector('.tab-cursor'); return !!c && c.style.opacity === '1'; },
+  playingNotes: () => document.querySelectorAll('.tab-note.playing').length,
 };
 
 // Record: capture the live processed output into a take, append it as a clip.
@@ -1434,9 +1471,11 @@ if ($('diag')) window.__tabDebug = {
   // Play / Stop playback of recorded takes; the playhead sweeps the timeline.
   const playBtn = $('tp-play');
   if (playBtn) playBtn.addEventListener('click', () => {
-    if (player.isPlaying()) { player.stop(); reflectPlay(); restoreFoldIfIdle(); return; }
+    if (player.isPlaying()) { player.stop(); reflectPlay(); tabLane?.hidePlayhead(); restoreFoldIfIdle(); return; }
     if (!allTakes().length) return;
-    player.play(buildGroups(), playheadSec, setPlayhead, () => { reflectPlay(); setPlayhead(0); restoreFoldIfIdle(); });
+    if (tabMidi.isPlaying()) { tabMidi.stop(); tabLane?.setPlaying(false); } // don't stack two players
+    // transportTick sweeps the timeline playhead AND rides the tab cursor in sync.
+    player.play(buildGroups(), playheadSec, transportTick, () => { reflectPlay(); setPlayhead(0); tabLane?.hidePlayhead(); restoreFoldIfIdle(); });
     reflectPlay();
     autoFold.fold(); // playback started — free the vertical space for the tracks
   });
@@ -1444,7 +1483,7 @@ if ($('diag')) window.__tabDebug = {
   // Skip to start: stop playback and park the playhead at bar 1.
   const skipBtn = $('tp-start');
   if (skipBtn) skipBtn.addEventListener('click', () => {
-    player.stop(); reflectPlay(); setPlayhead(0); restoreFoldIfIdle();
+    player.stop(); reflectPlay(); setPlayhead(0); tabLane?.hidePlayhead(); restoreFoldIfIdle();
   });
 
   // Seek + scrub: click an empty part of the timeline to move the playhead, or
@@ -1455,7 +1494,7 @@ if ($('diag')) window.__tabDebug = {
     const tl = lane.querySelector('.track-timeline');
     if (!tl) return;
     const x = e_x(clientX, tl) / zoomLevel; // view px → base (model) px
-    player.stop(); reflectPlay(); restoreFoldIfIdle();
+    player.stop(); reflectPlay(); tabLane?.hidePlayhead(); restoreFoldIfIdle();
     setPlayhead(snapPx(Math.max(0, x), free) / PX_PER_SEC);
   }
   function e_x(clientX, tl) { return clientX - tl.getBoundingClientRect().left + tl.scrollLeft; }

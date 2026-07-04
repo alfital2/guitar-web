@@ -65,3 +65,14 @@ export function quantizeToGrid(tSec, bpm, subdiv = 4) {
   const spb = 60 / (bpm || 120);
   return Math.max(0, Math.round((tSec / spb) * subdiv));
 }
+
+// ── Transport ↔ tab cursor sync ─────────────────────────────────────────────
+// The tab was transcribed from one clip that sits at `clipStartSec` on the
+// transport timeline. Map a transport playback position to a tab-local time so
+// the lane cursor can ride the real recording — or null when the transport is
+// outside the clip's span (cursor hidden).
+export function tabTimeForTransport(pos, clipStartSec, clipDurSec, pad = 0.1) {
+  const t = pos - clipStartSec;
+  if (t < -0.03 || t > (clipDurSec || 0) + pad) return null;
+  return Math.max(0, t);
+}

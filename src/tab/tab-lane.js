@@ -28,6 +28,7 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   const head = document.createElement('div');
   head.className = 'tab-head';
   head.innerHTML = `
+    <button type="button" class="tab-play" aria-label="Play tab as MIDI" title="Play the tab as MIDI notes">▶</button>
     <span class="tab-title">TAB <span class="tab-state">transcription</span></span>
     <span class="tab-meta">${bpm} BPM · 16th grid · standard tuning</span>
     <span class="tab-hint">drag a note between strings · double-click to edit</span>
@@ -50,6 +51,13 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   lines.className = 'tab-lines';
   lines.innerHTML = STRING_NAMES.map((_, i) => `<i style="top:${i * LINE_GAP}px"></i>`).join('');
   stage.appendChild(lines);
+
+  // Playhead cursor — ridden by both the transport (real audio) and the tab's
+  // own MIDI player. Hidden until something plays.
+  const cursor = document.createElement('div');
+  cursor.className = 'tab-cursor';
+  cursor.style.opacity = '0';
+  stage.appendChild(cursor);
 
   container.append(head, gutter, scroll);
 
@@ -243,12 +251,42 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
     }
   }
 
+  // ── playhead (transport audio OR the tab's own MIDI player) ────────────────
+  // `tSec` is seconds from the tab's start. Positions the cursor on the same
+  // 16th-column geometry the notes use, highlights the sounding note, and
+  // keeps the cursor in view.
+  function setPlayhead(tSec) {
+    if (tSec == null || tSec < 0) { hidePlayhead(); return; }
+    const colF = tSec * (bpmVal / 60) * 4;         // seconds → 16th columns
+    ensureCols(Math.ceil(colF) + 1);
+    const x = colF * COL_W + COL_W / 2;
+    cursor.style.transform = `translateX(${x}px)`;
+    cursor.style.opacity = '1';
+    for (const n of noteMap.values()) {
+      const on = n.tSec != null && tSec >= n.tSec && tSec < n.tSec + Math.max(n.durSec || 0.25, 0.12);
+      n.el.classList.toggle('playing', on);
+    }
+    if (x < scroll.scrollLeft + 24 || x > scroll.scrollLeft + scroll.clientWidth - 40) {
+      scroll.scrollLeft = Math.max(0, x - scroll.clientWidth * 0.4);
+    }
+  }
+  function hidePlayhead() {
+    cursor.style.opacity = '0';
+    for (const n of noteMap.values()) n.el.classList.remove('playing');
+  }
+
   const api = {
     // Place a detected note. `meta` carries the pitch + timing so edits can
     // preserve it and the export can pair it with the audio.
     noteOn(string, fret, col, meta = {}) {
       return addNote({ string, fret, col, midi: meta.midi, tSec: meta.tSec, durSec: meta.durSec });
     },
+    setPlayhead, hidePlayhead,
+    setPlaying(on) {
+      const b = head.querySelector('.tab-play');
+      if (b) { b.textContent = on ? '⏸' : '▶'; b.classList.toggle('on', on); }
+    },
+    onPlay(cb) { head.querySelector('.tab-play').addEventListener('click', cb); },
     // Programmatic edits (also used by drag/dblclick + e2e).
     moveNoteToString(id, string) { const n = noteMap.get(id); return n ? moveToString(n, string) : false; },
     setNoteFret(id, fret) { const n = noteMap.get(id); if (!n) return false; if (fret < 0 || fret > MAX_FRET) return false; applyFret(n, fret); return true; },
