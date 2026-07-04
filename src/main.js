@@ -130,11 +130,12 @@ function pushUndo() { undoStack.push(snapshot()); if (undoStack.length > 60) und
 // immediate=true right after a take is captured so a fast reload can't lose it.
 // An empty session clears the store. Best-effort — take-store swallows failures.
 let persistTimer = 0;
+let sessionRestoreDone = false; // don't let the initial empty track wipe a saved session before restore runs
 function persistSession(immediate = false) {
   if (persistTimer) { clearTimeout(persistTimer); persistTimer = 0; }
   const run = () => {
     if (tracks.some((t) => t.takes.length)) takeStore.saveSession(snapshot());
-    else takeStore.clearSession();
+    else if (sessionRestoreDone) takeStore.clearSession(); // only clear once we know the user really emptied it
   };
   if (immediate) run(); else persistTimer = setTimeout(run, 1000);
 }
@@ -1250,8 +1251,12 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
 // in a moment later once IDB resolves. `restore` reuses the undo re-hydration
 // path (sets tracks/armedId/takeSeq/nextTrackId + re-renders).
 (async function restoreRecordingSession() {
-  const s = await takeStore.loadSession();
-  if (s && Array.isArray(s.tracks) && s.tracks.some((t) => t.takes && t.takes.length)) restore(s);
+  try {
+    const s = await takeStore.loadSession();
+    if (s && Array.isArray(s.tracks) && s.tracks.some((t) => t.takes && t.takes.length)) restore(s);
+  } finally {
+    sessionRestoreDone = true; // from here on, an empty session may clear the store
+  }
 })();
 
 // Toolbar transport cluster: inert transport (ground for recording) + working
