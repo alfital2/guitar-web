@@ -15,11 +15,8 @@
     "test:jam": "node tools/jam-e2e.mjs"
   },
   "devDependencies": {
+    "vitest": "^2.1.0",
     "jsdom": "^25.0.0",
-    "playwright": "^1.48.0",
-    "vitest": "^2.1.0"
-  },
-  "dependencies": {
-    "@spotify/basic-pitch": "^1.0.1"
+    "playwright": "^1.48.0"
   }
 }

@@ -32,7 +32,7 @@ import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
 import { connectInputChannel } from './audio/input-channel.js';
 import { maybeShowSafariNotice } from './browser-notice.js';
-import { assignFret, quantizeToGrid } from './tab/transcribe.js';
+import { createNoteTracker2, createOnsetDetector, assignFret, quantizeToGrid } from './tab/transcribe.js';
 import { transcribeTake } from './tab/offline-transcribe.js';
 import { mountTabLane } from './tab/tab-lane.js';
 import { initJamUI } from './jam-ui.js';
@@ -1215,18 +1215,35 @@ const transport = mountTransport($('transport-cluster'), {
   onGain: (v) => { if (gainOut) gainOut.gain.value = v; },
   // Tempo drives the ruler grid + beat snap — re-render the lane on change.
   onTempoChange: (n) => { uiBpm = n; renderTrack(); if (tabLane) tabLane.setBpm(n); },
+  onToggleTab: () => toggleTabMode(),
 });
 
-// ── TAB transcription (offline, neural) ────────────────────────────────────
-// Right-click a recorded clip → "Transcribe → TAB". Detection runs Spotify's
-// Basic Pitch (Apache-2.0) — a small neural transcription model trained on
-// real instrument recordings (incl. GuitarSet) — fully in-browser via
-// TensorFlow.js. The bundle + 900 KB model lazy-load on first use. The
-// hand-rolled DSP pipeline (src/tab/offline-transcribe.js) stays as the
-// fallback when the model can't load.
-let tabLane = null; // persists until ✕ — the transcription stays readable
+// ── Live TAB transcription (Phase 1: mono, standard tuning, 16th grid) ─────
+// Launch: TAB chip in the toolbar. The metronome free-runs (you play to the
+// click), pitch comes from the same pre-FX input tap the tuner uses, notes are
+// segmented + fret-assigned live and land on a beat-quantized tab lane above
+// the amp. Detection/monitoring lag is compensated by a fixed offset so notes
+// played ON the click land ON the column.
+const TAB_LAG_SEC = 0.11; // click output latency + analysis window + onset frames
+let tabLane = null;       // persists after stop — the transcription stays readable
+let tabState = null;      // listening session: { tracker, raf, t0, buf, prevPos, metroWasFree }
 
+// Stop LISTENING but keep the tab on screen (the point is reading it back).
+function stopTabListening() {
+  if (!tabState) return;
+  clearInterval(tabState.timer);
+  cancelAnimationFrame(tabState.cursorRaf);
+  try { tabState.an && analyser && analyser.disconnect(tabState.an); } catch {}
+  tabState.tracker.end((performance.now() - tabState.t0) / 1000);
+  if (!tabState.metroWasFree) transport.setMetroFree(false); // leave things as we found them
+  tabState = null;
+  tabLane?.setLive(false);
+  $('tab-toggle')?.classList.remove('on');
+}
+
+// ✕ — remove the lane entirely.
 function closeTabLane() {
+  stopTabListening();
   tabLane?.destroy();
   tabLane = null;
 }
@@ -1236,67 +1253,21 @@ function ensureTabLane() {
   if (!laneEl) return false;
   if (!tabLane) {
     tabLane = mountTabLane(laneEl, { bpm: uiBpm });
-    tabLane.onClear(() => tabLane.clear());
+    tabLane.onClear(() => { tabLane.clear(); if (tabState) tabState.prevPos = null; });
     tabLane.onClose(() => closeTabLane());
   }
   return true;
 }
 
-const BP_SAMPLE_RATE = 22050;
-let bpEnginePromise = null; // lazy: { bp, outputToNotesPoly, noteFramesToTime, addPitchBendsToNoteEvents }
-function loadBasicPitch() {
-  bpEnginePromise = bpEnginePromise || (async () => {
-    const mod = await import('./vendor/basic-pitch/basic-pitch.bundle.js');
-    const bp = new mod.BasicPitch('assets/basic-pitch/model.json');
-    return { mod, bp };
-  })();
-  return bpEnginePromise;
-}
-
-// Any-rate mono Float32Array → 22050 Hz via OfflineAudioContext (proper
-// windowed-sinc resampling in the browser's own resampler).
-async function resampleTo22050(samples, sampleRate) {
-  if (sampleRate === BP_SAMPLE_RATE) return samples;
-  const len = Math.ceil((samples.length * BP_SAMPLE_RATE) / sampleRate);
-  const oc = new OfflineAudioContext(1, len, BP_SAMPLE_RATE);
-  const buf = oc.createBuffer(1, samples.length, sampleRate);
-  if (buf.copyToChannel) buf.copyToChannel(samples, 0); else buf.getChannelData(0).set(samples);
-  const src = oc.createBufferSource();
-  src.buffer = buf; src.connect(oc.destination); src.start();
-  const out = await oc.startRendering();
-  return out.getChannelData(0);
-}
-
-// Neural transcription: Basic Pitch frames → note events → midi list.
-async function transcribeNeural(samples, sampleRate, onProgress) {
-  const { mod, bp } = await loadBasicPitch();
-  const mono = await resampleTo22050(samples, sampleRate);
-  const frames = [], onsets = [], contours = [];
-  await bp.evaluateModel(
-    mono,
-    (f, o, c) => { frames.push(...f); onsets.push(...o); contours.push(...c); },
-    (pct) => { if (onProgress) onProgress(pct); },
-  );
-  // Thresholds tuned for single-note guitar: onset 0.5 keeps only confident
-  // attacks, frame 0.3, min length 5 frames (~58 ms) drops fret noise.
-  const events = mod.noteFramesToTime(
-    mod.outputToNotesPoly(frames, onsets, 0.5, 0.3, 5),
-  );
-  const all = events
-    .filter((e) => e.pitchMidi >= 36 && e.pitchMidi <= 88)
-    .map((e) => ({ tSec: e.startTimeSeconds, midi: e.pitchMidi, durSec: e.durationSeconds, amp: e.amplitude }))
-    .sort((x, y) => x.tSec - y.tSec);
-  // The model sometimes re-triggers a held note (or its octave image) a few
-  // frames later — collapse same-midi events closer than 90 ms.
-  const lastAt = new Map();
-  return all.filter((e) => {
-    const t = lastAt.get(e.midi);
-    lastAt.set(e.midi, e.tSec);
-    return t == null || e.tSec - t >= 0.09;
-  });
-}
-
-function renderNotesToLane(notes, label) {
+// Offline path: right-click a recorded clip → Transcribe. The whole take is
+// analysed at once (spectral-flux onsets + sustain pitch votes + ring-over
+// cancellation — see src/tab/offline-transcribe.js), which beats the live
+// tracker on fast runs and repicked notes. Renders into the same TAB lane;
+// col 0 = clip start.
+function transcribeSamplesToLane(samples, sampleRate, label) {
+  if (!ensureTabLane()) return 0;
+  if (tabState) stopTabListening();          // offline result replaces a live session
+  const { notes } = transcribeTake(samples, sampleRate);
   tabLane.clear();
   tabLane.setBpm(uiBpm);
   let prev = null;
@@ -1306,24 +1277,8 @@ function renderNotesToLane(notes, label) {
     prev = pos;
     tabLane.noteOn(pos.string, pos.fret, quantizeToGrid(nt.tSec, uiBpm));
   }
-  tabLane.setLive(false, `${label} — ${notes.length} notes`);
+  tabLane.setLive(false, `${label || 'transcribed clip'} — ${notes.length} notes · TAB re-arms fresh`);
   return notes.length;
-}
-
-async function transcribeSamplesToLane(samples, sampleRate, label) {
-  if (!ensureTabLane()) return 0;
-  tabLane.setLive(false, 'transcribing… 0%');
-  try {
-    const notes = await transcribeNeural(samples, sampleRate, (pct) => {
-      tabLane?.setLive(false, `transcribing… ${Math.round(pct * 100)}%`);
-    });
-    return renderNotesToLane(notes, label || 'transcribed clip');
-  } catch (err) {
-    // Model missing/failed (offline asset, old browser) → DSP fallback.
-    console.warn('basic-pitch unavailable, falling back to DSP:', err);
-    const { notes } = transcribeTake(samples, sampleRate);
-    return renderNotesToLane(notes, `${label || 'transcribed clip'} (fallback)`);
-  }
 }
 
 function transcribeClipToLane(trackId, n) {
@@ -1339,11 +1294,86 @@ function transcribeClipToLane(trackId, n) {
   $('tab-lane')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
+function toggleTabMode() {
+  if (tabState) { stopTabListening(); return; }
+  if (!ctx || !analyser) { $('error').textContent = 'Power on first — live TAB listens to your guitar input.'; return; }
+  if (!ensureTabLane()) return;
+  tabLane.clear(); // re-arming records a fresh take on a fresh grid
+  const lane = tabLane;
+  lane.setLive(true);
+  lane.setBpm(uiBpm);
+  // v2 analysis chain: a DEDICATED small-window analyser (1024 ≈ 21 ms — half
+  // the transition smear of the tuner's 2048) chained off the main input
+  // analyser (a pass-through, so it always follows the selected channel), on a
+  // FIXED 8 ms interval (rAF jitters/throttles). Attack-driven segmentation:
+  // the onset detector forces a boundary on every pick — re-picked SAME notes
+  // and fast runs register — and the tracker votes the median pitch over the
+  // post-attack ticks instead of trusting the noisy first frames.
+  if (!tabState || !tabState.an || tabState.anCtx !== ctx) { /* fresh below */ }
+  const an = ctx.createAnalyser(); an.fftSize = 1024;
+  analyser.connect(an);
+  const tracker = createNoteTracker2();
+  const onsets = createOnsetDetector();
+  const buf = new Float32Array(an.fftSize);
+  const metroWasFree = transport.isMetroFree();
+  if (!metroWasFree) transport.setMetroFree(true); // the grid needs an audible click
+  const t0 = performance.now();
+  tabState = { tracker, timer: 0, cursorRaf: 0, t0, buf, prevPos: null, metroWasFree, an };
+  $('tab-toggle')?.classList.add('on');
+
+  const tick = () => {
+    if (!tabState) return;
+    if (!ctx || !analyser) { stopTabListening(); return; }
+    const nowSec = (performance.now() - t0) / 1000;
+    an.getFloatTimeDomainData(buf);
+    let rms = 0;
+    for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+    rms = Math.sqrt(rms / buf.length);
+    const onset = onsets.push(rms, nowSec);
+    const det = detectPitchMPM(buf, ctx.sampleRate) || {};
+    if (window.__tabDebug) window.__tabDebug.probe = { rms: +rms.toFixed(4), freq: det.freq ? +det.freq.toFixed(1) : null, clarity: det.clarity ? +det.clarity.toFixed(2) : 0, onset };
+    const events = tracker.push({ freq: det.freq || null, clarity: det.clarity || 0, rms, tSec: nowSec, onset });
+    for (const ev of events) {
+      if (ev.type !== 'on') continue;
+      const pos = assignFret(ev.midi, tabState.prevPos);
+      if (!pos) continue;
+      tabState.prevPos = pos;
+      lane.noteOn(pos.string, pos.fret, quantizeToGrid(ev.tSec - TAB_LAG_SEC, uiBpm));
+    }
+  };
+  tabState.timer = setInterval(tick, 8);
+  const sweep = () => {
+    if (!tabState) return;
+    lane.setCursor(Math.max(0, ((performance.now() - t0) / 1000 - TAB_LAG_SEC) * (uiBpm / 60)));
+    tabState.cursorRaf = requestAnimationFrame(sweep);
+  };
+  sweep();
+}
 if ($('diag')) window.__tabDebug = {
   count: () => (tabLane ? tabLane.noteCount() : -1),
-  // Test-only: run the offline pipeline on synthesized samples and render.
-  // Returns a promise resolving to the rendered note count.
+  active: () => !!tabState,
+  // Test-only: drive the tracker with synthetic pitch frames (the fake-mic
+  // test device emits unpitched pulses that MPM rightly rejects, so e2e proves
+  // the segmentation→fret→quantize→render path this way; the analyser→MPM leg
+  // is proven daily by the tuner, which shares it).
+  // Test-only: run the OFFLINE pipeline on synthesized samples and render.
   offline(arr, sr) { return transcribeSamplesToLane(Float32Array.from(arr), sr, 'e2e'); },
+  sim(freq, frames = 8) {
+    if (!tabState) return 0;
+    const nowSec = (performance.now() - tabState.t0) / 1000;
+    const events = [];
+    for (let i = 0; i < frames; i++) {
+      events.push(...tabState.tracker.push({ freq, clarity: 0.95, rms: 0.05, tSec: nowSec + i * 0.008, onset: i === 0 && freq != null }));
+    }
+    for (const ev of events) {
+      if (ev.type !== 'on') continue;
+      const pos = assignFret(ev.midi, tabState.prevPos);
+      if (!pos) continue;
+      tabState.prevPos = pos;
+      tabLane.noteOn(pos.string, pos.fret, quantizeToGrid(ev.tSec - TAB_LAG_SEC, uiBpm));
+    }
+    return tabLane.noteCount();
+  },
 };
 
 // Record: capture the live processed output into a take, append it as a clip.
