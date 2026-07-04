@@ -495,14 +495,31 @@
   .collapse-chev:focus-visible, .amp-vstrip:focus-visible, .board-strip:focus-visible {
     outline: 2px solid rgba(var(--accent-rgb), 0.8); outline-offset: 2px;
   }
-  /* Collapse chevron (top-right of the head) — folds the amp to the value strip. */
-  .amp-collapse-btn { position: absolute; top: 11px; right: 13px; z-index: 3; }
+  /* Fold control — an iOS-sheet-style "grabber" pill centered on the amp's
+     bottom edge (was a near-invisible dark chevron in the tolex corner). Clear
+     contrast on the grille, unmistakably a "put this away" affordance. */
+  .amp-collapse-btn.collapse-chev {
+    position: absolute; left: 50%; bottom: 7px; transform: translateX(-50%);
+    top: auto; right: auto; z-index: 6;
+    width: 52px; height: 15px; border-radius: 9px; font-size: 9px;
+    color: rgba(255,255,255,0.72);
+    background: linear-gradient(180deg, rgba(60,60,66,0.92), rgba(24,24,28,0.94));
+    border: 1px solid rgba(0,0,0,0.6);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 2px 6px rgba(0,0,0,0.5);
+    backdrop-filter: none;
+  }
+  .amp-collapse-btn.collapse-chev:hover { color: #fff; transform: translateX(-50%) translateY(-1px); }
+  .amp-collapse-btn.collapse-chev > span { display: inline-block; transform: translateY(-0.5px); }
 
   /* ── Amp collapsed value strip (concept D) ──────────────
      Read-only brushed-metal row: label + current value per knob, grouped by
      section. Tap to expand the full amp head. */
-  .amp-wrap.collapsed .amp-head { display: none; }
-  .amp-wrap:not(.collapsed) .amp-vstrip { display: none; }
+  /* Collapse: keep the ACTIVE body in flow (it sets the wrap height) and lift
+     the other to an absolute, transparent overlay so the two can cross-fade
+     during the height tween (see src/chain-ui/collapse.js). */
+  .amp-wrap { position: relative; }
+  .amp-wrap.collapsed .amp-head { position: absolute; inset: 0 0 auto 0; opacity: 0; pointer-events: none; }
+  .amp-wrap:not(.collapsed) .amp-vstrip { position: absolute; inset: 0 0 auto 0; opacity: 0; pointer-events: none; }
   .amp-vstrip {
     display: flex; align-items: stretch; width: fit-content; max-width: 1180px; margin: 0 auto; cursor: pointer;
     padding: 9px 6px; border-radius: 13px; border: 1px solid #8d8f95; overflow: visible;
@@ -834,8 +851,10 @@
 
   /* ── Collapsed pedalboard: slim strip of mini pedals in chain order (like
      the amp's value strip) — frees the vertical real estate after tuning. ── */
-  .board-wrap.collapsed .pedalboard { display: none; }
-  .board-wrap:not(.collapsed) .board-strip { display: none; }
+  /* Same cross-fade collapse pattern as the amp (see src/chain-ui/collapse.js). */
+  .board-wrap { position: relative; }
+  .board-wrap.collapsed .pedalboard { position: absolute; inset: 0 0 auto 0; opacity: 0; pointer-events: none; }
+  .board-wrap:not(.collapsed) .board-strip { position: absolute; inset: 0 0 auto 0; opacity: 0; pointer-events: none; }
   .pedalboard { position: relative; }
   .board-collapse-btn { position: absolute; top: 9px; right: 9px; z-index: 6; }
   .board-strip { display: flex; align-items: center; gap: 9px; width: fit-content; max-width: 100%; margin: 0 auto;
@@ -959,11 +978,23 @@
   /* On wide screens the library is a static sidebar — never show drawer chrome. */
   @media (min-width: 1041px) {
     #presets-backdrop, .presets-close { display: none !important; }
-    /* Wide screens: the persistent sidebar can be collapsed away. */
-    body.presets-hidden .preset-browser { display: none; }
+    /* Wide screens: the sidebar collapses away with a quick spring — its width
+       tweens to 0 while it fades + slides left, so the window reflows smoothly
+       to fill the space (no display:none pop). */
+    .preset-browser { will-change: width; overflow: hidden; }
+    body.presets-hidden .preset-browser {
+      width: 0; min-width: 0; opacity: 0; transform: translateX(-18px);
+      pointer-events: none; border-right-width: 0;
+    }
     /* Sidebar visible → hide the toolbar button; show it only when collapsed. */
     .presets-toggle { display: none; }
     body.presets-hidden .presets-toggle { display: inline-flex; }
+  }
+  @media (min-width: 1041px) and (prefers-reduced-motion: no-preference) {
+    .preset-browser {
+      transition: width .34s cubic-bezier(.32,.72,0,1), opacity .24s ease,
+                  transform .34s cubic-bezier(.32,.72,0,1);
+    }
   }
   /* On narrow screens the browser is a drawer; the collapse chevron is N/A. */
   @media (max-width: 1040px) { .pb-collapse { display: none; } }

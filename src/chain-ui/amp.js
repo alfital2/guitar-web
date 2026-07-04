@@ -1,6 +1,7 @@
 // src/chain-ui/amp.js
 import { createKnob } from './knob.js';
 import { MODELS } from '../effects/neuralamp.js';
+import { animateCollapse } from './collapse.js';
 
 const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
 
@@ -227,9 +228,15 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
   // Collapsed value strip; tap anywhere (or the "TAP TO EDIT" affordance) to expand.
   const strip = buildStrip(head);
 
+  head.inert = collapsed; strip.inert = !collapsed; // only the active body is focusable
   const setCollapsed = (c, notify = true) => {
     if (c) syncStrip(strip, head);
-    wrap.classList.toggle('collapsed', c);
+    animateCollapse(wrap, {
+      toggle: () => { wrap.classList.toggle('collapsed', c); head.inert = c; strip.inert = !c; },
+      outgoing: c ? head : strip,
+      incoming: c ? strip : head,
+      toCollapsed: c,
+    });
     if (notify && opts.onCollapse) opts.onCollapse(c);
   };
   // Programmatic collapse (transport auto-fold): same path as the UI controls

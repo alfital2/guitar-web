@@ -1188,6 +1188,7 @@ function setPresets(open) {
 // opens/closes the drawer.
 function setPresetsHidden(hidden) {
   document.body.classList.toggle('presets-hidden', hidden);
+  $('preset-browser') && ($('preset-browser').inert = hidden); // collapsed sidebar is off the a11y/tab path
   chainStore.savePresetsHidden(hidden);
   // The toolbar button is the sidebar's expand/collapse control on wide screens.
   $('presets-toggle')?.setAttribute('aria-expanded', String(!hidden));
@@ -1199,7 +1200,7 @@ $('presets-toggle').addEventListener('click', () => {
 });
 $('presets-close').addEventListener('click', () => setPresets(false));
 $('presets-backdrop').addEventListener('click', () => setPresets(false));
-if (chainStore.loadPresetsHidden()) document.body.classList.add('presets-hidden');
+if (chainStore.loadPresetsHidden()) { document.body.classList.add('presets-hidden'); $('preset-browser') && ($('preset-browser').inert = true); }
 $('presets-toggle')?.setAttribute('aria-expanded', String(!chainStore.loadPresetsHidden()));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { setSettings(false); setPresets(false); } });
 $('diag').textContent = `${isSafari ? 'Safari' : 'Chrome'} · setSinkId: ${hasSetSinkId ? 'yes' : 'no'}`;

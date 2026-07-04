@@ -2,6 +2,7 @@
 import { createKnob } from './knob.js';
 import { FX_FONTS, FX_BODY, pedalTypographyVars, FX_MOTIFS } from './fx-art.js';
 import { registerViz, resetViz, setVizBypassed } from './fx-viz.js';
+import { animateCollapse } from './collapse.js';
 
 // Chrome cap for the CSS-pedal knobs (light → mid → dark), amber-ish arc per effect.
 const PEDAL_CAP = ['#eef2f5', '#aeb4ba', '#40454a'];
@@ -576,8 +577,14 @@ export function renderPedalboard(container, units, handlers, opts = {}) {
   board.appendChild(collapseBtn);
 
   const strip = buildBoardStrip(units);
+  board.inert = opts.collapsed; strip.inert = !opts.collapsed;
   const setCollapsed = (c, notify = true) => {
-    wrap.classList.toggle('collapsed', c);
+    animateCollapse(wrap, {
+      toggle: () => { wrap.classList.toggle('collapsed', c); board.inert = c; strip.inert = !c; },
+      outgoing: c ? board : strip,
+      incoming: c ? strip : board,
+      toCollapsed: c,
+    });
     if (notify) opts.onCollapse?.(c);
   };
   const expand = () => setCollapsed(false);
