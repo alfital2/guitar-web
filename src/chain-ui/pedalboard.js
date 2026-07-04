@@ -1,7 +1,7 @@
 // src/chain-ui/pedalboard.js
 import { createKnob } from './knob.js';
 import { FX_FONTS, FX_BODY, pedalTypographyVars, FX_MOTIFS } from './fx-art.js';
-import { registerViz, resetViz } from './fx-viz.js';
+import { registerViz, resetViz, setVizBypassed } from './fx-viz.js';
 
 // Chrome cap for the CSS-pedal knobs (light → mid → dark), amber-ish arc per effect.
 const PEDAL_CAP = ['#eef2f5', '#aeb4ba', '#40454a'];
@@ -477,6 +477,7 @@ function buildBoardStrip(units) {
     }
     const mini = pedalIcon(u.type, COLORS[u.type] ?? '#8a8a90');
     mini.classList.add('board-strip-mini');
+    mini.dataset.instanceId = String(u.instanceId); // so in-place bypass can find it
     if (u.bypassed) mini.classList.add('off');
     mini.title = u.schema.label + (u.bypassed ? ' — off' : '');
     strip.appendChild(mini);
@@ -492,6 +493,32 @@ function buildBoardStrip(units) {
   exp.innerHTML = '<span>TAP TO EDIT</span><span class="board-strip-chev">▾</span>';
   strip.appendChild(exp);
   return strip;
+}
+
+// Update ONE pedal's bypass state in place — no re-render, so the live screen
+// canvas is never recreated (that recreation is what flickered). Toggles the
+// CSS-driven dim on both the full pedal and its collapsed-strip mini, updates
+// the footswitch a11y state, and freezes/wakes the screen viz. Returns whether
+// anything was found (caller falls back to a full render if not).
+export function setPedalBypassed(container, instanceId, bypassed, label) {
+  const id = String(instanceId);
+  const pedal = container.querySelector(`.pedal[data-instance-id="${id}"]`);
+  if (pedal) {
+    pedal.classList.toggle('bypassed', bypassed);
+    const power = pedal.querySelector('.pedal-power');
+    if (power) {
+      power.setAttribute('aria-checked', bypassed ? 'false' : 'true');
+      power.title = bypassed ? 'Off — click to power on' : 'On — click to bypass';
+    }
+    const viz = pedal.querySelector('.pedal-viz');
+    if (viz) setVizBypassed(viz, bypassed);
+  }
+  const mini = container.querySelector(`.board-strip-mini[data-instance-id="${id}"]`);
+  if (mini) {
+    mini.classList.toggle('off', bypassed);
+    if (label != null) mini.title = label + (bypassed ? ' — off' : '');
+  }
+  return !!(pedal || mini);
 }
 
 export function renderPedalboard(container, units, handlers, opts = {}) {

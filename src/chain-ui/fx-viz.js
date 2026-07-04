@@ -761,6 +761,22 @@ export function registerViz(canvas, type, getParams, opts = {}) {
   return true;
 }
 
+// Flip a live pedal's bypass state WITHOUT re-registering (which would recreate
+// the canvas and flash a blank frame). Bypassed = freeze on the current frame;
+// un-bypassed = wake it so knob turns animate again. The dimming itself is pure
+// CSS on `.pedal.bypassed .pedal-viz`, so the drawn pixels persist across the
+// toggle — no flicker.
+export function setVizBypassed(canvas, bypassed) {
+  const e = entries.find((x) => x.canvas === canvas);
+  if (!e) return false;
+  e.frozen = !!bypassed;
+  if (!bypassed) {
+    e.drawn = false; // repaint once on the next tick so it resumes cleanly
+    if (!timer && typeof setInterval === 'function') timer = setInterval(() => tickViz(), TICK_MS);
+  }
+  return true;
+}
+
 // Drop every registered canvas (the board re-renders often; the renderer calls
 // this before each rebuild so dead canvases never accumulate).
 export function resetViz() {

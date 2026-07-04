@@ -3,7 +3,7 @@ import { registry } from './effects/index.js';
 import { buildChain } from './engine.js';
 import { PRESETS, validatePreset, GB_CATEGORIES } from './presets.js';
 import { renderPresetBrowser } from './preset-browser.js';
-import { renderPedalboard } from './chain-ui/pedalboard.js';
+import { renderPedalboard, setPedalBypassed } from './chain-ui/pedalboard.js';
 import { renderAmp } from './chain-ui/amp.js';
 import { applyRigDock } from './chain-ui/rig-bar.js';
 import { createAutoFold } from './chain-ui/auto-fold.js';
@@ -357,25 +357,29 @@ function defaultParams(type) {
 // Build the locked (amp-head) module list and the full pedalboard list from the
 // current chain, then (re)build the audio graph if audio is running. Editing
 // works before Start too — then only the model + UI update.
+// Rebuild only the AUDIO graph from the current chain model (no DOM work).
+function rebuildAudio() {
+  if (!ctx) return;
+  if (engine) {
+    try { calibrationEq.output.disconnect(); } catch {}
+    try { engine.output.disconnect(); } catch {}
+    // Stop every LFO oscillator / worklet the old chain started before it's
+    // abandoned — otherwise running sources never GC and keep costing CPU
+    // (worst case: an abandoned neural-amp worklet keeps running inference).
+    try { engine.destroy?.(); } catch (e) { console.warn('engine destroy failed:', e); }
+  }
+  engine = buildChain(ctx, chainState.toEngineChain(currentChain), registry);
+  if (calibrationEq) calibrationEq.output.connect(engine.input);
+  // Pedalboard feeds the amp reverb stage, which feeds normGain.
+  if (reverbStage) { reverbStage.apply(ampReverb); engine.output.connect(reverbStage.input); }
+  else if (normGain) engine.output.connect(normGain);
+}
+
 function rebuildGraph() {
   const view = currentChain.map((u) => ({ ...u, schema: registry[u.type].schema }));
   const locked = view.filter((u) => u.locked);
 
-  if (ctx) {
-    if (engine) {
-      try { calibrationEq.output.disconnect(); } catch {}
-      try { engine.output.disconnect(); } catch {}
-      // Stop every LFO oscillator / worklet the old chain started before it's
-      // abandoned — otherwise running sources never GC and keep costing CPU
-      // (worst case: an abandoned neural-amp worklet keeps running inference).
-      try { engine.destroy?.(); } catch (e) { console.warn('engine destroy failed:', e); }
-    }
-    engine = buildChain(ctx, chainState.toEngineChain(currentChain), registry);
-    if (calibrationEq) calibrationEq.output.connect(engine.input);
-    // Pedalboard feeds the amp reverb stage, which feeds normGain.
-    if (reverbStage) { reverbStage.apply(ampReverb); engine.output.connect(reverbStage.input); }
-    else if (normGain) engine.output.connect(normGain);
-  }
+  rebuildAudio();
 
   // The amp head also hosts the always-on reverb (rendered as a synthetic module
   // so it reuses the amp-knob UI), placed after the drive/eq/cabinet groups.
@@ -469,7 +473,16 @@ function removeEffect(instanceId) {
 
 function toggleBypass(instanceId) {
   currentChain = chainState.toggleBypass(currentChain, instanceId);
-  rebuildGraph();
+  const u = currentChain.find((x) => x.instanceId === instanceId);
+  // The signal path changed, so rebuild the AUDIO graph — but do NOT re-render
+  // the board. A full render recreates each pedal's screen canvas, which flashes
+  // a blank frame (the flicker). Instead flip just this pedal's bypass state in
+  // place (pure-CSS dim; the drawn screen persists).
+  rebuildAudio();
+  const label = u && registry[u.type]?.schema?.label;
+  if (!u || !setPedalBypassed($('chain'), instanceId, u.bypassed, label)) { rebuildGraph(); return; }
+  chainStore.save(currentChain);
+  scheduleNormalize();
 }
 
 function moveEffect(instanceId, beforeInstanceId) {

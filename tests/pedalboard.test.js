@@ -1,6 +1,6 @@
 // tests/pedalboard.test.js
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { renderPedalboard, computeDrop } from '../src/chain-ui/pedalboard.js';
+import { renderPedalboard, setPedalBypassed, computeDrop } from '../src/chain-ui/pedalboard.js';
 
 afterEach(() => {
   document.querySelectorAll('.fx-modal, .fx-modal-backdrop, .fx-ghost').forEach((n) => n.remove());
@@ -205,5 +205,45 @@ describe('unified collapse affordance (board)', () => {
     wrap.dispatchEvent(new CustomEvent('board-set-collapsed', { detail: { collapsed: false } }));
     expect(wrap.classList.contains('collapsed')).toBe(false);
     expect(onCollapse).not.toHaveBeenCalled();
+  });
+});
+
+describe('setPedalBypassed (in-place bypass — no re-render, no screen flicker)', () => {
+  it('toggles the bypass state without recreating the screen canvas', () => {
+    const el = document.createElement('div');
+    renderPedalboard(el, units, noop);
+    const pedal = el.querySelector('.pedal[data-instance-id="4"]'); // delay (has a viz)
+    const canvasBefore = pedal.querySelector('.pedal-viz');
+    expect(canvasBefore).toBeTruthy();
+
+    expect(setPedalBypassed(el, 4, true, 'Delay')).toBe(true);
+    expect(pedal.classList.contains('bypassed')).toBe(true);
+    expect(pedal.querySelector('.pedal-power').getAttribute('aria-checked')).toBe('false');
+    // THE anti-flicker guarantee: the very same canvas node is still there
+    // (a full re-render would have created a new one).
+    expect(pedal.querySelector('.pedal-viz')).toBe(canvasBefore);
+
+    setPedalBypassed(el, 4, false, 'Delay');
+    expect(pedal.classList.contains('bypassed')).toBe(false);
+    expect(pedal.querySelector('.pedal-power').getAttribute('aria-checked')).toBe('true');
+    expect(pedal.querySelector('.pedal-viz')).toBe(canvasBefore); // still the same node
+  });
+
+  it('also updates the collapsed-strip mini for the same pedal', () => {
+    const el = document.createElement('div');
+    renderPedalboard(el, units, noop);
+    const mini = el.querySelector('.board-strip-mini[data-instance-id="4"]');
+    expect(mini).toBeTruthy();
+    setPedalBypassed(el, 4, true, 'Delay');
+    expect(mini.classList.contains('off')).toBe(true);
+    expect(mini.title).toBe('Delay — off');
+    setPedalBypassed(el, 4, false, 'Delay');
+    expect(mini.classList.contains('off')).toBe(false);
+  });
+
+  it('returns false when the instance is not on the board', () => {
+    const el = document.createElement('div');
+    renderPedalboard(el, units, noop);
+    expect(setPedalBypassed(el, 999, true, 'Nope')).toBe(false);
   });
 });
