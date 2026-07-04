@@ -516,15 +516,13 @@
   /* ── Amp collapsed value strip (concept D) ──────────────
      Read-only brushed-metal row: label + current value per knob, grouped by
      section. Tap to expand the full amp head. */
-  /* Collapse: keep the ACTIVE body in flow (it sets the wrap height) and lift
-     the other to an absolute, transparent overlay so the two can cross-fade
-     during the height tween (see src/chain-ui/collapse.js). `inset:0` +
-     `overflow:hidden` CONSTRAIN that overlay to the wrap's (collapsed) height —
-     otherwise the full-height hidden body sticks out below the short strip,
-     extends the page, and spawns a stray scrollbar that jitters the layout. */
+  /* Collapse: the inactive body is plain display:none at REST (no layout, no
+     overflow). collapse.js animates the fold by pinning the outgoing body as a
+     same-size overlay only for the ~340ms transition. position:relative anchors
+     that overlay. */
   .amp-wrap { position: relative; }
-  .amp-wrap.collapsed .amp-head { position: absolute; inset: 0; overflow: hidden; opacity: 0; pointer-events: none; }
-  .amp-wrap:not(.collapsed) .amp-vstrip { position: absolute; inset: 0; overflow: hidden; opacity: 0; pointer-events: none; }
+  .amp-wrap.collapsed .amp-head { display: none; }
+  .amp-wrap:not(.collapsed) .amp-vstrip { display: none; }
   .amp-vstrip {
     display: flex; align-items: stretch; width: fit-content; max-width: 1180px; margin: 0 auto; cursor: pointer;
     padding: 9px 6px; border-radius: 13px; border: 1px solid #8d8f95; overflow: visible;
@@ -856,11 +854,11 @@
 
   /* ── Collapsed pedalboard: slim strip of mini pedals in chain order (like
      the amp's value strip) — frees the vertical real estate after tuning. ── */
-  /* Same cross-fade collapse pattern as the amp (see src/chain-ui/collapse.js).
-     inset:0 + overflow:hidden keep the hidden overlay from overflowing the page. */
+  /* Same collapse pattern as the amp — display:none at rest; collapse.js pins
+     the outgoing body for the transition (see src/chain-ui/collapse.js). */
   .board-wrap { position: relative; }
-  .board-wrap.collapsed .pedalboard { position: absolute; inset: 0; overflow: hidden; opacity: 0; pointer-events: none; }
-  .board-wrap:not(.collapsed) .board-strip { position: absolute; inset: 0; overflow: hidden; opacity: 0; pointer-events: none; }
+  .board-wrap.collapsed .pedalboard { display: none; }
+  .board-wrap:not(.collapsed) .board-strip { display: none; }
   .pedalboard { position: relative; }
   .board-collapse-btn { position: absolute; top: 9px; right: 9px; z-index: 6; }
   .board-strip { display: flex; align-items: center; gap: 9px; width: fit-content; max-width: 100%; margin: 0 auto;
