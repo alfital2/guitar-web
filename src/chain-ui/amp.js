@@ -216,7 +216,7 @@ export function renderAmp(container, modules, onParamChange, opts = {}) {
   collapseBtn.title = 'Collapse amp to value strip';
   collapseBtn.setAttribute('aria-label', 'Collapse amp');
   collapseBtn.setAttribute('aria-expanded', 'true');
-  collapseBtn.innerHTML = '<span>▴</span>';
+  collapseBtn.innerHTML = '<span>▾</span>';
 
   // Pre-rendered amber "tube warming up" glow layer (opacity-animated via CSS
   // when the head carries .amp-warming). Only meaningful for neural heads.

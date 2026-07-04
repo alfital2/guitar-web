@@ -47,7 +47,9 @@
 
   * { box-sizing: border-box; }
   html, body { height: 100%; }
-  html { overflow-x: hidden; }
+  /* Reserve the vertical-scrollbar gutter always, so a scrollbar appearing or
+     disappearing (e.g. while a panel collapses) never re-flows the app width. */
+  html { overflow-x: hidden; scrollbar-gutter: stable; }
   body {
     margin: 0; color: var(--text); font: 14px/1.5 var(--font);
     background: var(--window);
@@ -499,8 +501,8 @@
      bottom edge (was a near-invisible dark chevron in the tolex corner). Clear
      contrast on the grille, unmistakably a "put this away" affordance. */
   .amp-collapse-btn.collapse-chev {
-    position: absolute; left: 50%; bottom: 7px; transform: translateX(-50%);
-    top: auto; right: auto; z-index: 6;
+    position: absolute; left: 50%; top: 9px; bottom: auto; right: auto;
+    transform: translateX(-50%); z-index: 6;
     width: 52px; height: 15px; border-radius: 9px; font-size: 9px;
     color: rgba(255,255,255,0.72);
     background: linear-gradient(180deg, rgba(60,60,66,0.92), rgba(24,24,28,0.94));
@@ -508,18 +510,21 @@
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.16), 0 2px 6px rgba(0,0,0,0.5);
     backdrop-filter: none;
   }
-  .amp-collapse-btn.collapse-chev:hover { color: #fff; transform: translateX(-50%) translateY(-1px); }
-  .amp-collapse-btn.collapse-chev > span { display: inline-block; transform: translateY(-0.5px); }
+  .amp-collapse-btn.collapse-chev:hover { color: #fff; transform: translateX(-50%) translateY(1px); }
+  .amp-collapse-btn.collapse-chev > span { display: inline-block; transform: translateY(0.5px); }
 
   /* ── Amp collapsed value strip (concept D) ──────────────
      Read-only brushed-metal row: label + current value per knob, grouped by
      section. Tap to expand the full amp head. */
   /* Collapse: keep the ACTIVE body in flow (it sets the wrap height) and lift
      the other to an absolute, transparent overlay so the two can cross-fade
-     during the height tween (see src/chain-ui/collapse.js). */
+     during the height tween (see src/chain-ui/collapse.js). `inset:0` +
+     `overflow:hidden` CONSTRAIN that overlay to the wrap's (collapsed) height —
+     otherwise the full-height hidden body sticks out below the short strip,
+     extends the page, and spawns a stray scrollbar that jitters the layout. */
   .amp-wrap { position: relative; }
-  .amp-wrap.collapsed .amp-head { position: absolute; inset: 0 0 auto 0; opacity: 0; pointer-events: none; }
-  .amp-wrap:not(.collapsed) .amp-vstrip { position: absolute; inset: 0 0 auto 0; opacity: 0; pointer-events: none; }
+  .amp-wrap.collapsed .amp-head { position: absolute; inset: 0; overflow: hidden; opacity: 0; pointer-events: none; }
+  .amp-wrap:not(.collapsed) .amp-vstrip { position: absolute; inset: 0; overflow: hidden; opacity: 0; pointer-events: none; }
   .amp-vstrip {
     display: flex; align-items: stretch; width: fit-content; max-width: 1180px; margin: 0 auto; cursor: pointer;
     padding: 9px 6px; border-radius: 13px; border: 1px solid #8d8f95; overflow: visible;
@@ -851,10 +856,11 @@
 
   /* ── Collapsed pedalboard: slim strip of mini pedals in chain order (like
      the amp's value strip) — frees the vertical real estate after tuning. ── */
-  /* Same cross-fade collapse pattern as the amp (see src/chain-ui/collapse.js). */
+  /* Same cross-fade collapse pattern as the amp (see src/chain-ui/collapse.js).
+     inset:0 + overflow:hidden keep the hidden overlay from overflowing the page. */
   .board-wrap { position: relative; }
-  .board-wrap.collapsed .pedalboard { position: absolute; inset: 0 0 auto 0; opacity: 0; pointer-events: none; }
-  .board-wrap:not(.collapsed) .board-strip { position: absolute; inset: 0 0 auto 0; opacity: 0; pointer-events: none; }
+  .board-wrap.collapsed .pedalboard { position: absolute; inset: 0; overflow: hidden; opacity: 0; pointer-events: none; }
+  .board-wrap:not(.collapsed) .board-strip { position: absolute; inset: 0; overflow: hidden; opacity: 0; pointer-events: none; }
   .pedalboard { position: relative; }
   .board-collapse-btn { position: absolute; top: 9px; right: 9px; z-index: 6; }
   .board-strip { display: flex; align-items: center; gap: 9px; width: fit-content; max-width: 100%; margin: 0 auto;
