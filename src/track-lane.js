@@ -511,6 +511,22 @@ export function renderTrackLane(container, {
 
   row.append(headers, wrap);
   container.appendChild(row);
+  // Fill the numbered ruler across the whole visible width — `bars` is only a
+  // CONTENT minimum, so on a near-empty timeline the grid used to stop mid-screen
+  // (at bar 16) with dead space to its right. Now measured post-layout and topped
+  // up to cover the viewport (recomputed every render, so it adapts to zoom and
+  // window size).
+  const visW = timeline.clientWidth;
+  if (visW > 0 && bw > 0) {
+    let n = bars;
+    const cap = n + 512; // safety bound at extreme zoom-out on ultrawide screens
+    while (n * bw < visW + bw && n < cap) {
+      n++;
+      const c = el('div', 'track-bar'); c.textContent = String(n);
+      c.style.width = `${bw}px`; c.style.flex = `0 0 ${bw}px`;
+      ruler.appendChild(c);
+    }
+  }
   // Restore the pre-render view (time at the left edge) under the new zoom.
   timeline.scrollLeft = Math.max(0, prevLeftSec * PX_PER_SEC * Z);
   applySelection(scroll); // restore selection highlight after the rebuild
