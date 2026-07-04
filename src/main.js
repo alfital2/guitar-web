@@ -28,6 +28,7 @@ import { drawWaveform } from './waveform.js';
 import { cloneTake, splitTakeAt, resolveNoOverlap, clampRepeat, planPaste } from './clip-ops.js';
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
+import * as takeStore from './take-store.js';
 import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
 import { connectInputChannel } from './audio/input-channel.js';
@@ -123,6 +124,24 @@ function restore(s) {
   renderTrack(); updateTransport();
 }
 function pushUndo() { undoStack.push(snapshot()); if (undoStack.length > 60) undoStack.shift(); redoStack = []; }
+
+// Persist the whole session (tracks + recorded audio) to IndexedDB so a refresh
+// doesn't wipe the user's takes. Debounced for ordinary edits; call with
+// immediate=true right after a take is captured so a fast reload can't lose it.
+// An empty session clears the store. Best-effort — take-store swallows failures.
+let persistTimer = 0;
+function persistSession(immediate = false) {
+  if (persistTimer) { clearTimeout(persistTimer); persistTimer = 0; }
+  const run = () => {
+    if (tracks.some((t) => t.takes.length)) takeStore.saveSession(snapshot());
+    else takeStore.clearSession();
+  };
+  if (immediate) run(); else persistTimer = setTimeout(run, 1000);
+}
+// Flush on the way out (backgrounding is the reliable signal; pagehide is a
+// best-effort fallback since IndexedDB writes may not finish during unload).
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistSession(true); });
+window.addEventListener('pagehide', () => persistSession(true));
 function undo() { if (!undoStack.length) return; redoStack.push(snapshot()); restore(undoStack.pop()); }
 function redo() { if (!redoStack.length) return; undoStack.push(snapshot()); restore(redoStack.pop()); }
 document.addEventListener('keydown', (e) => {
@@ -725,6 +744,7 @@ function renderTrack() {
       renderTrack(); updateTransport();
     },
   });
+  persistSession(); // debounced — any structural change re-saves the session
 }
 
 // Restore a persisted chain (array of {type, params}) into the model.
@@ -1225,6 +1245,15 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
   renderTrack();
 })();
 
+// Reload a persisted recording session (tracks + audio) from IndexedDB. The
+// default empty track renders instantly above; if the user had takes, they pop
+// in a moment later once IDB resolves. `restore` reuses the undo re-hydration
+// path (sets tracks/armedId/takeSeq/nextTrackId + re-renders).
+(async function restoreRecordingSession() {
+  const s = await takeStore.loadSession();
+  if (s && Array.isArray(s.tracks) && s.tracks.some((t) => t.takes && t.takes.length)) restore(s);
+})();
+
 // Toolbar transport cluster: inert transport (ground for recording) + working
 // metronome and tuner. The tuner taps the live engine analyser when running.
 const transport = mountTransport($('transport-cluster'), {
@@ -1417,6 +1446,7 @@ if ($('diag')) window.__tabDebug = {
         track.takes.push({ ...t, samples, duration, n: ++takeSeq, name: track.name, x: recStartX, offset: 0, len: duration });
         renderTrack();
         updateTransport();
+        persistSession(true); // save the fresh take at once — survive an immediate refresh
       }
     } else {
       if (player.isPlaying()) { player.stop(); reflectPlay(); }
