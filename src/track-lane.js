@@ -105,17 +105,12 @@ function enableClipDrag(clip, trackId, take, handlers, getStrip, root, beginTrim
   clip.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     const key = clipKey(trackId, take.n);
-    // Cmd/Ctrl+click → toggle this clip in the selection; don't start a drag.
-    if (e.metaKey || e.ctrlKey) {
-      if (selection.has(key)) selection.delete(key); else selection.add(key);
-      applySelection(root);
-      e.preventDefault(); e.stopPropagation();
-      return;
-    }
-    // Edge grab = trim, matching the ew-resize affordance zone. The right
-    // edge is split like GarageBand: its upper LOOP_ZONE loop-drags (repeat
-    // the clip), the rest trims.
-    if (beginTrim) {
+    // Cmd/Ctrl is the FREE-MOVE modifier: a drag places the clip anywhere with
+    // no grid snap, and a plain click (no drag) still toggles the selection.
+    const modifier = e.metaKey || e.ctrlKey;
+    // Edge grab = trim/loop (ew-resize zone) — only WITHOUT the modifier, so a
+    // Cmd/Ctrl drag from anywhere on the clip free-moves instead of trimming.
+    if (!modifier && beginTrim) {
       const r = clip.getBoundingClientRect();
       const edge = Math.min(TRIM_EDGE_PX, r.width / 3); // keep a move surface on tiny clips
       if (r.width > 0 && e.clientX - r.left < edge) { beginTrim.l(e); return; }
@@ -124,13 +119,15 @@ function enableClipDrag(clip, trackId, take, handlers, getStrip, root, beginTrim
         beginTrim.r(e); return;
       }
     }
-    // Plain click on an unselected clip → make it the sole selection.
-    if (!selection.has(key)) { selection.clear(); selection.add(key); applySelection(root); }
-    // Drag every selected clip together.
-    const items = [...root.querySelectorAll('.track-clip.selected')].map((c) => ({
+    // Plain click on an unselected clip → make it the sole selection. With the
+    // modifier we defer any selection change to pointerup (click = toggle).
+    if (!modifier && !selection.has(key)) { selection.clear(); selection.add(key); applySelection(root); }
+    // Drag the selection if this clip is in it, else just this clip.
+    const dragEls = selection.has(key) ? [...root.querySelectorAll('.track-clip.selected')] : [clip];
+    const items = dragEls.map((c) => ({
       el: c, trackId: c.dataset.trackId, n: c.dataset.takeId, origLeft: parseFloat(c.style.left) || 0,
     }));
-    drag = { startX: e.clientX, items };
+    drag = { startX: e.clientX, items, modifier, moved: false, key };
     items.forEach((it) => it.el.classList.add('dragging'));
     try { clip.setPointerCapture(e.pointerId); } catch {}
     e.preventDefault(); e.stopPropagation();
@@ -138,6 +135,7 @@ function enableClipDrag(clip, trackId, take, handlers, getStrip, root, beginTrim
   clip.addEventListener('pointermove', (e) => {
     if (!drag) return;
     const dx = e.clientX - drag.startX;
+    if (Math.abs(dx) > 3) drag.moved = true; // past this it's a drag, not a click
     const out = outside(e);
     drag.items.forEach((it) => {
       it.el.style.left = `${Math.max(0, it.origLeft + dx)}px`;
@@ -147,20 +145,29 @@ function enableClipDrag(clip, trackId, take, handlers, getStrip, root, beginTrim
   });
   clip.addEventListener('pointerup', (e) => {
     if (!drag) return;
+    const { modifier, moved, key } = drag;
     const dx = e.clientX - drag.startX;
     const out = outside(e);
     getStrip().classList.remove('removing');
     drag.items.forEach((it) => it.el.classList.remove('dragging', 'will-delete'));
+    // Cmd/Ctrl press with no real drag = a click → toggle the selection.
+    if (modifier && !moved) {
+      if (selection.has(key)) selection.delete(key); else selection.add(key);
+      applySelection(root);
+      drag = null; return;
+    }
     if (out) {
       const items = drag.items.map((it) => ({ trackId: +it.trackId, n: +it.n }));
       if (handlers.onDeleteClips) handlers.onDeleteClips(items);
       else if (handlers.onDeleteClip) items.forEach((it) => handlers.onDeleteClip(it.trackId, it.n));
       items.forEach((it) => selection.delete(clipKey(it.trackId, it.n)));
     } else {
-      // origLeft + dx are VIEW px; handlers expect BASE (model) px.
+      // origLeft + dx are VIEW px; handlers expect BASE (model) px. Cmd/Ctrl
+      // (or Alt) = FREE placement, no grid snap.
+      const free = modifier || e.altKey;
       const moves = drag.items.map((it) => ({ trackId: +it.trackId, n: +it.n, x: Math.max(0, (it.origLeft + dx) / Z) }));
-      if (handlers.onMoveClips) handlers.onMoveClips(moves, e.altKey);
-      else if (handlers.onMoveClip) moves.forEach((m) => handlers.onMoveClip(m.trackId, m.n, m.x, e.altKey));
+      if (handlers.onMoveClips) handlers.onMoveClips(moves, free);
+      else if (handlers.onMoveClip) moves.forEach((m) => handlers.onMoveClip(m.trackId, m.n, m.x, free));
     }
     drag = null;
   });

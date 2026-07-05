@@ -127,10 +127,14 @@ describe('renderTrackLane (multi-track)', () => {
     const moves = [];
     renderTrackLane(el, { tracks: tracks(), armedId: 1, onMoveClips: (m) => moves.push(m) });
     const clip = el.querySelector('.track-clip');
-    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, metaKey: true, bubbles: true }));
+    const metaClick = () => {
+      clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, metaKey: true, bubbles: true }));
+      clip.dispatchEvent(new MouseEvent('pointerup', { button: 0, metaKey: true, bubbles: true })); // click = down+up, no move
+    };
+    metaClick();
     expect(clip.classList.contains('selected')).toBe(true);
     expect(moves).toEqual([]); // toggling does not start a drag
-    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, metaKey: true, bubbles: true }));
+    metaClick();
     expect(clip.classList.contains('selected')).toBe(false); // toggles back off
   });
   it('clicking empty timeline clears the selection', () => {
@@ -138,6 +142,7 @@ describe('renderTrackLane (multi-track)', () => {
     renderTrackLane(el, { tracks: tracks(), armedId: 1 });
     const clip = el.querySelector('.track-clip');
     clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, metaKey: true, bubbles: true }));
+    clip.dispatchEvent(new MouseEvent('pointerup', { button: 0, metaKey: true, bubbles: true }));
     expect(clip.classList.contains('selected')).toBe(true);
     // plain click on empty timeline (down + up, no drag) clears the selection
     el.querySelector('.track-scroll').dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 5, clientY: 5, bubbles: true }));
@@ -165,8 +170,12 @@ describe('renderTrackLane (multi-track)', () => {
     ] }];
     renderTrackLane(el, { tracks: two, armedId: 1, onMoveClips: (m) => batches.push(m) });
     const clips = el.querySelectorAll('.track-clip');
-    clips[0].dispatchEvent(new MouseEvent('pointerdown', { button: 0, metaKey: true, bubbles: true }));
-    clips[1].dispatchEvent(new MouseEvent('pointerdown', { button: 0, metaKey: true, bubbles: true }));
+    const metaClick = (c) => {
+      c.dispatchEvent(new MouseEvent('pointerdown', { button: 0, metaKey: true, bubbles: true }));
+      c.dispatchEvent(new MouseEvent('pointerup', { button: 0, metaKey: true, bubbles: true }));
+    };
+    metaClick(clips[0]);
+    metaClick(clips[1]);
     expect(clips[0].classList.contains('selected')).toBe(true);
     expect(clips[1].classList.contains('selected')).toBe(true);
     clips[0].dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 0, clientY: 0, bubbles: true }));
@@ -177,6 +186,28 @@ describe('renderTrackLane (multi-track)', () => {
     el.querySelector('.track-scroll').dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 5, clientY: 5, bubbles: true }));
     window.dispatchEvent(new MouseEvent('pointerup', { clientX: 5, clientY: 5, bubbles: true }));
   });
+  it('Cmd/Ctrl+drag free-moves a clip (free flag → true, no grid snap)', () => {
+    const el = document.createElement('div');
+    let freeFlag = null;
+    renderTrackLane(el, { tracks: tracks(), armedId: 1, onMoveClips: (m, free) => { freeFlag = free; } });
+    const clip = el.querySelector('.track-clip');
+    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, ctrlKey: true, clientX: 0, clientY: 0, bubbles: true }));
+    clip.dispatchEvent(new MouseEvent('pointermove', { ctrlKey: true, clientX: 40, clientY: 0, bubbles: true })); // real drag (>3px)
+    clip.dispatchEvent(new MouseEvent('pointerup', { ctrlKey: true, clientX: 40, clientY: 0, bubbles: true }));
+    expect(freeFlag).toBe(true); // Ctrl held → placement is free (no snap)
+    clearClipSelection();
+  });
+  it('a plain drag (no modifier) snaps — free flag → false', () => {
+    const el = document.createElement('div');
+    let freeFlag = null;
+    renderTrackLane(el, { tracks: tracks(), armedId: 1, onMoveClips: (m, free) => { freeFlag = free; } });
+    const clip = el.querySelector('.track-clip');
+    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 40, clientY: 0, bubbles: true }));
+    clip.dispatchEvent(new MouseEvent('pointermove', { clientX: 80, clientY: 0, bubbles: true }));
+    clip.dispatchEvent(new MouseEvent('pointerup', { clientX: 80, clientY: 0, bubbles: true }));
+    expect(freeFlag).toBe(false);
+    clearClipSelection();
+  });
   it('positions the playhead at playheadSec (preserved across re-renders)', () => {
     const el = document.createElement('div');
     renderTrackLane(el, { tracks: tracks(), armedId: 1, playheadSec: 5 });
@@ -185,7 +216,9 @@ describe('renderTrackLane (multi-track)', () => {
   it('getSelectedClips reflects the selection and clears', () => {
     const el = document.createElement('div');
     renderTrackLane(el, { tracks: tracks(), armedId: 1 });
-    el.querySelector('.track-clip').dispatchEvent(new MouseEvent('pointerdown', { button: 0, metaKey: true, bubbles: true }));
+    const c = el.querySelector('.track-clip');
+    c.dispatchEvent(new MouseEvent('pointerdown', { button: 0, metaKey: true, bubbles: true }));
+    c.dispatchEvent(new MouseEvent('pointerup', { button: 0, metaKey: true, bubbles: true }));
     expect(getSelectedClips()).toEqual([{ trackId: 1, n: 1 }]);
     clearClipSelection();
     expect(getSelectedClips()).toEqual([]);
