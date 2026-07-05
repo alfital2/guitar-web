@@ -63,9 +63,10 @@ export function animateCollapse(wrap, { toggle, outgoing, incoming }) {
   // fill:forwards so the head STAYS invisible after its (shorter) fade — else
   // it reverts to opacity 1 and pops back as a dark clipped sliver while the
   // height tween is still finishing.
-  outgoing.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.round(DUR * 0.45), easing: 'ease-out', fill: 'forwards' });
+  const fade = outgoing.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.round(DUR * 0.45), easing: 'ease-out', fill: 'forwards' });
 
   const cleanup = () => {
+    fade.cancel(); // drop the fill:forwards hold — else the body stays opacity:0 and is invisible next time it's shown
     wrap.style.overflow = ''; wrap.style.willChange = '';
     outgoing.style.cssText = prevStyle; // restore → back to CSS display:none
   };
