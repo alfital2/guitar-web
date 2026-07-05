@@ -37,6 +37,7 @@ import { assignFret, quantizeToGrid, tabTimeForTransport } from './tab/transcrib
 import { encodeWav } from './wav.js';
 import { transcribeTake } from './tab/offline-transcribe.js';
 import { mountTabLane } from './tab/tab-lane.js';
+import { encodeLick, decodeLick, toAscii } from './tab/tab-file.js';
 import { createTabMidiPlayer } from './tab/tab-midi-player.js';
 import { initJamUI } from './jam-ui.js';
 
@@ -1432,6 +1433,10 @@ if ($('diag')) window.__tabDebug = {
     const n = tabLane.getModel().getState().notes[idx];
     return n ? tabLane.getModel().setDuration([n.id], durTicks) : 0;
   },
+  // Test-only: phase-3 .lick round-trip without the browser download path.
+  saveLick: () => (tabLane ? encodeLick(tabLane.serialize()) : null),
+  loadLick: async (bytes) => { if (!ensureTabLane()) return false; tabLane.loadNotes(await decodeLick(new Uint8Array(bytes))); return true; },
+  ascii: () => (tabLane ? toAscii(tabLane.serialize()) : ''),
 };
 
 // Record: capture the live processed output into a take, append it as a clip.

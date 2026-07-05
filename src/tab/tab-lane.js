@@ -24,6 +24,7 @@ import {
 import { createTabRenderer, COL_W, LINE_GAP } from './tab-render.js';
 import { attachTabInput } from './tab-input.js';
 import { can } from '../features.js';
+import { downloadLick, readLickFile, autosaveTab, loadAutosave, toAscii } from './tab-file.js';
 
 const dash = '·';
 
@@ -286,6 +287,111 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
 
   const seeded = (fn) => { suppress++; try { return fn(); } finally { suppress--; } };
 
+  // ── .lick file actions: Save / Open / ASCII, drag-drop, autosave ───────────
+  // Gated controls stay visible when the cap is off (premium-ready upsell
+  // affordance) but are disabled and inert.
+  const fileActions = head.querySelector('.tab-file-actions');
+  fileActions.innerHTML = `
+    <button type="button" class="tab-save" title="Save as a shareable .lick file">Save</button>
+    <button type="button" class="tab-open" title="Open a .lick file">Open</button>
+    <button type="button" class="tab-ascii" title="Copy as ASCII tab">ASCII</button>`;
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.lick';
+  fileInput.hidden = true;
+  fileActions.appendChild(fileInput);
+
+  const lockIfGated = (btn, cap) => {
+    if (can(cap)) return;
+    btn.disabled = true;
+    btn.classList.add('tab-locked');
+    btn.title = 'Available on the paid plan';
+  };
+  lockIfGated(fileActions.querySelector('.tab-save'), 'tab.file');
+  lockIfGated(fileActions.querySelector('.tab-open'), 'tab.file');
+  lockIfGated(fileActions.querySelector('.tab-ascii'), 'tab.ascii');
+
+  // Flash a transient message on the header state text (decode errors,
+  // "copied"), then restore whatever label was there before.
+  let flashTimer = 0, flashRestore = null;
+  function flashState(msg) {
+    const st = head.querySelector('.tab-state');
+    if (!st) return;
+    if (flashRestore == null) flashRestore = st.textContent;
+    st.textContent = msg;
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => {
+      const el = head.querySelector('.tab-state');
+      if (el) el.textContent = flashRestore;
+      flashRestore = null;
+    }, 2500);
+  }
+
+  let loadFileCb = null;
+  async function openLickFile(file) {
+    try {
+      const state = await readLickFile(file);
+      model.load(state);
+      if (loadFileCb) loadFileCb(state);
+      flashState(`opened ${file.name || '.lick'}`);
+    } catch (err) {
+      flashState(err && err.message ? err.message : 'Could not open file');
+    }
+  }
+
+  fileActions.querySelector('.tab-save').addEventListener('click', () => {
+    if (!can('tab.file')) return;
+    downloadLick(model.serialize(), 'lick');
+  });
+  fileActions.querySelector('.tab-open').addEventListener('click', () => {
+    if (!can('tab.file')) return;
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (f) openLickFile(f);
+    fileInput.value = '';
+  });
+  fileActions.querySelector('.tab-ascii').addEventListener('click', async () => {
+    if (!can('tab.ascii')) return;
+    try {
+      await navigator.clipboard.writeText(toAscii(model.serialize()));
+      flashState('ASCII tab copied');
+    } catch {
+      flashState('Clipboard blocked');
+    }
+  });
+
+  // Drop a .lick anywhere on the lane.
+  const onDragover = (e) => {
+    if (!can('tab.file')) return;
+    e.preventDefault();
+    container.classList.add('tab-drop');
+  };
+  const onDragleave = () => container.classList.remove('tab-drop');
+  const onDrop = (e) => {
+    e.preventDefault();
+    container.classList.remove('tab-drop');
+    if (!can('tab.file')) return;
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) openLickFile(f);
+  };
+  container.addEventListener('dragover', onDragover);
+  container.addEventListener('dragleave', onDragleave);
+  container.addEventListener('drop', onDrop);
+
+  // Working-copy autosave: debounced 800 ms after the last model mutation.
+  let autosaveTimer = 0;
+  const unsubAutosave = model.subscribe(() => {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => autosaveTab(model.serialize()), 800);
+  });
+
+  // Restore the working copy when the lane mounts empty (transcription and
+  // loadNotes() both clear/seed afterwards, so this never fights them).
+  const autosaved = loadAutosave();
+  if (autosaved && Array.isArray(autosaved.notes) && autosaved.notes.length) model.load(autosaved);
+
   const api = {
     // Place a detected note (col = 16th column). meta carries pitch + timing
     // so edits preserve the sound and the export pairs notes with the audio.
@@ -343,6 +449,7 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
       if (st && label) st.textContent = label;
     },
     onChange(cb) { changeCb = cb; },
+    onLoadFile(cb) { loadFileCb = cb; },
     onExport(cb) { head.querySelector('.tab-export').addEventListener('click', cb); },
     onClear(cb) { head.querySelector('.tab-clear').addEventListener('click', () => { cb(); }); },
     onClose(cb) { head.querySelector('.tab-close').addEventListener('click', cb); },
@@ -353,6 +460,12 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
     focus() { stage.focus(); },
 
     destroy() {
+      clearTimeout(autosaveTimer);
+      clearTimeout(flashTimer);
+      unsubAutosave();
+      container.removeEventListener('dragover', onDragover);
+      container.removeEventListener('dragleave', onDragleave);
+      container.removeEventListener('drop', onDrop);
       input.destroy();
       renderer.destroy();
       container.innerHTML = '';
