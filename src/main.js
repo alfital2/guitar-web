@@ -301,6 +301,45 @@ document.addEventListener('keydown', (e) => {
   else duplicateClips(sel);
 });
 
+// ── Transport keyboard shortcuts ────────────────────────────────────────────
+//  Space — play/stop from the playhead. It is DEDICATED to the transport, not
+//          "re-press the last button": while recording it only STOPS the take
+//          (never starts playback). The preventDefault also kills the browser's
+//          default of activating a focused button (which is what made Space
+//          re-toggle Record).
+//  R     — record (identical to clicking Record: count-in/practice respected,
+//          toggles stop while recording).
+//  Enter — park the playhead at the start (ignored mid-take).
+// Ignored while typing in a field, while the tab editor's stage holds focus
+// (it owns the keys), and while the add-effect modal is open.
+function shortcutBlocked(e) {
+  const t = e.target;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '') || t.isContentEditable) return true;
+  const lane = $('tab-lane');
+  if (lane && !lane.hidden && lane.contains(document.activeElement)) return true;
+  if (document.querySelector('.fx-modal-backdrop')) return true;
+  return false;
+}
+document.addEventListener('keydown', (e) => {
+  if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+  if (shortcutBlocked(e)) return;
+  const k = e.key;
+  if (k === ' ' || k === 'Spacebar') {
+    e.preventDefault();
+    if (recorder.isRecording()) { logL.transport.info('key', { key: 'space', action: 'stop-record' }); $('tp-record')?.click(); }
+    else { logL.transport.info('key', { key: 'space', action: 'play-toggle' }); $('tp-play')?.click(); }
+  } else if (k === 'Enter') {
+    if (recorder.isRecording()) return; // don't disrupt a running take
+    e.preventDefault();
+    logL.transport.info('key', { key: 'enter', action: 'to-start' });
+    $('tp-start')?.click();
+  } else if (k === 'r' || k === 'R') {
+    e.preventDefault();
+    logL.transport.info('key', { key: 'r', action: 'record' });
+    $('tp-record')?.click();
+  }
+});
+
 let ctxMenu = null;
 function closeCtxMenu() { if (ctxMenu) { ctxMenu.remove(); ctxMenu = null; } }
 function ctxItem(label, fn, disabled) {
