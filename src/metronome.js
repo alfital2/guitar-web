@@ -8,6 +8,26 @@ export function clampTempo(bpm) {
   return Math.max(40, Math.min(240, Math.round(bpm)));
 }
 
+// Tap-tempo: BPM from a series of tap timestamps (ms). Uses the MEDIAN interval
+// over the most recent taps so one off-beat tap doesn't wreck the estimate,
+// clamped to the metronome range. Needs ≥ 2 taps; null otherwise.
+export function tapToBpm(taps, { window = 6 } = {}) {
+  if (!Array.isArray(taps) || taps.length < 2) return null;
+  const recent = taps.slice(-window);
+  const gaps = [];
+  for (let i = 1; i < recent.length; i++) {
+    const g = recent[i] - recent[i - 1];
+    if (g > 0) gaps.push(g);
+  }
+  if (!gaps.length) return null;
+  gaps.sort((a, b) => a - b);
+  const med = gaps[Math.floor(gaps.length / 2)];
+  return clampTempo(60000 / med);
+}
+
+// A tap sequence resets if the player pauses longer than this between taps.
+export const TAP_RESET_MS = 2000;
+
 const LOOKAHEAD_MS = 25;     // how often the scheduler wakes
 const SCHEDULE_AHEAD = 0.1;  // seconds of audio scheduled in advance
 // Start the recorder slightly before the audible downbeat so its ScriptProcessor

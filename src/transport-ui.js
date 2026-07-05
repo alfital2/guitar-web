@@ -1,5 +1,5 @@
 // src/transport-ui.js
-import { createMetronome, clampTempo } from './metronome.js';
+import { createMetronome, clampTempo, tapToBpm, TAP_RESET_MS } from './metronome.js';
 import { createTuner } from './tuner.js';
 
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -66,19 +66,41 @@ export function mountTransport(container, { getLiveAnalyser, onGain, onTempoChan
     if (on) metronome.start(); else metronome.stop();
   };
 
-  // ── Practice popover (right-click the metronome) ──
+  // ── Practice popover (right-click the metronome): play/stop + tap tempo ──
   let metroMenu = null;
+  let tapTimes = [];
   const onDocDown = (e) => { if (metroMenu && !metroMenu.contains(e.target) && e.target !== metroBtn) closeMetroMenu(); };
-  function closeMetroMenu() { if (metroMenu) { metroMenu.remove(); metroMenu = null; document.removeEventListener('pointerdown', onDocDown, true); } }
+  function closeMetroMenu() { if (metroMenu) { metroMenu.remove(); metroMenu = null; tapTimes = []; document.removeEventListener('pointerdown', onDocDown, true); } }
   metroBtn.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     if (metroMenu) { closeMetroMenu(); return; }
+    tapTimes = [];
     const m = el('div', 'metro-menu');
     const item = el('button', 'metro-menu-item');
     item.type = 'button';
     item.textContent = metroFree ? '■  Stop metronome' : '▶  Play metronome (practice)';
     item.addEventListener('click', () => { setFree(!metroFree); closeMetroMenu(); });
     m.appendChild(item);
+
+    // Tap tempo: keep clicking the pad to the beat — BPM comes from the median
+    // tap interval. The menu stays open so you can tap several times; a long
+    // pause (TAP_RESET_MS) starts a fresh count.
+    const tap = el('button', 'metro-menu-item metro-tap');
+    tap.type = 'button';
+    tap.innerHTML = '<span class="metro-tap-dot"></span><span class="metro-tap-txt">Tap tempo — click to the beat</span>';
+    const txt = tap.querySelector('.metro-tap-txt');
+    tap.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const now = performance.now();
+      if (tapTimes.length && now - tapTimes[tapTimes.length - 1] > TAP_RESET_MS) tapTimes = [];
+      tapTimes.push(now);
+      const b = tapToBpm(tapTimes);
+      if (b != null) { setBpm(b); txt.textContent = `Tap tempo — ${b} BPM`; }
+      else txt.textContent = 'Tap tempo — keep tapping…';
+      tap.classList.remove('tapped'); void tap.offsetWidth; tap.classList.add('tapped'); // pulse
+    });
+    m.appendChild(tap);
+
     document.body.appendChild(m);
     const r = metroBtn.getBoundingClientRect();
     m.style.left = `${Math.round(r.left)}px`;
