@@ -23,6 +23,7 @@ import {
 } from './tab-model.js';
 import { createTabRenderer, COL_W, LINE_GAP } from './tab-render.js';
 import { attachTabInput } from './tab-input.js';
+import { can } from '../features.js';
 
 const dash = '·';
 
@@ -74,15 +75,93 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   let suppress = 0;               // >0 while seeding programmatically — no onChange
   let playIndex = [];             // [{id, t0, t1}] — playhead highlight windows
 
-  const metaEl = head.querySelector('.tab-meta');
   const requestRender = () => renderer.render(model.getState(), ui);
 
-  function refreshChrome(state) {
-    const t = TUNING_PRESETS[state.tuning];
-    metaEl.textContent =
-      `${state.tempo} BPM ${dash} ${state.timeSig.num}/${state.timeSig.den} ${dash} ${t.name}` +
-      (state.capo ? ` ${dash} capo ${state.capo}` : '');
-    gutter.innerHTML = t.names.map((n, i) => `<i style="top:${i * LINE_GAP}px">${n}</i>`).join('');
+  // ── Interactive meta: tempo click-to-edit + TS picker + tuning/capo ────────
+  const TS_CHOICES = ['2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '3/8', '6/8', '7/8', '9/8', '12/8', '2/2'];
+  function mountMeta() {
+    const meta = head.querySelector('.tab-meta');
+    meta.innerHTML = `
+      <button type="button" class="tab-bpm" title="Tempo — click to edit"></button><span class="tab-unit">BPM</span>
+      <span class="tab-sep">${dash}</span>
+      <select class="tab-ts" aria-label="Time signature">${TS_CHOICES.map((c) => `<option value="${c}">${c}</option>`).join('')}</select>
+      <span class="tab-sep">${dash}</span>
+      <span class="tab-tune-slot"></span>`;
+    const bpmBtn = meta.querySelector('.tab-bpm');
+    const tsSel = meta.querySelector('.tab-ts');
+    const refresh = (s) => {
+      if (!meta.querySelector('.tab-bpm-input')) bpmBtn.textContent = String(s.tempo);
+      const v = `${s.timeSig.num}/${s.timeSig.den}`;
+      if (tsSel.value !== v) {
+        // a loaded file may use a TS outside the common list — add it on the fly
+        if (![...tsSel.options].some((o) => o.value === v)) tsSel.add(new Option(v, v));
+        tsSel.value = v;
+      }
+    };
+    bpmBtn.addEventListener('click', () => {
+      if (!can('tab.edit') || meta.querySelector('.tab-bpm-input')) return;
+      const input = document.createElement('input');
+      input.className = 'tab-bpm-input';
+      input.type = 'text';
+      input.inputMode = 'numeric';
+      input.value = String(model.getState().tempo);
+      input.setAttribute('aria-label', 'Tempo (BPM)');
+      bpmBtn.textContent = '';
+      bpmBtn.appendChild(input);
+      input.focus();
+      input.select();
+      let done = false;
+      const commit = (save) => {
+        if (done) return; done = true;
+        const raw = input.value.trim();
+        input.remove();
+        if (save && /^\d{2,3}$/.test(raw)) model.setTempo(parseInt(raw, 10));  // model clamps 30–300
+        bpmBtn.textContent = String(model.getState().tempo);
+      };
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+        else if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+        e.stopPropagation();                      // don't leak to lane/app keys
+      });
+      input.addEventListener('blur', () => commit(true));
+      input.addEventListener('pointerdown', (e) => e.stopPropagation());
+    });
+    tsSel.addEventListener('change', () => {
+      if (!can('tab.edit')) { refresh(model.getState()); return; }
+      const [num, den] = tsSel.value.split('/').map(Number);
+      model.setTimeSig(num, den);
+    });
+    model.subscribe(refresh);
+    refresh(model.getState());
+  }
+
+  // ── Tuning + capo pickers; gutter string names follow the tuning ───────────
+  function mountTunePickers() {
+    const slot = head.querySelector('.tab-tune-slot');
+    slot.innerHTML = `
+      <select class="tab-tuning" aria-label="Tuning">${Object.entries(TUNING_PRESETS)
+        .map(([id, p]) => `<option value="${id}">${p.name}</option>`).join('')}</select>
+      <select class="tab-capo" aria-label="Capo fret">${Array.from({ length: 8 },
+        (_, i) => `<option value="${i}">${i ? `capo ${i}` : 'no capo'}</option>`).join('')}</select>`;
+    const tunSel = slot.querySelector('.tab-tuning');
+    const capoSel = slot.querySelector('.tab-capo');
+    const refresh = (s) => {
+      tunSel.value = s.tuning;
+      capoSel.value = String(s.capo);
+      // gutter names in display order (high → low), same geometry as the lines
+      gutter.innerHTML = TUNING_PRESETS[s.tuning].names
+        .map((n, i) => `<i style="top:${i * LINE_GAP}px">${n}</i>`).join('');
+    };
+    tunSel.addEventListener('change', () => {
+      if (!can('tab.edit')) { refresh(model.getState()); return; }
+      model.setTuning(tunSel.value);
+    });
+    capoSel.addEventListener('change', () => {
+      if (!can('tab.edit')) { refresh(model.getState()); return; }
+      model.setCapo(parseInt(capoSel.value, 10));
+    });
+    model.subscribe(refresh);
+    refresh(model.getState());
   }
 
   // Highlight windows prefer the DETECTED audio times (the recording is the
@@ -98,11 +177,12 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
 
   function onModelChange(state) {
     renderer.render(state, ui);
-    refreshChrome(state);
     rebuildPlayIndex(state);
     if (!suppress && changeCb) changeCb(api.serialize());
   }
   model.subscribe(onModelChange);
+  mountMeta();
+  mountTunePickers();
 
   // ── inline fret editor (double-click a note) ────────────────────────────────
   function beginEdit(noteId) {

@@ -3,12 +3,13 @@
 // Detection lives in offline-transcribe.js (right-click clip → Transcribe).
 // This module owns what comes AFTER a midi note exists: which string/fret to
 // write it on, moving a note between strings while preserving its PITCH, and
-// which grid column it lands in. Standard tuning EADGBE, frets 0-17, 16th-note
+// which grid column it lands in. Tuning is per-tab (presets live in
+// tab-model.js; helpers default to standard EADGBE), frets 0-24, 16th-note
 // grid at the transport BPM.
 
 // Standard tuning, DISPLAY order: index 0 = high e line (top of tab) … 5 = low E.
 export const TUNING_MIDI = [64, 59, 55, 50, 45, 40]; // e B G D A E
-export const MAX_FRET = 17;
+export const MAX_FRET = 24;
 
 export const freqToMidiFloat = (f) => 69 + 12 * Math.log2(f / 440);
 
@@ -22,8 +23,8 @@ export function midiForPosition(string, fret) {
 // This is the invariant used when the user drags a note to another string:
 // the SOUND stays, the fret changes. E.g. fret 5 on D (midi 55) dragged to the
 // G string (open = 55) → fret 0.
-export function fretForString(midi, string, maxFret = MAX_FRET) {
-  const fret = midi - TUNING_MIDI[string];
+export function fretForString(midi, string, maxFret = MAX_FRET, tuning = TUNING_MIDI) {
+  const fret = midi - tuning[string];
   return fret >= 0 && fret <= maxFret ? fret : null;
 }
 

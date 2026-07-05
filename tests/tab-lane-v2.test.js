@@ -16,14 +16,16 @@ describe('lane v2 shell', () => {
     expect(container.querySelector('.tab-file-actions')).toBeTruthy();
   });
 
-  it('meta line reads tempo · TS · tuning and follows model changes', () => {
+  it('meta controls reflect the model: bpm readout, TS picker, tuning slot', () => {
     const lane = mountTabLane(container, { bpm: 120 });
-    const meta = container.querySelector('.tab-meta');
-    expect(meta.textContent).toBe('120 BPM · 4/4 · Standard');
+    expect(container.querySelector('.tab-bpm').textContent).toBe('120');
+    expect(container.querySelector('.tab-ts').value).toBe('4/4');
     lane.getModel().setTimeSig(3, 4);
     lane.getModel().setTuning('DropD');
     lane.getModel().setCapo(2);
-    expect(meta.textContent).toBe('120 BPM · 3/4 · Drop D · capo 2');
+    expect(container.querySelector('.tab-ts').value).toBe('3/4');
+    expect(container.querySelector('.tab-tuning').value).toBe('DropD');
+    expect(container.querySelector('.tab-capo').value).toBe('2');
   });
 
   it('gutter string names follow the tuning', () => {
