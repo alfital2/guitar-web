@@ -47,6 +47,10 @@ export function durTicksFromSec(sec, tempo) {
   return best;
 }
 
+// Legal technique values (contract-fixed; toAscii and the player key off
+// exactly these): hp h/p, slide / \, bend ½/full tone, dead, palm mute.
+const TECH_VALUES = { hp: ['h', 'p'], slide: ['/', '\\'], bend: [0.5, 1], dead: [true], pm: [true] };
+
 const DEFAULT_STATE = () => ({
   version: 2, tempo: 120, timeSig: { num: 4, den: 4 }, tuning: 'EADGBE', capo: 0, notes: [],
 });
@@ -175,6 +179,24 @@ export function createTabModel(init = {}) {
       if (!hit.length) return 0;
       pushUndo();
       for (const n of hit) n.durTicks = durTicks;
+      emit();
+      return hit.length;
+    },
+
+    // toggleTech — per-note toggle: the same value clears the flag, a
+    // different one replaces it. Techniques stack (a note can be hammered
+    // AND palm-muted); values outside the contract table are rejected.
+    toggleTech(ids, key, value) {
+      const legal = TECH_VALUES[key];
+      if (!legal || !legal.includes(value)) return 0;
+      const set = new Set(Array.isArray(ids) ? ids : [ids]);
+      const hit = state.notes.filter((n) => set.has(n.id));
+      if (!hit.length) return 0;
+      pushUndo();
+      for (const n of hit) {
+        if (n.tech[key] === value) delete n.tech[key];
+        else n.tech[key] = value;
+      }
       emit();
       return hit.length;
     },

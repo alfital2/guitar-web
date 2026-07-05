@@ -57,6 +57,17 @@ export function loopWindow(state, selection = null) {
   return { startSec: ticksToSec(a, state.tempo), endSec: ticksToSec(b, state.tempo) };
 }
 
+// Frequency automation (slides/bends) rides real AudioParams; the unit-test
+// fake's oscillator frequency is a plain { value } holder, so this degrades
+// to the base pitch (same try/catch convention stop() uses for gain ramps).
+function glide(param, f0, f1, start, end) {
+  param.value = f0;
+  try {
+    param.setValueAtTime(f0, start);
+    param.linearRampToValueAtTime(f1, end);
+  } catch { /* fake param — stays at the base pitch */ }
+}
+
 export function createTabMidiPlayer({ getContext } = {}) {
   let own = null;
   let ctx = null;
@@ -65,6 +76,19 @@ export function createTabMidiPlayer({ getContext } = {}) {
   let raf = 0;
   let playing = false;
   const live = new Set();     // scheduled/sounding voices: { o, g }
+
+  let noiseBuf = null;        // dead-note noise, built once per context
+  let noiseCtx = null;
+
+  function noiseBuffer() {
+    if (noiseBuf && noiseCtx === ctx) return noiseBuf;
+    const len = Math.max(1, Math.floor(ctx.sampleRate * 0.06));
+    noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const ch = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+    noiseCtx = ctx;
+    return noiseBuf;
+  }
 
   function resolveCtx() {
     const liveCtx = getContext && getContext();
@@ -98,6 +122,23 @@ export function createTabMidiPlayer({ getContext } = {}) {
     const spd = clampSpeed(speed);
     const usable = (notes || []).filter((n) => n.midi != null && n.tSec != null).sort((a, b) => a.tSec - b.tSec);
     if (!usable.length) { if (onEnd) onEnd(); return false; }
+
+    // Resolve slide targets up front: a slide glides INTO the next note on
+    // the same string (the '/' vs '\' the tab shows is direction; the audible
+    // target is the destination note's pitch). A phrase-ending slide falls
+    // back to ±2 semitones in the marked direction.
+    const slideTarget = new Map();
+    const byString = new Map();
+    for (const n of usable) {
+      if (n.string == null) continue;
+      if (!byString.has(n.string)) byString.set(n.string, []);
+      byString.get(n.string).push(n);
+    }
+    for (const list of byString.values()) {
+      for (let i = 0; i < list.length - 1; i++) {
+        if (list[i].tech && list[i].tech.slide) slideTarget.set(list[i], list[i + 1].midi);
+      }
+    }
 
     master = ctx.createGain();
     master.gain.value = 0.32;
@@ -140,24 +181,60 @@ export function createTabMidiPlayer({ getContext } = {}) {
 
     const totalU = countSec + span + 0.12;         // non-loop end (unwrapped)
 
+    // One note = one voice; technique flags shape it (design doc §3):
+    //   dead  → no tone at all, a short bandpassed noise tick ("chk")
+    //   pm    → darker lowpass + much faster decay (palm rests on the strings)
+    //   hp    → softened attack (no pick transient on a hammer-on/pull-off)
+    //   slide → linear freq glide across the note into the next on the string
+    //   bend  → linear freq rise of 1 or 2 semitones (½/full tone)
     function voice(n, start) {
-      const dur = clampDur(n.durSec) / spd;
+      const t = n.tech || {};
+      if (t.dead) { deadTick(start); return; }
+      const dur = (clampDur(n.durSec) / spd) * (t.pm ? 0.45 : 1);
+      const f0 = midiToFreq(n.midi);
       const o = ctx.createOscillator();
       o.type = 'triangle';
-      o.frequency.value = midiToFreq(n.midi);
+      o.frequency.value = f0;
+      if (t.slide) {
+        const target = slideTarget.has(n) ? slideTarget.get(n) : n.midi + (t.slide === '/' ? 2 : -2);
+        glide(o.frequency, f0, midiToFreq(target), start, start + dur);       // arrive as the next note starts
+      } else if (t.bend) {
+        glide(o.frequency, f0, midiToFreq(n.midi + t.bend * 2), start, start + Math.min(dur * 0.5, 0.25));
+      }
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = Math.min(6000, midiToFreq(n.midi) * 6);
+      lp.frequency.value = t.pm ? Math.min(1400, f0 * 3) : Math.min(6000, f0 * 6);
       const g = ctx.createGain();
       g.gain.setValueAtTime(0.0001, start);
-      g.gain.exponentialRampToValueAtTime(0.9, start + 0.006);   // pluck attack
-      g.gain.exponentialRampToValueAtTime(0.0001, start + dur);  // string decay
+      if (t.hp) g.gain.exponentialRampToValueAtTime(0.55, start + 0.03);      // legato swell, no pick
+      else g.gain.exponentialRampToValueAtTime(t.pm ? 0.7 : 0.9, start + 0.006);  // pluck attack
+      g.gain.exponentialRampToValueAtTime(0.0001, start + dur);               // string decay
       o.connect(lp); lp.connect(g); g.connect(master);
       o.start(start);
       o.stop(start + dur + 0.05);
       const v = { o, g };
       live.add(v);
       o.onended = () => { live.delete(v); try { o.disconnect(); } catch {} try { g.disconnect(); } catch {} };
+    }
+
+    // Muted string: pitchless noise through a bandpass, gone in 60ms.
+    function deadTick(start) {
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuffer();
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 3000;
+      bp.Q.value = 0.8;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(0.5, start + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + 0.06);
+      src.connect(bp); bp.connect(g); g.connect(master);
+      src.start(start);
+      src.stop(start + 0.08);
+      const v = { o: src, g };
+      live.add(v);
+      src.onended = () => { live.delete(v); try { src.disconnect(); } catch {} try { g.disconnect(); } catch {} };
     }
 
     // Click blip — metronome.js voice, routed through master so stop() kills it.

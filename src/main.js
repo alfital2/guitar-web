@@ -1308,8 +1308,9 @@ function toggleTabMidi() {
   if (!notes.length) return;
   if (player.isPlaying()) { player.stop(); reflectPlay(); tabLane.hidePlayhead(); }
   const st = tabLane.serialize();                        // v2 state: tempo + timeSig ride along
+  const played = tabLane.getModel().notesWithTime();     // {tSec,durSec,midi,tech,string} — techniques ride into the voices
   tabLane.setPlaying(true);
-  tabMidi.play(notes, {
+  tabMidi.play(played, {
     onTick: (t) => tabLane.setPlayhead(t),
     onEnd: () => { tabLane.hidePlayhead(); tabLane.setPlaying(false); },
     tempo: st.tempo, timeSig: st.timeSig,
@@ -1442,6 +1443,11 @@ if ($('diag')) window.__tabDebug = {
   loadLick: async (bytes) => { if (!ensureTabLane()) return false; tabLane.loadNotes(await decodeLick(new Uint8Array(bytes))); return true; },
   ascii: () => (tabLane ? toAscii(tabLane.serialize()) : ''),
   practice: () => (tabLane ? tabLane.getPractice() : null),
+  tech(idx, key, value) {
+    if (!tabLane) return 0;
+    const n = tabLane.getModel().getState().notes[idx];
+    return n ? tabLane.getModel().toggleTech([n.id], key, value) : 0;
+  },
 };
 
 // Record: capture the live processed output into a take, append it as a clip.

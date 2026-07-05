@@ -129,6 +129,38 @@ export function attachTabInput({ scrollEl, stage, model, ui, requestRender, onEd
     } else requestRender();
   }
 
+  // ── Technique keys ──────────────────────────────────────────────────────────
+  // h/p hammer-on/pull-off, / \ slides, b bend cycle (½ → full → off), x dead
+  // note, m palm mute. Applies to the selection, else the note under the
+  // cursor. toggleTech is a per-note toggle, so the same key clears the mark.
+  const TECH_KEYS = {
+    h: ['hp', 'h'], p: ['hp', 'p'],
+    '/': ['slide', '/'], '\\': ['slide', '\\'],
+    b: ['bend', null],                  // value resolved by the cycle below
+    x: ['dead', true], m: ['pm', true],
+  };
+  const techTargets = () => {
+    const ids = selectedIds();
+    if (ids && ids.length) return ids;
+    if (!ui.cursor) return null;
+    const at = model.getState().notes.find((n) => n.tick === ui.cursor.tick && n.string === ui.cursor.string);
+    return at ? [at.id] : null;
+  };
+
+  function applyTech(k) {
+    const ids = techTargets();
+    if (!ids) return;
+    const [key, value] = TECH_KEYS[k];
+    if (key === 'bend') {
+      // cycle keyed off the first target's current value: off → ½ → full →
+      // off (a set bend + value 1 replaces; value 1 twice toggles off)
+      const first = model.getState().notes.find((n) => n.id === ids[0]);
+      model.toggleTech(ids, 'bend', first && first.tech.bend ? 1 : 0.5);
+    } else {
+      model.toggleTech(ids, key, value);
+    }
+  }
+
   function deleteAtCursor() {
     if (!can('tab.edit')) return;
     const ids = selectedIds();
@@ -194,6 +226,13 @@ export function attachTabInput({ scrollEl, stage, model, ui, requestRender, onEd
       e.preventDefault(); e.stopPropagation();
       flushPendingDigit();
       applyDot();
+      return;
+    }
+    if (TECH_KEYS[e.key]) {
+      e.preventDefault(); e.stopPropagation();
+      if (!can('tab.techniques')) return;
+      flushPendingDigit();
+      applyTech(e.key);
       return;
     }
     if (/^[0-9]$/.test(e.key)) {

@@ -1360,6 +1360,24 @@
   .tab-speed { font: 700 10px var(--font); color: var(--text-secondary); background: #17171d;
     border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 2px 4px; cursor: pointer; }
   .tab-practice .locked { opacity: .45; cursor: not-allowed; }
+  /* technique glyphs: slur arcs (h/p), slides, bends, PM―― spans, dead × */
+  .tab-glyphs { position: absolute; inset: 0; pointer-events: none; }
+  .tab-glyph { position: absolute; font: 700 7px var(--mono); font-style: normal;
+    line-height: 1; color: rgba(255,255,255,0.65); }
+  .tab-glyph.hp { height: 7px; border: 1px solid rgba(255,255,255,0.4); border-bottom: none;
+    border-radius: 50% 50% 0 0 / 100% 100% 0 0; }
+  .tab-glyph.hp::after { content: attr(data-t); position: absolute; left: 50%; top: 3px;
+    transform: translateX(-50%); color: rgba(255,255,255,0.8); background: rgba(12,12,16,0.7); padding: 0 1px; }
+  .tab-glyph.slide { width: 9px; height: 2px; border-radius: 1px; background: rgba(255,255,255,0.55); }
+  .tab-glyph.slide.up { transform: rotate(-24deg); }
+  .tab-glyph.slide.down { transform: rotate(24deg); }
+  .tab-glyph.bend { color: var(--accent); }
+  .tab-glyph.bend::after { content: '↗'; margin-left: 1px; }
+  .tab-glyph.pm { top: -4px; height: 8px; display: inline-flex; align-items: center;
+    letter-spacing: .08em; color: rgba(255,255,255,0.55); }
+  .tab-glyph.pm::after { content: ''; flex: 1; margin-left: 3px;
+    border-top: 1px dashed rgba(255,255,255,0.35); }
+  .tab-note.dead { color: var(--very-muted); }
   .tab-lane.paused .tab-title { color: var(--text-secondary); }
   /* v2 editor overlays: grid cursor cell + column-range selection band.
      Static styles only — moving them is a left/top write, no animation. */

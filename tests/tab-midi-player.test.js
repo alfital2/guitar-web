@@ -259,3 +259,116 @@ describe('loopWindow', () => {
     expect(loopWindow({ ...state, tempo: 60 }, null)).toEqual({ startSec: 0, endSec: 8 });
   });
 });
+
+// Techniques need observable AudioParam automation; the base fake's params
+// are plain { value } holders. This wrapper upgrades oscillator frequency to
+// a recording param and logs every gain's exponential ramps, so freq glides
+// and attack/decay envelopes can be asserted.
+function makeTechCtx() {
+  const { fc, starts } = makeCtx();
+  const freqEvents = [];
+  const gainRamps = [];
+  const wrapOsc = fc.createOscillator;               // makeCtx's wrapper (records starts)
+  fc.createOscillator = () => {
+    const o = wrapOsc();
+    const f = o.frequency;                           // plain { value } on the fake
+    o.frequency = {
+      get value() { return f.value; },
+      set value(v) { f.value = v; },
+      setValueAtTime(v, t) { f.value = v; freqEvents.push({ kind: 'set', v, t }); },
+      linearRampToValueAtTime(v, t) { freqEvents.push({ kind: 'ramp', v, t }); },
+    };
+    return o;
+  };
+  const mkGain = fc.createGain.bind(fc);
+  fc.createGain = () => {
+    const g = mkGain();
+    const ramp = g.gain.exponentialRampToValueAtTime.bind(g.gain);
+    g.gain.exponentialRampToValueAtTime = (v, t) => { gainRamps.push({ v, t }); ramp(v, t); };
+    return g;
+  };
+  return { fc, starts, freqEvents, gainRamps };
+}
+
+describe('technique voices', () => {
+  it('slide glides to the NEXT note on the same string across the note', () => {
+    const { fc, freqEvents } = makeTechCtx();
+    const p = createTabMidiPlayer({ getContext: () => fc });
+    p.play([
+      { tSec: 0, durSec: 0.3, midi: 55, string: 2, tech: { slide: '/' } },
+      { tSec: 0.3, durSec: 0.3, midi: 60, string: 2, tech: {} },
+    ], {});
+    expect(freqEvents).toHaveLength(2);
+    expect(freqEvents[0].kind).toBe('set');
+    expect(freqEvents[0].v).toBeCloseTo(196.0, 1);       // G3 — the written note
+    expect(freqEvents[0].t).toBeCloseTo(0.06, 5);
+    expect(freqEvents[1].kind).toBe('ramp');
+    expect(freqEvents[1].v).toBeCloseTo(261.63, 1);      // C4 — the destination note
+    expect(freqEvents[1].t).toBeCloseTo(0.36, 5);        // arrives as the next note starts
+    p.stop();
+  });
+
+  it('a phrase-ending slide falls back to ±2 semitones in the marked direction', () => {
+    const { fc, freqEvents } = makeTechCtx();
+    const p = createTabMidiPlayer({ getContext: () => fc });
+    p.play([{ tSec: 0, durSec: 0.3, midi: 55, string: 2, tech: { slide: '\\' } }], {});
+    expect(freqEvents[1].v).toBeCloseTo(174.61, 1);      // F3 — two semitones down
+    p.stop();
+  });
+
+  it('bend ramps up ½ or 1 tone within the first half of the note', () => {
+    const { fc, freqEvents } = makeTechCtx();
+    const p = createTabMidiPlayer({ getContext: () => fc });
+    p.play([{ tSec: 0, durSec: 0.4, midi: 55, tech: { bend: 0.5 } }], {});
+    expect(freqEvents[1].v).toBeCloseTo(207.65, 1);      // +1 semitone (½ tone)
+    expect(freqEvents[1].t).toBeCloseTo(0.26, 5);        // 0.06 + min(dur/2, 0.25)
+    p.stop();
+    freqEvents.length = 0;
+    p.play([{ tSec: 0, durSec: 0.4, midi: 55, tech: { bend: 1 } }], {});
+    expect(freqEvents[1].v).toBeCloseTo(220, 1);         // +2 semitones (full tone)
+    p.stop();
+  });
+
+  it('hp softens the attack: slower, quieter swell instead of a pluck', () => {
+    const { fc, gainRamps } = makeTechCtx();
+    const p = createTabMidiPlayer({ getContext: () => fc });
+    p.play([{ tSec: 0, durSec: 0.3, midi: 55, tech: { hp: 'h' } }], {});
+    expect(gainRamps[0].v).toBe(0.55);                   // vs 0.9 pluck
+    expect(gainRamps[0].t).toBeCloseTo(0.09, 5);         // 30ms swell vs 6ms pick
+    expect(gainRamps[1]).toMatchObject({ v: 0.0001 });   // normal decay
+    p.stop();
+  });
+
+  it('pm darkens the lowpass and cuts the decay short', () => {
+    const { fc, gainRamps } = makeTechCtx();
+    const p = createTabMidiPlayer({ getContext: () => fc });
+    p.play([{ tSec: 0, durSec: 0.4, midi: 57, tech: { pm: true } }], {});
+    const lp = fc.nodesByKind.biquad.find((b) => b.type === 'lowpass');
+    expect(lp.frequency.value).toBeCloseTo(660, 5);      // min(1400, 3·220) vs 1320 open
+    expect(gainRamps[0].v).toBe(0.7);
+    expect(gainRamps[1].t).toBeCloseTo(0.24, 5);         // 0.06 + 0.4·0.45 — vs 0.46 open
+    p.stop();
+  });
+
+  it('dead notes make a noise tick, not a tone', () => {
+    const { fc, starts } = makeTechCtx();
+    const p = createTabMidiPlayer({ getContext: () => fc });
+    p.play([{ tSec: 0, durSec: 0.3, midi: 55, tech: { dead: true } }], {});
+    expect(notesOf(starts)).toHaveLength(0);             // no oscillator voice at all
+    expect(fc.srcStarts).toBe(1);                        // one noise burst
+    const bp = fc.nodesByKind.biquad.find((b) => b.type === 'bandpass');
+    expect(bp.frequency.value).toBe(3000);
+    expect(fc.nodesByKind.buffersource[0].buffer.length).toBe(2880);  // 60ms @ 48k
+    p.stop();
+  });
+
+  it('plain notes are untouched: pluck attack, open lowpass, no freq automation', () => {
+    const { fc, freqEvents, gainRamps } = makeTechCtx();
+    const p = createTabMidiPlayer({ getContext: () => fc });
+    p.play([{ tSec: 0, durSec: 0.3, midi: 55, tech: {} }], {});
+    expect(freqEvents).toHaveLength(0);
+    expect(gainRamps[0]).toMatchObject({ v: 0.9 });
+    expect(fc.nodesByKind.biquad[0].frequency.value).toBeCloseTo(1176, 0);  // 6·196
+    p.stop();
+  });
+});

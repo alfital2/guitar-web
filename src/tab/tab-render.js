@@ -40,6 +40,11 @@ export function createTabRenderer(stage) {
   rhythm.className = 'tab-rhythm';
   stage.appendChild(rhythm);
 
+  // Technique glyph layer — pointer-events off so it never steals clicks.
+  const glyphs = document.createElement('div');
+  glyphs.className = 'tab-glyphs';
+  stage.appendChild(glyphs);
+
   let barKey = '';                // `${barTicks}:${cols}` — bars rebuild only when this changes
 
   function renderBars(state, cols) {
@@ -178,6 +183,88 @@ export function createTabRenderer(stage) {
     rhythm.appendChild(frag);
   }
 
+  // ── Technique glyphs (Guitar Pro-style tab marks) ───────────────────────────
+  // h/p slur arc from the previous note on the string, / \ slide dash, bend
+  // amount above the note, PM―― span over palm-muted runs. Rebuilt wholesale
+  // per render — glyphs connect notes across columns, so like the rhythm
+  // layer there is no per-note identity worth preserving. The stage has only
+  // ~4px of headroom above string 0 (same limit .tab-cursor lives with),
+  // hence the Math.max(-4, …) clamp on everything drawn above a note.
+  function renderGlyphs(state) {
+    glyphs.textContent = '';
+    const frag = document.createDocumentFragment();
+    const sorted = [...state.notes].sort((a, b) => a.tick - b.tick || a.string - b.string);
+
+    // dead: × replaces the fret number on the note span itself. The keyed
+    // spans belong to the note reconcile — only label/class are adjusted
+    // here, in BOTH directions so a stale × never survives an un-toggle,
+    // and never while an inline fret edit is open inside the span.
+    for (const n of sorted) {
+      const el = noteEls.get(n.id);
+      if (!el || el.querySelector('input')) continue;
+      const dead = !!(n.tech && n.tech.dead);
+      const label = dead ? '×' : String(n.fret);
+      if (el.textContent !== label) el.textContent = label;
+      el.classList.toggle('dead', dead);
+    }
+
+    const byString = new Map();
+    for (const n of sorted) {
+      if (!byString.has(n.string)) byString.set(n.string, []);
+      byString.get(n.string).push(n);
+    }
+
+    for (const [s, list] of byString) {
+      for (let i = 0; i < list.length; i++) {
+        const n = list[i], t = n.tech || {};
+        const x = xForTick(n.tick), y = yForString(s);
+        if (t.hp) {
+          // slur arc from the previous note on the string; a phrase-opening
+          // hammer/pull gets a half-column stub arc instead
+          const from = i > 0 ? xForTick(list[i - 1].tick) + 5 : x - COL_W / 2;
+          const el = document.createElement('i');
+          el.className = 'tab-glyph hp';
+          el.dataset.t = t.hp;
+          el.style.left = `${from}px`;
+          el.style.width = `${Math.max(8, x - 5 - from)}px`;
+          el.style.top = `${Math.max(-4, y - 11)}px`;
+          frag.appendChild(el);
+        }
+        if (t.slide) {
+          const el = document.createElement('i');
+          el.className = `tab-glyph slide ${t.slide === '/' ? 'up' : 'down'}`;
+          el.style.left = `${x + 7}px`;
+          el.style.top = `${y - 3}px`;
+          frag.appendChild(el);
+        }
+        if (t.bend) {
+          const el = document.createElement('i');
+          el.className = 'tab-glyph bend';
+          el.textContent = t.bend === 1 ? 'full' : '½';
+          el.style.left = `${x + 6}px`;
+          el.style.top = `${Math.max(-4, y - 13)}px`;
+          frag.appendChild(el);
+        }
+      }
+    }
+
+    // PM―― spans: palm-muted runs chain while consecutive muted columns are
+    // at most a beat apart; drawn in the bar-number band above the strings.
+    const pmTicks = [...new Set(sorted.filter((n) => n.tech && n.tech.pm).map((n) => n.tick))];
+    for (let i = 0; i < pmTicks.length; i++) {
+      const start = pmTicks[i];
+      let last = start;
+      while (i + 1 < pmTicks.length && pmTicks[i + 1] - pmTicks[i] <= PPQ) { i++; last = pmTicks[i]; }
+      const el = document.createElement('i');
+      el.className = 'tab-glyph pm';
+      el.textContent = 'PM';
+      el.style.left = `${xForTick(start) - 6}px`;
+      el.style.width = `${Math.max(18, xForTick(last) - xForTick(start) + 12)}px`;
+      frag.appendChild(el);
+    }
+    glyphs.appendChild(frag);
+  }
+
   function render(state, ui) {
     const lastEnd = state.notes.reduce((m, n) => Math.max(m, n.tick + n.durTicks), 0);
     const uiTick = ui && ui.cursor ? ui.cursor.tick : 0;
@@ -187,6 +274,7 @@ export function createTabRenderer(stage) {
     renderNotes(state);
     renderOverlays(ui);
     renderRhythm(state);
+    renderGlyphs(state);
   }
 
   function noteEl(id) { return noteEls.get(id) || null; }
@@ -198,6 +286,7 @@ export function createTabRenderer(stage) {
     cellCursor.remove();
     selection.remove();
     rhythm.remove();
+    glyphs.remove();
   }
 
   return { render, noteEl, destroy };
