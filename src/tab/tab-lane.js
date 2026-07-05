@@ -541,6 +541,7 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
     },
 
     destroy() {
+      if (resizeObs) resizeObs.disconnect();
       clearTimeout(autosaveTimer);
       clearTimeout(flashTimer);
       unsubAutosave();
@@ -553,6 +554,18 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
       container.hidden = true;
     },
   };
+
+  // Re-wrap when the lane's width changes (window resize, rig dock/undock) —
+  // otherwise rows stay laid out for a stale width until the next edit.
+  let resizeObs = null;
+  if (typeof ResizeObserver !== 'undefined') {
+    let raf = 0;
+    resizeObs = new ResizeObserver(() => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => { requestRender(); renderGutter(model.getState()); });
+    });
+    resizeObs.observe(scroll);
+  }
 
   onModelChange(model.getState());               // first paint (no cb registered yet)
   // Gutter is absolutely positioned in the lane — anchor it to wherever the

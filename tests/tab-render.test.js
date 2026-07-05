@@ -161,6 +161,13 @@ describe('wrapped layout (bars flow into rows like paper tab)', () => {
     expect(layout.cellAt(13, 5)).toEqual({ tick: 0, string: 0 });
   });
 
+  it('clicks in the margin right of the last bar clamp to THIS row, never the next', () => {
+    const r = mountWrapped([]);                                         // 1 bar/row = 48 ticks
+    const layout = r.getLayout();
+    expect(layout.cellAt(900, 5)).toEqual({ tick: 45, string: 0 });     // row 0 last column
+    expect(layout.cellAt(700, ROW_H + 40)).toEqual({ tick: 93, string: 3 });  // row 1 last column
+  });
+
   it('string lines repeat per row; row starts get numbers, not lines', () => {
     mountWrapped([{ tick: 48, string: 0, fret: 0 }]);
     expect(stage.querySelectorAll('.tab-lines i')).toHaveLength(18);    // 3 rows × 6 strings

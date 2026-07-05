@@ -87,8 +87,12 @@ export function createTabRenderer(stage, { getViewWidth = () => 0 } = {}) {
       },
       cellAt(x, y) {
         const row = ticksPerRow === Infinity ? 0 : Math.max(0, Math.min(rows - 1, Math.floor(y / ROW_H)));
-        const tick = row * (ticksPerRow === Infinity ? 0 : ticksPerRow) + tickForX(x);
-        return { tick, string: stringForY(y - row * ROW_H) };
+        // clamp to the row's own bars — a click in the margin right of the
+        // last bar belongs to THIS row's final column, not the next row
+        const rel = ticksPerRow === Infinity
+          ? tickForX(x)
+          : Math.min(tickForX(x), ticksPerRow - SIXTEENTH);
+        return { tick: row * (ticksPerRow === Infinity ? 0 : ticksPerRow) + rel, string: stringForY(y - row * ROW_H) };
       },
     };
   }
