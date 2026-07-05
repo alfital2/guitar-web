@@ -14,10 +14,10 @@
 
 export function concatChunks(chunks) {
   let total = 0;
-  for (const c of chunks) total += c.length;
+  for (const c of chunks) if (c) total += c.length;
   const out = new Float32Array(total);
   let off = 0;
-  for (const c of chunks) { out.set(c, off); off += c.length; }
+  for (const c of chunks) if (c) { out.set(c, off); off += c.length; }
   return out;
 }
 
@@ -47,8 +47,13 @@ export function createRecorder({ getSource, getContext }) {
       });
       node.port.onmessage = (e) => {
         if (!recording || !e.data) return;
-        chunksL.push(e.data.l);
-        if (e.data.r) chunksR.push(e.data.r);            // transferred buffers — no copy
+        const d = e.data;
+        // Robust to a version skew (a stale cached worklet posting a raw
+        // Float32Array instead of {l,r}) — treat that as mono so recording
+        // never silently breaks on a mismatched deploy.
+        if (d instanceof Float32Array) { chunksL.push(d); return; }
+        if (d.l) chunksL.push(d.l);
+        if (d.r) chunksR.push(d.r);                      // transferred buffers — no copy
       };
       node.__isWorklet = true;
       return node;

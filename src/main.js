@@ -29,6 +29,9 @@ import { cloneTake, splitTakeAt, resolveNoOverlap, clampRepeat, planPaste } from
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import * as takeStore from './take-store.js';
+import { installLogCapture, log } from './log.js';
+
+installLogCapture(); // capture console errors + app events early (run __logs() in the console)
 import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
 import { connectInputChannel } from './audio/input-channel.js';
@@ -1481,6 +1484,8 @@ if ($('diag')) window.__tabDebug = {
       transport.endSession();
       recBtn.classList.remove('recording');
       restoreFoldIfIdle(); // transport idle again — un-fold to the pre-record state
+      log('record stop', { samples: t ? t.samples.length : 0, stereo: !!(t && t.samplesR) });
+      if (!t || !t.samples.length) log('WARN: empty capture — no clip created (check the audio worklet / input)');
       if (t && t.samples.length) {
         pushUndo();
         // Recording-latency compensation: drop the monitoring-delay head so the
@@ -1511,6 +1516,7 @@ if ($('diag')) window.__tabDebug = {
         if (!ctx || recorder.isRecording()) return;
         recorder.start();
         recBtn.classList.add('recording');
+        log('record start', { atSec: +Math.max(0, playheadSec).toFixed(2), armedTrack: track.id });
         // Recording starts AT the playhead (where the user parked it), not at
         // the end of the track. The clip + the stored take share this anchor.
         const startSec = Math.max(0, playheadSec);

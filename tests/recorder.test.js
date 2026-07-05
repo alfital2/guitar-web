@@ -32,4 +32,8 @@ describe('concatChunks', () => {
     const out = concatChunks([new Float32Array(100), new Float32Array(250)]);
     expect(out.length).toBe(350);
   });
+  it('skips null/undefined chunks (defensive vs a worklet version skew)', () => {
+    const out = concatChunks([new Float32Array([1, 2]), undefined, new Float32Array([3]), null]);
+    expect(Array.from(out)).toEqual([1, 2, 3]);
+  });
 });
