@@ -11,8 +11,12 @@
 // narrow and drift). GPU-cheap (height on one node, opacity on two), one-shot,
 // reduced-motion aware.
 
-const EASE = 'cubic-bezier(.32, .72, 0, 1)'; // fast, no-overshoot iOS settle
-const DUR = 340;
+// Slight ease-in then smooth settle (Material-standard). The gentle START is
+// deliberate: it holds the panel briefly at full size so the outgoing body can
+// fade out while still SUBSTANTIAL, instead of the height snapping thin and
+// leaving a dark clipped sliver mid-fold.
+const EASE = 'cubic-bezier(.4, 0, .2, 1)';
+const DUR = 360;
 
 function prefersReduced() {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -51,9 +55,15 @@ export function animateCollapse(wrap, { toggle, outgoing, incoming }) {
   outgoing.style.pointerEvents = 'none';
   outgoing.style.zIndex = '1';
 
+  // The incoming body sits underneath at FULL opacity the whole time (revealed
+  // by the height tween), and the outgoing overlay fades out FAST and
+  // front-loaded so it's gone by the time the (decelerating) height tween has
+  // clipped the panel thin — no "thin dark bar" flash, no dark gap.
   const hAnim = wrap.animate([{ height: `${startH}px` }, { height: `${endH}px` }], { duration: DUR, easing: EASE });
-  outgoing.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.round(DUR * 0.6), easing: 'ease-out' });
-  incoming.animate([{ opacity: 0 }, { opacity: 1 }], { duration: DUR, easing: EASE });
+  // fill:forwards so the head STAYS invisible after its (shorter) fade — else
+  // it reverts to opacity 1 and pops back as a dark clipped sliver while the
+  // height tween is still finishing.
+  outgoing.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.round(DUR * 0.45), easing: 'ease-out', fill: 'forwards' });
 
   const cleanup = () => {
     wrap.style.overflow = ''; wrap.style.willChange = '';
