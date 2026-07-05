@@ -25,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Stage site (exclude VCS/dev artifacts)
+      - name: Stage site (runtime files only — keep the artifact small)
         run: |
           mkdir -p _site
           rsync -a \
@@ -34,7 +34,16 @@ jobs:
             --exclude='node_modules' \
             --exclude='shots' \
             --exclude='.github' \
+            --exclude='.claude' \
+            --exclude='.superpowers' \
+            --exclude='.qa-learnings' \
+            --exclude='.maestro' \
+            --exclude='docs' \
+            --exclude='tests' \
+            --exclude='tools' \
+            --exclude='.DS_Store' \
             ./ _site/
+          echo "staged site size:"; du -sh _site
           ls -la _site | head
 
       - name: Setup Pages
