@@ -1486,6 +1486,48 @@ function exportTabTraining() {
   if (window.__tabDebug) window.__tabDebug.lastExport = { name, bytes: bundle.audioWavBase64.length, notes: bundle.notes.length };
 }
 
+// ── Test-only: sample-accurate recording-timing harness ─────────────────────
+// Injects a timing-marker impulse into the record path (normGain) at a
+// precisely-known audio-clock time, then finds it in the resulting take to the
+// sample — so a test can measure the true count-in head gap and overdub sync.
+if ($('diag')) window.__timing = {
+  now: () => (ctx ? ctx.currentTime : 0),
+  metroNow: () => (transport.getMetroCtxTime ? transport.getMetroCtxTime() : 0),
+  sr: () => (ctx ? ctx.sampleRate : 0),
+  downbeat: () => (transport.getArmedDownbeat ? transport.getArmedDownbeat() : 0),
+  lastRec: () => ({ backingT0: recBackingT0, ...(window.__lastRecordDebug || {}) }),
+  pendingDownbeat: false, pendingBackingSec: null, pendingOffsetSec: null,
+  // Silence the mic so ONLY injected impulses land in the take (timing math is
+  // unaffected — the capture clock is the same). normGain forced to unity so a
+  // still-measuring loudness gain can't zero the marker.
+  muteInput() { try { inputSplitter && calibrationEq && inputSplitter.disconnect(calibrationEq.input); } catch {} if (normGain) normGain.gain.value = 1; return true; },
+  _impulseAt(at, amp = 1, ms = 4) {
+    if (!ctx || !normGain) return;
+    const n = Math.max(1, Math.round(ctx.sampleRate * ms / 1000));
+    const b = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = b.getChannelData(0); for (let i = 0; i < n; i++) d[i] = amp;
+    const s = ctx.createBufferSource(); s.buffer = b; s.connect(normGain);
+    s.start(Math.max(at, ctx.currentTime + 0.003));
+  },
+  armDownbeatImpulse() { this.pendingDownbeat = true; },      // fire at the count-in downbeat
+  armOffsetImpulse(sec) { this.pendingOffsetSec = sec; },     // fire `sec` after capture starts
+  armBackingImpulse(sec) { this.pendingBackingSec = sec; },   // fire when backing reaches grid `sec`
+  // First sample above `threshold` in the last take + its grid mapping.
+  analyzeLastTake(threshold = 0.15) {
+    const tk = tracks.flatMap((t) => t.takes).slice(-1)[0];
+    if (!tk || !tk.samples) return null;
+    const s = tk.samples; let firstIdx = -1, peak = 0, peakIdx = -1;
+    for (let i = 0; i < s.length; i++) { const a = Math.abs(s[i]); if (a > peak) { peak = a; peakIdx = i; } if (firstIdx < 0 && a > threshold) firstIdx = i; }
+    const sr = tk.sampleRate;
+    return {
+      firstSec: firstIdx < 0 ? null : firstIdx / sr, peakSec: peakIdx / sr, peak,
+      sr, xSec: (tk.x || 0) / PX_PER_SEC, offsetSec: tk.offset || 0, lenSec: tk.len, samples: s.length, trimSec: (window.__lastRecordDebug || {}).trimSec,
+      // grid time of the marker = clip position + where it sits inside the take
+      gridSec: firstIdx < 0 ? null : ((tk.x || 0) / PX_PER_SEC) + (firstIdx / sr) - (tk.offset || 0),
+    };
+  },
+};
+
 if ($('diag')) window.__tabDebug = {
   count: () => (tabLane ? tabLane.noteCount() : -1),
   notes: () => (tabLane ? tabLane.getNotes() : []),
@@ -1573,7 +1615,7 @@ if ($('diag')) window.__tabDebug = {
       if (player.isPlaying()) { player.stop(); reflectPlay(); }
       autoFold.fold(); // free the vertical space for the take (incl. the count-in)
       // Actually begin capture + grow the live clip. Deferred past the count-in.
-      const begin = () => {
+      const begin = (downbeatTime) => {
         recBtn.classList.remove('counting');
         if (!ctx || recorder.isRecording()) return;
         recorder.start();
@@ -1591,6 +1633,15 @@ if ($('diag')) window.__tabDebug = {
         recBackingT0 = null;
         if (backing.some((g) => (g.takes || []).length)) recBackingT0 = player.play(backing, startSec, () => {}, () => {});
         recCapStart = ctx.currentTime; // recorder capture begins ~now (same clock)
+        // Test-only: inject a timing-marker impulse at a precisely-known audio
+        // time so a test can find it, sample-accurate, in the resulting take.
+        if (window.__timing) {
+          const T = window.__timing;
+          // exact downbeat time is passed in from the metronome (no racy global)
+          if (T.pendingDownbeat) { if (downbeatTime) T._impulseAt(downbeatTime); T.pendingDownbeat = false; T.lastDownbeat = downbeatTime || 0; }
+          if (T.pendingBackingSec != null && recBackingT0) { T._impulseAt(recBackingT0 + T.pendingBackingSec); T.pendingBackingSec = null; }
+          if (T.pendingOffsetSec != null) { T._impulseAt(recCapStart + T.pendingOffsetSec); T.pendingOffsetSec = null; }
+        }
         // Grow a purple clip in real time in the armed track's strip.
         const area = $('track-lane') && $('track-lane').querySelector(`.track-strip[data-track-id="${track.id}"]`);
         if (area) {

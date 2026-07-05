@@ -49,6 +49,7 @@ export function createMetronome({ onBeat } = {}) {
   // metronome share THIS one continuous beat grid, so there is no timing seam
   // between the last count beat and the first recorded beat.
   let session = null;
+  let armedDownbeat = 0; // audio-clock time of the armed count-in downbeat (diagnostics)
   // Everything scheduled ahead of the audible "now": lookahead-scheduled click
   // oscillators and pending setTimeout ids (beat-UI callbacks + an armed
   // count-in downbeat). stop() cancels all of it — previously a scheduled
@@ -88,9 +89,10 @@ export function createMetronome({ onBeat } = {}) {
       // Fire it on the same audio grid, exactly one beat after the last count.
       if (session && b === session.countBeats && !session.fired) {
         session.fired = true;
+        armedDownbeat = t; // exact audio-clock time recording is meant to start
         const cb = session.onDownbeat;
         const d = Math.max(0, (t - ctx.currentTime) * 1000 - REC_LEAD_MS);
-        after(d, () => { if (cb) cb(); });
+        after(d, () => { if (cb) cb(t); }); // pass the exact downbeat audio-time to the callback
         // Count-in only → halt the grid but do NOT cancel what's pending: the
         // downbeat timeout just armed above must fire (it starts the recording)
         // and the already-scheduled count clicks should play out. A user stop()
@@ -157,5 +159,5 @@ export function createMetronome({ onBeat } = {}) {
     }
   }
 
-  return { start, stop, toggle, setTempo, getTempo, isRunning, armRecord };
+  return { start, stop, toggle, setTempo, getTempo, isRunning, armRecord, getArmedDownbeat: () => armedDownbeat, getCtxTime: () => (ctx ? ctx.currentTime : 0) };
 }

@@ -195,6 +195,8 @@ export function mountTransport(container, { getLiveAnalyser, onGain, onTempoChan
     isCountIn: () => countOn,
     isMetroArmed: () => metroArmed,
     isMetroFree: () => metroFree,
+    getArmedDownbeat: () => metronome.getArmedDownbeat(),
+    getMetroCtxTime: () => metronome.getCtxTime(),
     // A record needs the metronome grid if counting in, armed, or practising.
     needsSession: () => countOn || metroArmed || metroFree,
     // Practice (free-run) → always count 4 in (continuing the running grid) and
