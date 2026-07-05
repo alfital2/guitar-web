@@ -19,7 +19,7 @@
 // = time move (snapped to the grid); drag on empty = range selection;
 // double-click a note = inline fret edit (lane owns the input element).
 
-import { SIXTEENTH } from './tab-model.js';
+import { SIXTEENTH, DURATIONS } from './tab-model.js';
 import { tickForX, stringForY, xForTick, yForString } from './tab-render.js';
 import { can } from '../features.js';
 
@@ -92,6 +92,43 @@ export function attachTabInput({ scrollEl, stage, model, ui, requestRender, onEd
     requestRender();
   }
 
+  // ── Duration keys ───────────────────────────────────────────────────────────
+  const DUR_KEYS = { q: 48, w: 24, e: 12, r: 6, t: 3 };
+  // Dotted variant when one exists (24→36), un-dot when already dotted (36→24).
+  // Whole (72) and dotted-16th (4.5) are not DURATIONS members → no-op.
+  const toggleDot = (d) => {
+    if (DURATIONS.includes(d * 1.5)) return d * 1.5;
+    if (Number.isInteger(d / 1.5) && DURATIONS.includes(d / 1.5)) return d / 1.5;
+    return d;
+  };
+
+  function applyDuration(dur) {
+    ui.currentDur = dur;
+    const ids = selectedIds();
+    if (ids && ids.length) model.setDuration(ids, dur);   // model change renders via subscribe
+    else requestRender();                                  // ui-only change
+  }
+
+  function applyDot() {
+    ui.currentDur = toggleDot(ui.currentDur);
+    const ids = selectedIds();
+    if (ids && ids.length) {
+      // per-note toggle: a mixed selection dots each note relative to itself.
+      // One setDuration call per target value; mixed selections cost extra
+      // undo steps — rare enough to accept.
+      const idSet = new Set(ids);
+      const byTarget = new Map();
+      for (const n of model.getState().notes) {
+        if (!idSet.has(n.id)) continue;
+        const next = toggleDot(n.durTicks);
+        if (next === n.durTicks) continue;
+        if (!byTarget.has(next)) byTarget.set(next, []);
+        byTarget.get(next).push(n.id);
+      }
+      for (const [dur, group] of byTarget) model.setDuration(group, dur);
+    } else requestRender();
+  }
+
   function deleteAtCursor() {
     if (!can('tab.edit')) return;
     const ids = selectedIds();
@@ -146,6 +183,18 @@ export function attachTabInput({ scrollEl, stage, model, ui, requestRender, onEd
         requestRender();
         return;
       default: break;
+    }
+    if (DUR_KEYS[e.key] != null && can('tab.edit')) {
+      e.preventDefault(); e.stopPropagation();
+      flushPendingDigit();
+      applyDuration(DUR_KEYS[e.key]);
+      return;
+    }
+    if (e.key === '.' && can('tab.edit')) {
+      e.preventDefault(); e.stopPropagation();
+      flushPendingDigit();
+      applyDot();
+      return;
     }
     if (/^[0-9]$/.test(e.key)) {
       e.preventDefault(); e.stopPropagation();

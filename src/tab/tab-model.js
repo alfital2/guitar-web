@@ -166,6 +166,19 @@ export function createTabModel(init = {}) {
       return true;
     },
 
+    // setDuration — durTicks must be a DURATIONS member (the grid has no other
+    // legal values; dotted-16th in particular doesn't exist at PPQ 12).
+    setDuration(ids, durTicks) {
+      if (!DURATIONS.includes(durTicks)) return 0;
+      const set = new Set(Array.isArray(ids) ? ids : [ids]);
+      const hit = state.notes.filter((n) => set.has(n.id) && n.durTicks !== durTicks);
+      if (!hit.length) return 0;
+      pushUndo();
+      for (const n of hit) n.durTicks = durTicks;
+      emit();
+      return hit.length;
+    },
+
     setTempo(bpm) {
       const v = Math.max(30, Math.min(300, Math.round(bpm)));
       if (!Number.isFinite(v) || v === state.tempo) return;

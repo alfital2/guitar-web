@@ -1427,6 +1427,11 @@ if ($('diag')) window.__tabDebug = {
     const m = tabLane.getModel();
     return m.pasteAt(atCol * 3, m.copyRange(startCol * 3, endCol * 3));
   },
+  setDur(idx, durTicks) {
+    if (!tabLane) return 0;
+    const n = tabLane.getModel().getState().notes[idx];
+    return n ? tabLane.getModel().setDuration([n.id], durTicks) : 0;
+  },
 };
 
 // Record: capture the live processed output into a take, append it as a clip.

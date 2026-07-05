@@ -6,7 +6,7 @@
 // survives re-renders. Geometry is the same 16th-column grid the v1 lane
 // used: COL_W px per 16th, LINE_GAP px between string lines.
 
-import { SIXTEENTH, barTicks } from './tab-model.js';
+import { SIXTEENTH, PPQ, barTicks } from './tab-model.js';
 
 export const COL_W = 26;          // px per 16th column
 export const LINE_GAP = 15;       // px between string lines
@@ -33,6 +33,12 @@ export function createTabRenderer(stage) {
   selection.className = 'tab-selection';
   selection.style.display = 'none';
   stage.appendChild(selection);
+
+  // Rhythm layer sits under the strings; pointer-events off so it never
+  // steals clicks from cells or notes.
+  const rhythm = document.createElement('div');
+  rhythm.className = 'tab-rhythm';
+  stage.appendChild(rhythm);
 
   let barKey = '';                // `${barTicks}:${cols}` — bars rebuild only when this changes
 
@@ -103,6 +109,75 @@ export function createTabRenderer(stage) {
     }
   }
 
+  // ── Rhythm layer: stems/beams/dots (Guitar Pro style) ──────────────────────
+  // One stem per occupied 16th column below the strings, flags/beams by value,
+  // dot for dotted. Rebuilt wholesale on every render — beams span columns so
+  // there is no per-note identity to preserve, and a lick is at most a few
+  // hundred columns (cheap next to the keyed note reconcile above).
+  const FLAG_COUNT = { 3: 2, 6: 1, 9: 1 };     // 16th, 8th, dotted-8th; ≥ quarter has none
+  const STEM_TOP = 78, BEAM_TOP = 86, BEAM_LVL = 3, FLAG_W = 12;
+
+  const beamEl = (a, b, level) => {
+    const el = document.createElement('i');
+    el.className = 'tab-beam';
+    el.style.left = `${xForTick(a)}px`;
+    el.style.width = `${xForTick(b) - xForTick(a)}px`;
+    el.style.top = `${BEAM_TOP - level * BEAM_LVL}px`;
+    return el;
+  };
+  const flagEl = (tick, level) => {
+    const el = document.createElement('i');
+    el.className = 'tab-beam flag';
+    el.style.left = `${xForTick(tick)}px`;
+    el.style.width = `${FLAG_W}px`;
+    el.style.top = `${BEAM_TOP - level * BEAM_LVL}px`;
+    return el;
+  };
+
+  function renderRhythm(state) {
+    rhythm.textContent = '';
+    const cols = new Map();                    // tick -> shortest duration (chords share a stem)
+    for (const n of state.notes) {
+      const cur = cols.get(n.tick);
+      if (cur == null || n.durTicks < cur) cols.set(n.tick, n.durTicks);
+    }
+    const ticks = [...cols.keys()].sort((a, b) => a - b);
+    const frag = document.createDocumentFragment();
+    let carried = 0;                           // beam levels drawn INTO column i by i−1
+    for (let i = 0; i < ticks.length; i++) {
+      const tick = ticks[i], dur = cols.get(tick);
+      if (dur < 48) {                          // whole notes carry no stem
+        const stem = document.createElement('i');
+        stem.className = 'tab-stem' + (dur >= 24 ? ' short' : '');
+        stem.style.left = `${xForTick(tick)}px`;
+        stem.style.top = `${STEM_TOP}px`;
+        frag.appendChild(stem);
+      }
+      if (dur === 36 || dur === 18 || dur === 9) {
+        const dot = document.createElement('i');
+        dot.className = 'tab-dot';
+        dot.style.left = `${xForTick(tick) + 4}px`;
+        frag.appendChild(dot);
+      }
+      const flags = FLAG_COUNT[dur] || 0;
+      let joined = 0;
+      if (flags) {
+        const next = ticks[i + 1];
+        const nextFlags = next != null ? (FLAG_COUNT[cols.get(next)] || 0) : 0;
+        // beam only when the next column starts exactly where this note ends
+        // AND both sit inside the same quarter-note beat
+        if (nextFlags && next === tick + dur && Math.floor(tick / PPQ) === Math.floor(next / PPQ)) {
+          joined = Math.min(flags, nextFlags);
+          for (let l = 0; l < joined; l++) frag.appendChild(beamEl(tick, next, l));
+        }
+        // levels not covered by an in- or out-going beam render as short flags
+        for (let l = Math.max(carried, joined); l < flags; l++) frag.appendChild(flagEl(tick, l));
+      }
+      carried = joined;
+    }
+    rhythm.appendChild(frag);
+  }
+
   function render(state, ui) {
     const lastEnd = state.notes.reduce((m, n) => Math.max(m, n.tick + n.durTicks), 0);
     const uiTick = ui && ui.cursor ? ui.cursor.tick : 0;
@@ -111,6 +186,7 @@ export function createTabRenderer(stage) {
     renderBars(state, cols);
     renderNotes(state);
     renderOverlays(ui);
+    renderRhythm(state);
   }
 
   function noteEl(id) { return noteEls.get(id) || null; }
@@ -121,6 +197,7 @@ export function createTabRenderer(stage) {
     noteEls.clear();
     cellCursor.remove();
     selection.remove();
+    rhythm.remove();
   }
 
   return { render, noteEl, destroy };
