@@ -29,9 +29,14 @@ import { cloneTake, splitTakeAt, resolveNoOverlap, clampRepeat, planPaste } from
 import * as chainState from './chain-state.js';
 import * as chainStore from './chain-store.js';
 import * as takeStore from './take-store.js';
-import { installLogCapture, log } from './log.js';
+import { installLogCapture, log, logger } from './log.js';
 
 installLogCapture(); // capture console errors + app events early (run __logs() in the console)
+// Per-subsystem structured loggers — logL.rec.info('start', {...}) etc.
+const logL = {
+  audio: logger('audio'), rec: logger('recorder'), play: logger('player'),
+  chain: logger('chain'), take: logger('take'), store: logger('store'), transport: logger('transport'),
+};
 import { loadWorklets } from './effects/worklets/index.js';
 import * as reverbFx from './effects/reverb.js';
 import { connectInputChannel } from './audio/input-channel.js';
@@ -140,8 +145,13 @@ let sessionRestoreDone = false; // don't let the initial empty track wipe a save
 function persistSession(immediate = false) {
   if (persistTimer) { clearTimeout(persistTimer); persistTimer = 0; }
   const run = () => {
-    if (tracks.some((t) => t.takes.length)) takeStore.saveSession(snapshot());
-    else if (sessionRestoreDone) takeStore.clearSession(); // only clear once we know the user really emptied it
+    if (tracks.some((t) => t.takes.length)) {
+      takeStore.saveSession(snapshot());
+      logL.store.debug('session-saved', { tracks: tracks.length, takes: allTakes().length, immediate });
+    } else if (sessionRestoreDone) {
+      takeStore.clearSession(); // only clear once we know the user really emptied it
+      logL.store.debug('session-cleared');
+    }
   };
   if (immediate) run(); else persistTimer = setTimeout(run, 1000);
 }
@@ -394,11 +404,14 @@ function rebuildAudio() {
     // (worst case: an abandoned neural-amp worklet keeps running inference).
     try { engine.destroy?.(); } catch (e) { console.warn('engine destroy failed:', e); }
   }
-  engine = buildChain(ctx, chainState.toEngineChain(currentChain), registry);
+  try {
+    engine = buildChain(ctx, chainState.toEngineChain(currentChain), registry);
+  } catch (e) { logL.chain.error('build-failed', { error: String(e), chain: currentChain.map((u) => u.type) }); throw e; }
   if (calibrationEq) calibrationEq.output.connect(engine.input);
   // Pedalboard feeds the amp reverb stage, which feeds normGain.
   if (reverbStage) { reverbStage.apply(ampReverb); engine.output.connect(reverbStage.input); }
   else if (normGain) engine.output.connect(normGain);
+  logL.chain.info('rebuilt', { units: currentChain.map((u) => ({ type: u.type, bypassed: !!u.bypassed })) });
 }
 
 function rebuildGraph() {
@@ -522,7 +535,8 @@ function moveEffect(instanceId, beforeInstanceId) {
 let activePresetName = null;
 function loadPreset(preset) {
   const errors = validatePreset(preset, registry);
-  if (errors.length) { $('error').textContent = errors.join('; '); return; }
+  if (errors.length) { logL.chain.error('preset-invalid', { name: preset && preset.name, errors }); $('error').textContent = errors.join('; '); return; }
+  logL.chain.info('preset-load', { name: preset.name });
   const { rest, reverb } = chainState.extractReverb(preset.chain);
   ampReverb = reverb || { size: 0.4, mix: 0 };
   chainStore.saveReverb(ampReverb);
@@ -968,7 +982,12 @@ async function start() {
 
     // Preload AudioWorklet processors (pitch shift, looper) before any chain is
     // built, so their nodes can be constructed synchronously in buildChain.
-    try { await loadWorklets(ctx); } catch (e) { console.warn('worklet load failed:', e); }
+    try { await loadWorklets(ctx); logL.audio.info('worklets-loaded'); } catch (e) { logL.audio.error('worklet-load-failed', { error: String(e) }); console.warn('worklet load failed:', e); }
+    logL.audio.info('context-ready', {
+      sampleRate: ctx.sampleRate, trackRate, resampling: !!(trackRate && trackRate !== ctx.sampleRate),
+      baseLatencyMs: +((ctx.baseLatency || 0) * 1000).toFixed(1), outputLatencyMs: +((ctx.outputLatency || 0) * 1000).toFixed(1),
+      inputChannel: chainStore.loadInputChannel && chainStore.loadInputChannel(),
+    });
 
     $('sr').textContent = ctx.sampleRate + ' Hz';
     // Diagnose the input path: a track-vs-context rate mismatch means an input
@@ -1259,7 +1278,10 @@ navigator.mediaDevices.enumerateDevices().then(listDevices).catch(() => {});
 (async function restoreRecordingSession() {
   try {
     const s = await takeStore.loadSession();
-    if (s && Array.isArray(s.tracks) && s.tracks.some((t) => t.takes && t.takes.length)) restore(s);
+    if (s && Array.isArray(s.tracks) && s.tracks.some((t) => t.takes && t.takes.length)) {
+      restore(s);
+      logL.store.info('session-restored', { tracks: s.tracks.length, takes: s.tracks.reduce((n, t) => n + (t.takes ? t.takes.length : 0), 0) });
+    }
   } finally {
     sessionRestoreDone = true; // from here on, an empty session may clear the store
   }
@@ -1484,8 +1506,9 @@ if ($('diag')) window.__tabDebug = {
       transport.endSession();
       recBtn.classList.remove('recording');
       restoreFoldIfIdle(); // transport idle again — un-fold to the pre-record state
-      log('record stop', { samples: t ? t.samples.length : 0, stereo: !!(t && t.samplesR) });
-      if (!t || !t.samples.length) log('WARN: empty capture — no clip created (check the audio worklet / input)');
+      const durS = t ? +(t.samples.length / t.sampleRate).toFixed(2) : 0;
+      logL.rec.info('stop', { samples: t ? t.samples.length : 0, durSec: durS, stereo: !!(t && t.samplesR), sr: t && t.sampleRate });
+      if (!t || !t.samples.length) logL.rec.warn('empty-capture', { reason: 'no samples — check the audio worklet / input channel' });
       if (t && t.samples.length) {
         pushUndo();
         // Recording-latency compensation: drop the monitoring-delay head so the
@@ -1516,7 +1539,7 @@ if ($('diag')) window.__tabDebug = {
         if (!ctx || recorder.isRecording()) return;
         recorder.start();
         recBtn.classList.add('recording');
-        log('record start', { atSec: +Math.max(0, playheadSec).toFixed(2), armedTrack: track.id });
+        logL.rec.info('start', { atSec: +Math.max(0, playheadSec).toFixed(2), armedTrack: track.id, countIn: transport.isCountIn(), practice: transport.isMetroFree() });
         // Recording starts AT the playhead (where the user parked it), not at
         // the end of the track. The clip + the stored take share this anchor.
         const startSec = Math.max(0, playheadSec);
@@ -1575,11 +1598,12 @@ if ($('diag')) window.__tabDebug = {
   // Play / Stop playback of recorded takes; the playhead sweeps the timeline.
   const playBtn = $('tp-play');
   if (playBtn) playBtn.addEventListener('click', () => {
-    if (player.isPlaying()) { player.stop(); reflectPlay(); tabLane?.hidePlayhead(); restoreFoldIfIdle(); return; }
+    if (player.isPlaying()) { player.stop(); reflectPlay(); tabLane?.hidePlayhead(); restoreFoldIfIdle(); logL.play.info('stop'); return; }
     if (!allTakes().length) return;
     if (tabMidi.isPlaying()) { tabMidi.stop(); tabLane?.setPlaying(false); } // don't stack two players
     // transportTick sweeps the timeline playhead AND rides the tab cursor in sync.
-    player.play(buildGroups(), playheadSec, transportTick, () => { reflectPlay(); setPlayhead(0); tabLane?.hidePlayhead(); restoreFoldIfIdle(); });
+    logL.play.info('play', { fromSec: +playheadSec.toFixed(2), tracks: tracks.length, takes: allTakes().length });
+    player.play(buildGroups(), playheadSec, transportTick, () => { reflectPlay(); setPlayhead(0); tabLane?.hidePlayhead(); restoreFoldIfIdle(); logL.play.info('ended'); });
     reflectPlay();
     autoFold.fold(); // playback started — free the vertical space for the tracks
   });

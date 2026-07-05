@@ -12,6 +12,10 @@
 // channels are identical (a mono chain up-mixed), the right one is dropped so
 // mono takes still cost one buffer.
 
+import { logger } from './log.js';
+
+const lg = logger('recorder');
+
 export function concatChunks(chunks) {
   let total = 0;
   for (const c of chunks) if (c) total += c.length;
@@ -34,6 +38,7 @@ export function createRecorder({ getSource, getContext }) {
   let recording = false;
   let proc = null, zero = null, source = null, ctx = null;
   let chunksL = [], chunksR = [];
+  let warnedSkew = false;
 
   // The worklet tap. loadWorklets() has already added capture-processor to the
   // live ctx by the time recording starts (main.js start()); if constructing
@@ -51,13 +56,14 @@ export function createRecorder({ getSource, getContext }) {
         // Robust to a version skew (a stale cached worklet posting a raw
         // Float32Array instead of {l,r}) — treat that as mono so recording
         // never silently breaks on a mismatched deploy.
-        if (d instanceof Float32Array) { chunksL.push(d); return; }
+        if (d instanceof Float32Array) { if (!warnedSkew) { warnedSkew = true; lg.warn('worklet-skew', { note: 'raw Float32Array from a stale worklet — recording mono' }); } chunksL.push(d); return; }
         if (d.l) chunksL.push(d.l);
         if (d.r) chunksR.push(d.r);                      // transferred buffers — no copy
       };
       node.__isWorklet = true;
+      lg.info('tap', { kind: 'worklet', channels: 2 });
       return node;
-    } catch { return null; }
+    } catch (err) { lg.warn('worklet-tap-failed', { error: String(err) }); return null; }
   }
 
   function makeScriptTap() {
@@ -76,9 +82,10 @@ export function createRecorder({ getSource, getContext }) {
     ctx = getContext && getContext();
     source = getSource && getSource();
     if (!ctx || !source) { recording = true; return; } // no audio (tests): just flag
-    chunksL = []; chunksR = [];
-    proc = makeWorkletTap() || makeScriptTap();
-    if (!proc) { recording = true; return; } // no capture path (tests): just flag
+    chunksL = []; chunksR = []; warnedSkew = false;
+    proc = makeWorkletTap();
+    if (!proc) { proc = makeScriptTap(); if (proc) lg.info('tap', { kind: 'script-fallback', channels: 2 }); }
+    if (!proc) { lg.warn('tap-none'); recording = true; return; } // no capture path (tests): just flag
     // A zero gain keeps the tap pulled by the destination without being heard.
     zero = ctx.createGain(); zero.gain.value = 0;
     source.connect(proc);
