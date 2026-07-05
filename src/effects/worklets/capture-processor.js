@@ -12,10 +12,17 @@ class CaptureProcessor extends AudioWorkletProcessor {
   }
   process(inputs) {
     if (this.stopped) return false; // release the node — recording ended
-    const ch = inputs[0] && inputs[0][0];
-    if (ch && ch.length) {
-      const copy = new Float32Array(ch); // the engine reuses the quantum buffer
-      this.port.postMessage(copy, [copy.buffer]);
+    const inp = inputs[0];
+    const l = inp && inp[0];
+    if (l && l.length) {
+      const lc = new Float32Array(l); // the engine reuses the quantum buffer
+      const r = inp[1];               // stereo (widener/pan) — keep both channels
+      if (r && r.length) {
+        const rc = new Float32Array(r);
+        this.port.postMessage({ l: lc, r: rc }, [lc.buffer, rc.buffer]);
+      } else {
+        this.port.postMessage({ l: lc }, [lc.buffer]);
+      }
     }
     return true;
   }

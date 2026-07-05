@@ -98,7 +98,9 @@ function restoreFoldIfIdle() {
 
 const armedTrack = () => tracks.find((t) => t.id === armedId) || null;
 const allTakes = () => tracks.flatMap((t) => t.takes);
-const newTrack = (name) => ({ id: nextTrackId++, name: name || 'Track', armed: false, takes: [], volume: 0.8, pan: 0, mute: false, solo: false, patch: null });
+// Default track volume 1.0 so a fresh recording plays back at the level it was
+// monitored at (the old 0.8 made every take ~2 dB quieter than the live sound).
+const newTrack = (name) => ({ id: nextTrackId++, name: name || 'Track', armed: false, takes: [], volume: 1.0, pan: 0, mute: false, solo: false, patch: null });
 // Effective playback gain for a track given the global solo state.
 function trackGain(t, anySolo) { return anySolo ? (t.solo ? t.volume : 0) : (t.mute ? 0 : t.volume); }
 function buildGroups() {
@@ -1489,12 +1491,13 @@ if ($('diag')) window.__tabDebug = {
         });
         const cut = Math.min(t.samples.length, Math.round(trimSec * t.sampleRate));
         const samples = cut > 0 ? t.samples.subarray(cut) : t.samples;
+        const samplesR = t.samplesR ? (cut > 0 ? t.samplesR.subarray(cut) : t.samplesR) : null; // same head-trim on the right channel
         const duration = samples.length / t.sampleRate;
         if ($('diag')) window.__lastRecordDebug = { t0: recBackingT0, capStart: recCapStart, trimSec, sr: t.sampleRate }; // e2e/inspection
         recBackingT0 = null;
         const newStart = recStartX / PX_PER_SEC;
         punchOver(track, newStart, newStart + duration); // overwrite overlapped audio
-        track.takes.push({ ...t, samples, duration, n: ++takeSeq, name: track.name, x: recStartX, offset: 0, len: duration });
+        track.takes.push({ ...t, samples, samplesR, duration, n: ++takeSeq, name: track.name, x: recStartX, offset: 0, len: duration });
         renderTrack();
         updateTransport();
         persistSession(true); // save the fresh take at once — survive an immediate refresh

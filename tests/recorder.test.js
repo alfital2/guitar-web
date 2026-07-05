@@ -1,6 +1,24 @@
 // tests/recorder.test.js
 import { describe, it, expect } from 'vitest';
-import { concatChunks } from '../src/recorder.js';
+import { concatChunks, channelsDiffer } from '../src/recorder.js';
+
+describe('channelsDiffer (mono-vs-stereo capture)', () => {
+  it('identical channels (mono chain up-mixed) → false, so R is dropped', () => {
+    const a = Float32Array.from({ length: 5000 }, (_, i) => Math.sin(i));
+    const b = a.slice();
+    expect(channelsDiffer(a, b)).toBe(false);
+  });
+  it('a Haas-delayed right channel → true (real stereo, keep R)', () => {
+    const a = Float32Array.from({ length: 5000 }, (_, i) => Math.sin(i / 7));
+    const b = new Float32Array(5000);
+    for (let i = 40; i < 5000; i++) b[i] = a[i - 40]; // ~delayed copy
+    expect(channelsDiffer(a, b)).toBe(true);
+  });
+  it('mismatched lengths or missing channel → true', () => {
+    expect(channelsDiffer(new Float32Array(10), new Float32Array(11))).toBe(true);
+    expect(channelsDiffer(new Float32Array(10), null)).toBe(true);
+  });
+});
 
 describe('concatChunks', () => {
   it('joins chunks in order', () => {

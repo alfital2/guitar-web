@@ -81,8 +81,14 @@ export function createPlayer({ getContext } = {}) {
         // take replays its trimmed window [offset, offset+len) back to back.
         const windows = takeSchedule(tk, fromSec);
         if (!windows.length) continue;
-        const buf = ctx.createBuffer(1, tk.samples.length, tk.sampleRate);
-        if (buf.copyToChannel) buf.copyToChannel(tk.samples, 0); else buf.getChannelData(0).set(tk.samples);
+        // ALWAYS a 2-channel buffer: a mono buffer through the StereoPanner at
+        // center gets the −3 dB mono-pan law, so playback was quieter than the
+        // monitor. A stereo take keeps its captured L/R (widener/pan width);
+        // a mono take plays L=R and passes the panner at unity.
+        const right = tk.samplesR && tk.samplesR.length === tk.samples.length ? tk.samplesR : tk.samples;
+        const buf = ctx.createBuffer(2, tk.samples.length, tk.sampleRate);
+        if (buf.copyToChannel) { buf.copyToChannel(tk.samples, 0); buf.copyToChannel(right, 1); }
+        else { buf.getChannelData(0).set(tk.samples); buf.getChannelData(1).set(right); }
         for (const w of windows) {
           const s = ctx.createBufferSource();
           s.buffer = buf; s.connect(gain);
