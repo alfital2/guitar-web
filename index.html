@@ -1363,7 +1363,7 @@
   .tab-practice button:hover { color: var(--text); border-color: rgba(255,255,255,0.22); }
   .tab-practice button.on { color: var(--accent); background: rgba(var(--accent-rgb),0.12);
     border-color: rgba(var(--accent-rgb),0.45); }
-  .tab-speed { font: 700 10px var(--font); color: var(--text-secondary); background: #17171d;
+  .tab-speed { width: auto; font: 700 10px var(--font); color: var(--text-secondary); background: #17171d;
     border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 2px 4px; cursor: pointer; }
   .tab-practice .locked { opacity: .45; cursor: not-allowed; }
   /* technique glyphs: slur arcs (h/p), slides, bends, PM―― spans, dead × */
@@ -1411,7 +1411,8 @@
   .tab-bpm:hover { color: var(--accent); border-color: rgba(var(--accent-rgb),0.4); }
   .tab-bpm-input { width: 30px; font: 700 10px var(--mono); text-align: center; color: var(--accent);
     background: #0c0c10; border: 1px solid rgba(var(--accent-rgb),0.6); border-radius: 3px; padding: 0; outline: none; }
-  .tab-meta select { font: 700 10px var(--mono); color: var(--text-secondary); background: #17171d;
+  /* width:auto beats the app-global `select { width:100% }` (settings panel) */
+  .tab-meta select { width: auto; font: 700 10px var(--mono); color: var(--text-secondary); background: #17171d;
     border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; padding: 2px 4px; cursor: pointer; }
   .tab-meta select:hover { border-color: rgba(var(--accent-rgb),0.4); }
   .tab-sep, .tab-unit { color: var(--very-muted); font-weight: 600; }
