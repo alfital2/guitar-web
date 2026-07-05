@@ -1297,6 +1297,19 @@ function ensureTabLane() {
   return true;
 }
 
+// Toolbar 🎼 TAB — open the editor standalone, no transcription needed.
+// The lane's autosave restores the last working lick on mount; a fresh one
+// starts blank with the cursor ready.
+{
+  const btn = $('tab-open');
+  if (btn) btn.addEventListener('click', () => {
+    if (!ensureTabLane()) return;
+    tabLane.setLive(false, tabLane.noteCount() ? 'composing' : 'blank tab — click the grid and type frets');
+    $('tab-lane')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    tabLane.focus();
+  });
+}
+
 // Play the TAB itself as synthesized notes (independent of the recording).
 // The lane cursor rides along. Toggles; stops any transport playback first so
 // you don't hear both at once. The practice pack (speed, metronome, count-in,
@@ -1448,6 +1461,7 @@ if ($('diag')) window.__tabDebug = {
     const n = tabLane.getModel().getState().notes[idx];
     return n ? tabLane.getModel().toggleTech([n.id], key, value) : 0;
   },
+  openLane: () => { $('tab-open')?.click(); return !!tabLane; },
 };
 
 // Record: capture the live processed output into a take, append it as a clip.

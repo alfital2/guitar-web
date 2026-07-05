@@ -33,19 +33,27 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   container.innerHTML = '';
   container.hidden = false;
 
+  // Two header rows — one line clips on laptop widths (metronome/tuning were
+  // truncating). Row 1: identity + file/lifecycle. Row 2: musical settings +
+  // practice pack.
   const head = document.createElement('div');
   head.className = 'tab-head';
   head.innerHTML = `
     <button type="button" class="tab-play" aria-label="Play tab as MIDI" title="Play the tab as MIDI notes">▶</button>
     <span class="tab-title">TAB <span class="tab-state">transcription</span></span>
-    <span class="tab-meta"></span>
     <span class="tab-hint">type frets at the cursor ${dash} drag notes ${dash} ⌫ delete ${dash} ⌘Z undo</span>
-    <span class="tab-practice"></span>
     <span class="tab-spacer"></span>
     <span class="tab-file-actions"></span>
     <button type="button" class="tab-export" title="Download audio + corrected notes as a training example">Export</button>
     <button type="button" class="tab-clear">Clear</button>
     <button type="button" class="tab-close" aria-label="Close tab lane">✕</button>`;
+
+  const head2 = document.createElement('div');
+  head2.className = 'tab-head tab-head2';
+  head2.innerHTML = `
+    <span class="tab-meta"></span>
+    <span class="tab-spacer"></span>
+    <span class="tab-practice"></span>`;
 
   const scroll = document.createElement('div');
   scroll.className = 'tab-scroll';
@@ -66,7 +74,7 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   cursor.style.opacity = '0';
   stage.appendChild(cursor);
 
-  container.append(head, gutter, scroll);
+  container.append(head, head2, gutter, scroll);
 
   // ── model / renderer / input ────────────────────────────────────────────────
   const model = createTabModel({ tempo: bpm });
@@ -82,7 +90,7 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   // ── Interactive meta: tempo click-to-edit + TS picker + tuning/capo ────────
   const TS_CHOICES = ['2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '3/8', '6/8', '7/8', '9/8', '12/8', '2/2'];
   function mountMeta() {
-    const meta = head.querySelector('.tab-meta');
+    const meta = head2.querySelector('.tab-meta');
     meta.innerHTML = `
       <button type="button" class="tab-bpm" title="Tempo — click to edit"></button><span class="tab-unit">BPM</span>
       <span class="tab-sep">${dash}</span>
@@ -139,17 +147,18 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
 
   // ── Tuning + capo pickers; gutter string names follow the tuning ───────────
   function mountTunePickers() {
-    const slot = head.querySelector('.tab-tune-slot');
+    const slot = head2.querySelector('.tab-tune-slot');
+    // Capo is a TYPED fret number (0–10; empty = none) — a dropdown clipped
+    // and typing is faster anyway. Commits on Enter/blur through the model.
     slot.innerHTML = `
       <select class="tab-tuning" aria-label="Tuning">${Object.entries(TUNING_PRESETS)
         .map(([id, p]) => `<option value="${id}">${p.name}</option>`).join('')}</select>
-      <select class="tab-capo" aria-label="Capo fret">${Array.from({ length: 8 },
-        (_, i) => `<option value="${i}">${i ? `capo ${i}` : 'no capo'}</option>`).join('')}</select>`;
+      <span class="tab-capo-wrap"><span class="tab-unit">capo</span><input class="tab-capo" type="text" inputmode="numeric" maxlength="2" aria-label="Capo fret (0–10)" title="Capo fret, 0–10 — type a number"></span>`;
     const tunSel = slot.querySelector('.tab-tuning');
-    const capoSel = slot.querySelector('.tab-capo');
+    const capoIn = slot.querySelector('.tab-capo');
     const refresh = (s) => {
       tunSel.value = s.tuning;
-      capoSel.value = String(s.capo);
+      if (document.activeElement !== capoIn) capoIn.value = s.capo ? String(s.capo) : '';
       // gutter names in display order (high → low), same geometry as the lines
       gutter.innerHTML = TUNING_PRESETS[s.tuning].names
         .map((n, i) => `<i style="top:${i * LINE_GAP}px">${n}</i>`).join('');
@@ -158,9 +167,17 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
       if (!can('tab.edit')) { refresh(model.getState()); return; }
       model.setTuning(tunSel.value);
     });
-    capoSel.addEventListener('change', () => {
+    const commitCapo = () => {
       if (!can('tab.edit')) { refresh(model.getState()); return; }
-      model.setCapo(parseInt(capoSel.value, 10));
+      const raw = capoIn.value.trim();
+      model.setCapo(raw === '' ? 0 : parseInt(raw, 10) || 0);   // model clamps 0–10
+      refresh(model.getState());
+    };
+    capoIn.addEventListener('change', commitCapo);
+    capoIn.addEventListener('blur', commitCapo);
+    capoIn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commitCapo(); capoIn.blur(); }
+      e.stopPropagation();                       // digits must not hit lane fret entry
     });
     model.subscribe(refresh);
     refresh(model.getState());
@@ -295,7 +312,7 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   // re-selecting and hitting play just works. Gated by can('tab.practice'):
   // locked controls render disabled — one switch point, nothing to hunt later.
   const practice = { metronome: false, countIn: false, loopOn: false, speed: 1 };
-  const practiceEl = head.querySelector('.tab-practice');
+  const practiceEl = head2.querySelector('.tab-practice');
   practiceEl.innerHTML = `
     <select class="tab-speed" title="Playback speed">
       <option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option>
@@ -521,5 +538,9 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   };
 
   onModelChange(model.getState());               // first paint (no cb registered yet)
+  // Gutter is absolutely positioned in the lane — anchor it to wherever the
+  // scroll strip actually starts (the two-row header moved it), instead of a
+  // hardcoded CSS top. jsdom offsetTop is 0; the CSS fallback still applies.
+  if (scroll.offsetTop) gutter.style.top = `${scroll.offsetTop + 4}px`;
   return api;
 }

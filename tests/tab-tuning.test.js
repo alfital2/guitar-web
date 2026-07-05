@@ -19,13 +19,13 @@ describe('tab-model tuning + capo', () => {
     expect(m.getState().tuning).toBe('EADGBE');
   });
 
-  it('setCapo shifts derived pitch and clamps 0–7', () => {
+  it('setCapo shifts derived pitch and clamps 0–10', () => {
     const m = createTabModel();
     m.addNote({ tick: 0, string: 5, fret: 0 });
     m.setCapo(3);
     expect(m.getState().capo).toBe(3);
     expect(m.notesWithTime()[0].midi).toBe(43);
-    m.setCapo(99); expect(m.getState().capo).toBe(7);
+    m.setCapo(99); expect(m.getState().capo).toBe(10);
     m.setCapo(-2); expect(m.getState().capo).toBe(0);
   });
 
@@ -65,19 +65,26 @@ describe('tab-lane header: tuning + capo pickers, tuning-driven gutter', () => {
     expect(names).toEqual(TUNING_PRESETS.DADGAD.names);      // ['d','A','G','D','A','D']
   });
 
-  it('capo picker commits through the model', () => {
+  it('typed capo commits through the model, clamped to fret 10; blank clears', () => {
     const lane = mountTabLane(container, { bpm: 120 });
-    const sel = container.querySelector('.tab-capo');
-    sel.value = '2';
-    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    const input = container.querySelector('input.tab-capo');
+    input.value = '2';
+    input.dispatchEvent(new Event('change', { bubbles: true }));
     expect(lane.serialize().capo).toBe(2);
+    input.value = '15';
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(lane.serialize().capo).toBe(10);
+    expect(input.value).toBe('10');                          // readout reflects the clamp
+    input.value = '';
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(lane.serialize().capo).toBe(0);
   });
 
   it('loading a v2 state reflects its tuning in picker and gutter', () => {
     const lane = mountTabLane(container, { bpm: 120 });
     lane.loadNotes({ version: 2, tempo: 100, timeSig: { num: 4, den: 4 }, tuning: 'DropD', capo: 1, notes: [] });
     expect(container.querySelector('.tab-tuning').value).toBe('DropD');
-    expect(container.querySelector('.tab-capo').value).toBe('1');
+    expect(container.querySelector('input.tab-capo').value).toBe('1');
     const names = [...container.querySelectorAll('.tab-gutter i')].map((i) => i.textContent);
     expect(names).toEqual(TUNING_PRESETS.DropD.names);       // ['e','B','G','D','A','D']
   });

@@ -227,7 +227,7 @@ export function createTabModel(init = {}) {
     },
 
     setCapo(n) {
-      const v = Math.max(0, Math.min(7, Math.round(n)));
+      const v = Math.max(0, Math.min(10, Math.round(n)));
       if (!Number.isFinite(v) || v === state.capo) return;
       pushUndo();
       state.capo = v;

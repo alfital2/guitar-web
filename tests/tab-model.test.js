@@ -169,7 +169,7 @@ describe('createTabModel core ops', () => {
     m.setTimeSig(4, 5);  expect(m.getState().timeSig).toEqual({ num: 3, den: 4 });   // den ∉ {2,4,8,16}
     m.setTuning('DropD');    expect(m.getState().tuning).toBe('DropD');
     m.setTuning('Ukulele');  expect(m.getState().tuning).toBe('DropD');              // unknown → no-op
-    m.setCapo(9);  expect(m.getState().capo).toBe(7);
+    m.setCapo(99); expect(m.getState().capo).toBe(10);
     m.setCapo(-1); expect(m.getState().capo).toBe(0);
     m.setCapo(3);  expect(m.getState().capo).toBe(3);
   });

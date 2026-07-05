@@ -10,10 +10,13 @@ const key = (stage, k, opts = {}) =>
   stage.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...opts }));
 
 describe('lane v2 shell', () => {
-  it('header carries the extension spans later phases fill', () => {
+  it('header is two rows: files/lifecycle on top, musical settings + practice below', () => {
     mountTabLane(container, { bpm: 120 });
-    expect(container.querySelector('.tab-practice')).toBeTruthy();
-    expect(container.querySelector('.tab-file-actions')).toBeTruthy();
+    const row2 = container.querySelector('.tab-head2');
+    expect(row2).toBeTruthy();
+    expect(row2.querySelector('.tab-meta')).toBeTruthy();
+    expect(row2.querySelector('.tab-practice')).toBeTruthy();
+    expect(container.querySelector('.tab-head .tab-file-actions')).toBeTruthy();
   });
 
   it('meta controls reflect the model: bpm readout, TS picker, tuning slot', () => {
