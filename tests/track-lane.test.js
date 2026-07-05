@@ -197,6 +197,17 @@ describe('renderTrackLane (multi-track)', () => {
     expect(freeFlag).toBe(true); // Ctrl held → placement is free (no snap)
     clearClipSelection();
   });
+  it('pressing Ctrl mid-drag (held only at release) still frees the placement', () => {
+    const el = document.createElement('div');
+    let freeFlag = null;
+    renderTrackLane(el, { tracks: tracks(), armedId: 1, onMoveClips: (m, free) => { freeFlag = free; } });
+    const clip = el.querySelector('.track-clip');
+    clip.dispatchEvent(new MouseEvent('pointerdown', { button: 0, clientX: 40, clientY: 0, bubbles: true })); // grabbed WITHOUT modifier
+    clip.dispatchEvent(new MouseEvent('pointermove', { clientX: 80, clientY: 0, bubbles: true }));
+    clip.dispatchEvent(new MouseEvent('pointerup', { ctrlKey: true, clientX: 80, clientY: 0, bubbles: true })); // Ctrl pressed by drop time
+    expect(freeFlag).toBe(true);
+    clearClipSelection();
+  });
   it('a plain drag (no modifier) snaps — free flag → false', () => {
     const el = document.createElement('div');
     let freeFlag = null;

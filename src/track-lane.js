@@ -163,8 +163,9 @@ function enableClipDrag(clip, trackId, take, handlers, getStrip, root, beginTrim
       items.forEach((it) => selection.delete(clipKey(it.trackId, it.n)));
     } else {
       // origLeft + dx are VIEW px; handlers expect BASE (model) px. Cmd/Ctrl
-      // (or Alt) = FREE placement, no grid snap.
-      const free = modifier || e.altKey;
+      // (or Alt) = FREE placement, no grid snap — honoured whether the modifier
+      // was held at grab OR is held now at drop (press Ctrl mid-drag → free).
+      const free = modifier || e.metaKey || e.ctrlKey || e.altKey;
       const moves = drag.items.map((it) => ({ trackId: +it.trackId, n: +it.n, x: Math.max(0, (it.origLeft + dx) / Z) }));
       if (handlers.onMoveClips) handlers.onMoveClips(moves, free);
       else if (handlers.onMoveClip) moves.forEach((m) => handlers.onMoveClip(m.trackId, m.n, m.x, free));
