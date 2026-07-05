@@ -1342,6 +1342,16 @@
     border: 1px solid rgba(var(--accent-rgb),0.4); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
   .tab-export:hover { background: rgba(var(--accent-rgb),0.18); }
   .tab-lane.paused .tab-title { color: var(--text-secondary); }
+  /* v2 editor overlays: grid cursor cell + column-range selection band.
+     Static styles only — moving them is a left/top write, no animation. */
+  .tab-cell-cursor { position: absolute; width: 22px; height: 13px; transform: translate(-50%, -55%);
+    border: 1px solid rgba(var(--accent-rgb),0.75); border-radius: 3px;
+    background: rgba(var(--accent-rgb),0.10); pointer-events: none; }
+  .tab-selection { position: absolute; top: -4px; height: 84px;
+    background: rgba(var(--accent-rgb),0.08); border-left: 1px solid rgba(var(--accent-rgb),0.35);
+    border-right: 1px solid rgba(var(--accent-rgb),0.35); pointer-events: none; }
+  .tab-stage:focus { outline: none; }
+  .tab-stage:focus-visible .tab-cell-cursor { box-shadow: 0 0 6px rgba(var(--accent-rgb),0.5); }
 
   /* ── Safari compositor relief ─────────────────────────────
      WebKit re-filters backdrop-filter surfaces EVERY frame while anything

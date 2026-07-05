@@ -1416,6 +1416,17 @@ if ($('diag')) window.__tabDebug = {
   midiPlaying: () => tabMidi.isPlaying(),
   cursorShown: () => { const c = document.querySelector('.tab-cursor'); return !!c && c.style.opacity === '1'; },
   playingNotes: () => document.querySelectorAll('.tab-note.playing').length,
+  // Test-only: v2 editor surface — compose, navigate, undo, copy/paste.
+  addAt(col, string, fret) { return tabLane ? tabLane.getModel().addNote({ tick: col * 3, string, fret, durTicks: tabLane.getUi().currentDur }) : null; },
+  cursor() { return tabLane ? tabLane.getUi().cursor : null; },
+  setCursor(col, string) { if (!tabLane) return null; tabLane.getUi().cursor = { tick: col * 3, string }; return tabLane.getUi().cursor; },
+  undo: () => (tabLane ? tabLane.getModel().undo() : false),
+  redo: () => (tabLane ? tabLane.getModel().redo() : false),
+  selCopyPaste(startCol, endCol, atCol) {
+    if (!tabLane) return [];
+    const m = tabLane.getModel();
+    return m.pasteAt(atCol * 3, m.copyRange(startCol * 3, endCol * 3));
+  },
 };
 
 // Record: capture the live processed output into a take, append it as a clip.

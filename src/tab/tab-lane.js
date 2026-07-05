@@ -1,25 +1,30 @@
-// src/tab/tab-lane.js — the TAB lane above the amp: a scrolling 6-line
-// tablature grid, one column per 16th note, bar lines every 16 columns (4/4),
-// with EDITABLE fret numbers. Detection (offline-transcribe.js) fills it; the
-// player then corrects it by hand:
+// src/tab/tab-lane.js — the TAB lane above the amp, rebuilt as a real editor
+// shell over the v2 stack: tab-model.js (pure musical-time state) →
+// tab-render.js (incremental keyed DOM) → tab-input.js (pointer/keyboard).
+// The lane owns the header strip, the string gutter, the playhead cursor,
+// the inline fret editor, and the BACK-COMPAT api main.js and the training
+// export were built on:
 //
-//   • DRAG a note up/down to another string — the PITCH is preserved and the
-//     fret is recomputed for the new string (fret 5 on D → 0 on G). Rejected
-//     with a shake if the pitch can't sit on the target string.
-//   • DOUBLE-CLICK the number to type a new fret — that CHANGES the pitch
-//     (a manual correction of a wrong detection).
+//   • noteOn(string, fret, col, meta)  — detection seeding (col = 16th column);
+//     meta carries the engine's pitch + audio-time anchor into det{} so a
+//     corrected tab stays a labelled training example.
+//   • getNotes() — v1-shaped dumps (col/detMidi/edited/tSec…); serialize()
+//     returns the v2 state (with a bpm alias); loadNotes() accepts v1 or v2.
+//   • Programmatic seeding (noteOn/loadNotes/clear) does NOT fire onChange —
+//     only real edits do, exactly like the v1 lane.
 //
-// Every note remembers what the engine originally detected (detMidi/detString/
-// detFret) alongside its current value, so a corrected tab is a labelled
-// training example: input = the audio clip, label = the human-verified notes.
-// serialize()/loadNotes() round-trip the model; onChange() fires after edits.
+// Editing beyond the v1 pair (string drag / fret retype): click a cell and
+// TYPE frets, arrows to move, Del, undo/redo, range select, copy/paste —
+// all delegated to tab-input.js against the model.
 
-import { TUNING_MIDI, MAX_FRET, midiForPosition, fretForString } from './transcribe.js';
+import {
+  createTabModel, TUNING_PRESETS, SIXTEENTH, MAX_FRET,
+  ticksToSec, durTicksFromSec, midiAt,
+} from './tab-model.js';
+import { createTabRenderer, COL_W, LINE_GAP } from './tab-render.js';
+import { attachTabInput } from './tab-input.js';
 
-const STRING_NAMES = ['e', 'B', 'G', 'D', 'A', 'E'];
-const COL_W = 26;         // px per 16th column
-const LINE_GAP = 15;      // px between string lines
-const DRAG_THRESH = 4;    // px before a pointerdown counts as a drag (vs a click)
+const dash = '·';
 
 export function mountTabLane(container, { bpm = 120 } = {}) {
   container.innerHTML = '';
@@ -30,9 +35,11 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   head.innerHTML = `
     <button type="button" class="tab-play" aria-label="Play tab as MIDI" title="Play the tab as MIDI notes">▶</button>
     <span class="tab-title">TAB <span class="tab-state">transcription</span></span>
-    <span class="tab-meta">${bpm} BPM · 16th grid · standard tuning</span>
-    <span class="tab-hint">drag a note between strings · double-click to edit</span>
+    <span class="tab-meta"></span>
+    <span class="tab-hint">type frets at the cursor ${dash} drag notes ${dash} ⌫ delete ${dash} ⌘Z undo</span>
+    <span class="tab-practice"></span>
     <span class="tab-spacer"></span>
+    <span class="tab-file-actions"></span>
     <button type="button" class="tab-export" title="Download audio + corrected notes as a training example">Export</button>
     <button type="button" class="tab-clear">Clear</button>
     <button type="button" class="tab-close" aria-label="Close tab lane">✕</button>`;
@@ -43,17 +50,14 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   stage.className = 'tab-stage';
   scroll.appendChild(stage);
 
-  // String name gutter + the 6 lines.
   const gutter = document.createElement('div');
   gutter.className = 'tab-gutter';
-  gutter.innerHTML = STRING_NAMES.map((n, i) => `<i style="top:${i * LINE_GAP}px">${n}</i>`).join('');
   const lines = document.createElement('div');
   lines.className = 'tab-lines';
-  lines.innerHTML = STRING_NAMES.map((_, i) => `<i style="top:${i * LINE_GAP}px"></i>`).join('');
+  lines.innerHTML = [0, 1, 2, 3, 4, 5].map((i) => `<i style="top:${i * LINE_GAP}px"></i>`).join('');
   stage.appendChild(lines);
 
-  // Playhead cursor — ridden by both the transport (real audio) and the tab's
-  // own MIDI player. Hidden until something plays.
+  // Playhead — ridden by the transport (real audio) and the tab MIDI player.
   const cursor = document.createElement('div');
   cursor.className = 'tab-cursor';
   cursor.style.opacity = '0';
@@ -61,57 +65,58 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
 
   container.append(head, gutter, scroll);
 
-  let cols = 0;
-  const noteMap = new Map();       // id -> { id, el, col, string, fret, midi, det*, edited, tSec, durSec }
-  let seq = 0;
-  let bpmVal = bpm;
+  // ── model / renderer / input ────────────────────────────────────────────────
+  const model = createTabModel({ tempo: bpm });
+  const ui = { cursor: null, selection: null, currentDur: SIXTEENTH };
+  const renderer = createTabRenderer(stage);
+
   let changeCb = null;
-  const emitChange = () => { if (changeCb) changeCb(serialize()); };
+  let suppress = 0;               // >0 while seeding programmatically — no onChange
+  let playIndex = [];             // [{id, t0, t1}] — playhead highlight windows
 
-  const ensureCols = (col) => {
-    if (col + 4 <= cols) return;
-    const target = col + 16;
-    for (let c = cols; c < target; c++) {
-      if (c > 0 && c % 16 === 0) {
-        const bar = document.createElement('i');
-        bar.className = 'tab-bar';
-        bar.style.left = `${c * COL_W}px`;
-        stage.appendChild(bar);
-        const num = document.createElement('span');
-        num.className = 'tab-barnum';
-        num.textContent = String(c / 16 + 1);
-        num.style.left = `${c * COL_W + 3}px`;
-        stage.appendChild(num);
-      }
-    }
-    cols = target;
-    stage.style.width = `${cols * COL_W + 40}px`;
-  };
-  ensureCols(16);
+  const metaEl = head.querySelector('.tab-meta');
+  const requestRender = () => renderer.render(model.getState(), ui);
 
-  const place = (note) => {
-    note.el.style.left = `${note.col * COL_W + COL_W / 2}px`;
-    note.el.style.top = `${note.string * LINE_GAP}px`;
-  };
+  function refreshChrome(state) {
+    const t = TUNING_PRESETS[state.tuning];
+    metaEl.textContent =
+      `${state.tempo} BPM ${dash} ${state.timeSig.num}/${state.timeSig.den} ${dash} ${t.name}` +
+      (state.capo ? ` ${dash} capo ${state.capo}` : '');
+    gutter.innerHTML = t.names.map((n, i) => `<i style="top:${i * LINE_GAP}px">${n}</i>`).join('');
+  }
 
-  const shake = (note) => {
-    note.el.classList.remove('invalid');
-    // reflow so the animation restarts on repeat rejects
-    void note.el.offsetWidth;
-    note.el.classList.add('invalid');
-  };
+  // Highlight windows prefer the DETECTED audio times (the recording is the
+  // truth a transcribed tab rides along) and fall back to grid-derived times
+  // for hand-entered notes. Rebuilt once per model change, not per frame.
+  function rebuildPlayIndex(state) {
+    playIndex = state.notes.map((n) => {
+      const t0 = n.det && n.det.tSec != null ? n.det.tSec : ticksToSec(n.tick, state.tempo);
+      const dur = n.det && n.det.durSec != null ? n.det.durSec : ticksToSec(n.durTicks, state.tempo);
+      return { id: n.id, t0, t1: t0 + Math.max(dur || 0.25, 0.12) };
+    });
+  }
 
-  // ── numeric edit (double-click) ────────────────────────────────────────────
-  function beginEdit(note) {
-    if (note.el.querySelector('input')) return;
+  function onModelChange(state) {
+    renderer.render(state, ui);
+    refreshChrome(state);
+    rebuildPlayIndex(state);
+    if (!suppress && changeCb) changeCb(api.serialize());
+  }
+  model.subscribe(onModelChange);
+
+  // ── inline fret editor (double-click a note) ────────────────────────────────
+  function beginEdit(noteId) {
+    const el = renderer.noteEl(noteId);
+    const note = model.getState().notes.find((n) => n.id === noteId);
+    if (!el || !note || el.querySelector('input')) return;
     const input = document.createElement('input');
     input.className = 'tab-note-input';
     input.type = 'text';
     input.inputMode = 'numeric';
     input.value = String(note.fret);
     input.setAttribute('aria-label', 'Fret number');
-    note.el.textContent = '';
-    note.el.appendChild(input);
+    el.textContent = '';
+    el.appendChild(input);
     input.focus();
     input.select();
     let done = false;
@@ -119,152 +124,52 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
       if (done) return; done = true;
       const raw = input.value.trim();
       input.remove();
+      el.textContent = String(model.getState().notes.find((n) => n.id === noteId)?.fret ?? note.fret);
       if (save && /^\d{1,2}$/.test(raw)) {
         const f = parseInt(raw, 10);
-        if (f >= 0 && f <= MAX_FRET) { applyFret(note, f); return; }
-        shake(note);
+        if (f >= 0 && f <= MAX_FRET) {
+          if (model.setFret(noteId, f)) { el.textContent = String(f); return; }
+        }
+        shakeNote(noteId);
       }
-      note.el.textContent = String(note.fret);   // revert display
     };
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); commit(true); }
       else if (e.key === 'Escape') { e.preventDefault(); commit(false); }
-      e.stopPropagation();                        // don't leak to app-level keys
+      e.stopPropagation();                        // don't leak into editor/app keys
     });
     input.addEventListener('blur', () => commit(true));
-    input.addEventListener('pointerdown', (e) => e.stopPropagation()); // no drag from inside
+    input.addEventListener('pointerdown', (e) => e.stopPropagation());
     input.addEventListener('dblclick', (e) => e.stopPropagation());
   }
 
-  // Typing a fret CHANGES the pitch (manual correction of a wrong detection).
-  function applyFret(note, fret) {
-    note.fret = fret;
-    note.midi = midiForPosition(note.string, fret);
-    note.edited = true;
-    note.el.textContent = String(fret);
-    note.el.classList.add('edited');
-    place(note);
-    emitChange();
+  function shakeNote(id) {
+    const el = renderer.noteEl(id);
+    if (!el) return;
+    el.classList.remove('invalid');
+    void el.offsetWidth;
+    el.classList.add('invalid');
   }
 
-  // Moving to another string PRESERVES the pitch (fret recomputed). Returns
-  // false (and shakes) when the pitch can't live on the target string.
-  function moveToString(note, string) {
-    if (string === note.string) return true;
-    const fret = fretForString(note.midi, string);
-    if (fret == null) { shake(note); return false; }
-    note.string = string;
-    note.fret = fret;
-    note.edited = true;
-    note.el.textContent = String(fret);
-    note.el.classList.add('edited');
-    place(note);
-    emitChange();
-    return true;
-  }
-
-  // ── drag (vertical → string reassignment) ──────────────────────────────────
-  function attachDrag(note) {
-    note.el.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
-      const startX = e.clientX, startY = e.clientY;
-      const stageTop = stage.getBoundingClientRect().top;
-      let dragging = false;
-      note.el.setPointerCapture(e.pointerId);
-      const move = (ev) => {
-        if (!dragging && Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESH) return;
-        dragging = true;
-        note.el.classList.add('dragging');
-        // follow the pointer vertically; snap-preview to the nearest line
-        const rel = ev.clientY - stageTop;
-        const s = Math.max(0, Math.min(TUNING_MIDI.length - 1, Math.round(rel / LINE_GAP)));
-        note.el.style.top = `${s * LINE_GAP}px`;
-      };
-      const up = (ev) => {
-        note.el.releasePointerCapture(e.pointerId);
-        note.el.removeEventListener('pointermove', move);
-        note.el.removeEventListener('pointerup', up);
-        note.el.classList.remove('dragging');
-        if (!dragging) return;                    // it was a click, not a drag
-        const rel = ev.clientY - stageTop;
-        const s = Math.max(0, Math.min(TUNING_MIDI.length - 1, Math.round(rel / LINE_GAP)));
-        if (!moveToString(note, s)) place(note);  // reject → snap home
-      };
-      note.el.addEventListener('pointermove', move);
-      note.el.addEventListener('pointerup', up);
-    });
-    note.el.addEventListener('dblclick', (e) => { e.preventDefault(); beginEdit(note); });
-  }
-
-  function addNote({ string, fret, col, midi, tSec, durSec, det }) {
-    ensureCols(col);
-    const el = document.createElement('span');
-    el.className = 'tab-note';
-    el.textContent = String(fret);
-    const note = {
-      id: ++seq, el, col, string, fret,
-      midi: midi != null ? midi : midiForPosition(string, fret),
-      detMidi: det ? det.midi : (midi != null ? midi : midiForPosition(string, fret)),
-      detString: det ? det.string : string,
-      detFret: det ? det.fret : fret,
-      edited: !!(det && (det.string !== string || det.fret !== fret)),
-      tSec: tSec == null ? null : tSec,
-      durSec: durSec == null ? null : durSec,
-    };
-    el.dataset.id = String(note.id);
-    if (note.edited) el.classList.add('edited');
-    place(note);
-    stage.appendChild(el);
-    noteMap.set(note.id, note);
-    attachDrag(note);
-    requestAnimationFrame(() => el.classList.add('in'));
-    scroll.scrollLeft = Math.max(0, (col + 3) * COL_W - scroll.clientWidth);
-    return note.id;
-  }
-
-  const dump = (n) => ({
-    id: n.id, col: n.col, string: n.string, fret: n.fret, midi: n.midi,
-    detMidi: n.detMidi, detString: n.detString, detFret: n.detFret,
-    edited: n.edited, tSec: n.tSec, durSec: n.durSec,
-  });
-
-  function serialize() {
-    const notes = [...noteMap.values()].sort((a, b) => a.col - b.col || a.string - b.string).map(dump);
-    return { bpm: bpmVal, tuning: 'EADGBE', notes };
-  }
-
-  function clear() {
-    stage.querySelectorAll('.tab-note, .tab-bar, .tab-barnum').forEach((n) => n.remove());
-    noteMap.clear();
-    cols = 0; ensureCols(16); scroll.scrollLeft = 0;
-  }
-
-  function loadNotes(model) {
-    clear();
-    if (model && Array.isArray(model.notes)) {
-      for (const n of model.notes) {
-        addNote({
-          string: n.string, fret: n.fret, col: n.col, midi: n.midi, tSec: n.tSec, durSec: n.durSec,
-          det: { midi: n.detMidi, string: n.detString, fret: n.detFret },
-        });
-      }
-    }
-  }
+  const input = attachTabInput({ scrollEl: scroll, stage, model, ui, requestRender, onEditFret: beginEdit });
 
   // ── playhead (transport audio OR the tab's own MIDI player) ────────────────
-  // `tSec` is seconds from the tab's start. Positions the cursor on the same
-  // 16th-column geometry the notes use, highlights the sounding note, and
-  // keeps the cursor in view.
+  function ensureWidthFor(x) {
+    const w = parseInt(stage.style.width, 10) || 0;
+    if (x + 60 > w) stage.style.width = `${x + 60 + 8 * COL_W}px`;
+  }
+
   function setPlayhead(tSec) {
     if (tSec == null || tSec < 0) { hidePlayhead(); return; }
-    const colF = tSec * (bpmVal / 60) * 4;         // seconds → 16th columns
-    ensureCols(Math.ceil(colF) + 1);
+    const state = model.getState();
+    const colF = tSec * (state.tempo / 60) * 4;          // seconds → 16th columns
     const x = colF * COL_W + COL_W / 2;
+    ensureWidthFor(x);
     cursor.style.transform = `translateX(${x}px)`;
     cursor.style.opacity = '1';
-    for (const n of noteMap.values()) {
-      const on = n.tSec != null && tSec >= n.tSec && tSec < n.tSec + Math.max(n.durSec || 0.25, 0.12);
-      n.el.classList.toggle('playing', on);
+    for (const w of playIndex) {
+      const el = renderer.noteEl(w.id);
+      if (el) el.classList.toggle('playing', tSec >= w.t0 && tSec < w.t1);
     }
     if (x < scroll.scrollLeft + 24 || x > scroll.scrollLeft + scroll.clientWidth - 40) {
       scroll.scrollLeft = Math.max(0, x - scroll.clientWidth * 0.4);
@@ -272,30 +177,87 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   }
   function hidePlayhead() {
     cursor.style.opacity = '0';
-    for (const n of noteMap.values()) n.el.classList.remove('playing');
+    for (const w of playIndex) {
+      const el = renderer.noteEl(w.id);
+      if (el) el.classList.remove('playing');
+    }
   }
 
+  // ── v1-shaped dumps for main.js, the training export and the e2e bridge ────
+  function dumpNotes(state) {
+    return [...state.notes]
+      .sort((a, b) => a.tick - b.tick || a.string - b.string)
+      .map((n) => {
+        const midi = midiAt(state, n);
+        const det = n.det;
+        return {
+          id: n.id,
+          col: Math.round(n.tick / SIXTEENTH),
+          string: n.string, fret: n.fret, midi,
+          detMidi: det ? det.midi : midi,
+          detString: det ? det.string : n.string,
+          detFret: det ? det.fret : n.fret,
+          edited: !!(det && (det.string !== n.string || det.fret !== n.fret)),
+          tSec: det && det.tSec != null ? det.tSec : ticksToSec(n.tick, state.tempo),
+          durSec: det && det.durSec != null ? det.durSec : ticksToSec(n.durTicks, state.tempo),
+        };
+      });
+  }
+
+  const seeded = (fn) => { suppress++; try { return fn(); } finally { suppress--; } };
+
   const api = {
-    // Place a detected note. `meta` carries the pitch + timing so edits can
-    // preserve it and the export can pair it with the audio.
+    // Place a detected note (col = 16th column). meta carries pitch + timing
+    // so edits preserve the sound and the export pairs notes with the audio.
     noteOn(string, fret, col, meta = {}) {
-      return addNote({ string, fret, col, midi: meta.midi, tSec: meta.tSec, durSec: meta.durSec });
+      return seeded(() => {
+        const state = model.getState();
+        const id = model.addNote({
+          tick: col * SIXTEENTH, string, fret,
+          durTicks: durTicksFromSec(meta.durSec, state.tempo),
+          det: {
+            midi: meta.midi != null ? meta.midi : midiAt(state, { string, fret }),
+            string, fret,
+            tSec: meta.tSec != null ? meta.tSec : null,
+            durSec: meta.durSec != null ? meta.durSec : null,
+          },
+        });
+        scroll.scrollLeft = Math.max(0, (col + 3) * COL_W - scroll.clientWidth);
+        return id;
+      });
     },
+
     setPlayhead, hidePlayhead,
+
     setPlaying(on) {
       const b = head.querySelector('.tab-play');
       if (b) { b.textContent = on ? '⏸' : '▶'; b.classList.toggle('on', on); }
     },
     onPlay(cb) { head.querySelector('.tab-play').addEventListener('click', cb); },
-    // Programmatic edits (also used by drag/dblclick + e2e).
-    moveNoteToString(id, string) { const n = noteMap.get(id); return n ? moveToString(n, string) : false; },
-    setNoteFret(id, fret) { const n = noteMap.get(id); if (!n) return false; if (fret < 0 || fret > MAX_FRET) return false; applyFret(n, fret); return true; },
-    getNotes() { return [...noteMap.values()].sort((a, b) => a.col - b.col || a.string - b.string).map(dump); },
-    serialize, loadNotes,
-    setBpm(v) { bpmVal = v; const m = head.querySelector('.tab-meta'); if (m) m.textContent = `${v} BPM · 16th grid · standard tuning`; },
-    clear,
-    noteCount: () => noteMap.size,
-    // Header state line (offline transcription only — no live cursor anymore).
+
+    // Programmatic edits (drag/dblclick paths + e2e bridge).
+    moveNoteToString(id, string) {
+      const ok = model.moveNote(id, { string });
+      if (!ok) shakeNote(id);
+      return ok;
+    },
+    setNoteFret(id, fret) { return model.setFret(id, fret); },
+
+    getNotes() { return dumpNotes(model.getState()); },
+    serialize() { return model.serialize(); },
+    loadNotes(m) { seeded(() => model.load(m)); },
+    setBpm(v) { model.setTempo(v); },
+    clear() {
+      seeded(() => {
+        const s = model.getState();
+        model.load({ version: 2, tempo: s.tempo, timeSig: s.timeSig, tuning: s.tuning, capo: s.capo, notes: [] });
+      });
+      ui.cursor = null; ui.selection = null;
+      requestRender();
+      scroll.scrollLeft = 0;
+    },
+    noteCount() { return model.getState().notes.length; },
+
     setLive(_on, label) {
       const st = head.querySelector('.tab-state');
       if (st && label) st.textContent = label;
@@ -304,7 +266,20 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
     onExport(cb) { head.querySelector('.tab-export').addEventListener('click', cb); },
     onClear(cb) { head.querySelector('.tab-clear').addEventListener('click', () => { cb(); }); },
     onClose(cb) { head.querySelector('.tab-close').addEventListener('click', cb); },
-    destroy() { container.innerHTML = ''; container.hidden = true; },
+
+    // v2 surface
+    getModel() { return model; },
+    getUi() { return ui; },
+    focus() { stage.focus(); },
+
+    destroy() {
+      input.destroy();
+      renderer.destroy();
+      container.innerHTML = '';
+      container.hidden = true;
+    },
   };
+
+  onModelChange(model.getState());               // first paint (no cb registered yet)
   return api;
 }
