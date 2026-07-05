@@ -1351,6 +1351,15 @@
   /* drag-a-.lick-over-the-lane highlight — static border/shadow, nothing animated */
   .tab-lane.tab-drop { border-color: rgba(var(--accent-rgb),0.6);
     box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.35); }
+  .tab-practice { display: inline-flex; align-items: center; gap: 6px; }
+  .tab-practice button { font: 700 10px var(--font); color: var(--text-secondary); background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+  .tab-practice button:hover { color: var(--text); border-color: rgba(255,255,255,0.22); }
+  .tab-practice button.on { color: var(--accent); background: rgba(var(--accent-rgb),0.12);
+    border-color: rgba(var(--accent-rgb),0.45); }
+  .tab-speed { font: 700 10px var(--font); color: var(--text-secondary); background: #17171d;
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 2px 4px; cursor: pointer; }
+  .tab-practice .locked { opacity: .45; cursor: not-allowed; }
   .tab-lane.paused .tab-title { color: var(--text-secondary); }
   /* v2 editor overlays: grid cursor cell + column-range selection band.
      Static styles only — moving them is a left/top write, no animation. */

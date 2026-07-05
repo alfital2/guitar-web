@@ -1299,17 +1299,21 @@ function ensureTabLane() {
 
 // Play the TAB itself as synthesized notes (independent of the recording).
 // The lane cursor rides along. Toggles; stops any transport playback first so
-// you don't hear both at once.
+// you don't hear both at once. The practice pack (speed, metronome, count-in,
+// loop window) is read from the lane at press time — tempo/TS from the model.
 function toggleTabMidi() {
   if (!tabLane) return;
   if (tabMidi.isPlaying()) { tabMidi.stop(); tabLane.hidePlayhead(); tabLane.setPlaying(false); return; }
   const notes = tabLane.getNotes();
   if (!notes.length) return;
   if (player.isPlaying()) { player.stop(); reflectPlay(); tabLane.hidePlayhead(); }
+  const st = tabLane.serialize();                        // v2 state: tempo + timeSig ride along
   tabLane.setPlaying(true);
   tabMidi.play(notes, {
     onTick: (t) => tabLane.setPlayhead(t),
     onEnd: () => { tabLane.hidePlayhead(); tabLane.setPlaying(false); },
+    tempo: st.tempo, timeSig: st.timeSig,
+    ...tabLane.getPractice(),                            // { speed, metronome, countIn, loop }
   });
 }
 
@@ -1437,6 +1441,7 @@ if ($('diag')) window.__tabDebug = {
   saveLick: () => (tabLane ? encodeLick(tabLane.serialize()) : null),
   loadLick: async (bytes) => { if (!ensureTabLane()) return false; tabLane.loadNotes(await decodeLick(new Uint8Array(bytes))); return true; },
   ascii: () => (tabLane ? toAscii(tabLane.serialize()) : ''),
+  practice: () => (tabLane ? tabLane.getPractice() : null),
 };
 
 // Record: capture the live processed output into a take, append it as a clip.

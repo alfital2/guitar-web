@@ -25,6 +25,7 @@ import { createTabRenderer, COL_W, LINE_GAP } from './tab-render.js';
 import { attachTabInput } from './tab-input.js';
 import { can } from '../features.js';
 import { downloadLick, readLickFile, autosaveTab, loadAutosave, toAscii } from './tab-file.js';
+import { loopWindow } from './tab-midi-player.js';
 
 const dash = '·';
 
@@ -287,6 +288,40 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
 
   const seeded = (fn) => { suppress++; try { return fn(); } finally { suppress--; } };
 
+  // ── practice pack (metronome · count-in · loop · speed) ────────────────────
+  // Header toggles feed getPractice(); main.js spreads that into
+  // tabMidi.play(). The loop window derives from the CURRENT selection at
+  // call time (expanded to whole bars — no selection loops the whole tab), so
+  // re-selecting and hitting play just works. Gated by can('tab.practice'):
+  // locked controls render disabled — one switch point, nothing to hunt later.
+  const practice = { metronome: false, countIn: false, loopOn: false, speed: 1 };
+  const practiceEl = head.querySelector('.tab-practice');
+  practiceEl.innerHTML = `
+    <select class="tab-speed" title="Playback speed">
+      <option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option>
+    </select>
+    <button type="button" class="tab-metro" title="Metronome during playback">Metro</button>
+    <button type="button" class="tab-countin" title="One-bar count-in">Count</button>
+    <button type="button" class="tab-loop" title="Loop the selected bars">Loop</button>`;
+  const bindPracticeToggle = (cls, key) => {
+    const b = practiceEl.querySelector(cls);
+    b.addEventListener('click', () => {
+      if (!can('tab.practice')) return;
+      practice[key] = !practice[key];
+      b.classList.toggle('on', practice[key]);
+    });
+  };
+  bindPracticeToggle('.tab-metro', 'metronome');
+  bindPracticeToggle('.tab-countin', 'countIn');
+  bindPracticeToggle('.tab-loop', 'loopOn');
+  const speedSel = practiceEl.querySelector('.tab-speed');
+  speedSel.addEventListener('change', () => { practice.speed = parseFloat(speedSel.value) || 1; });
+  speedSel.addEventListener('keydown', (e) => e.stopPropagation());   // select keys must not hit lane shortcuts
+  if (!can('tab.practice')) {
+    for (const el of practiceEl.querySelectorAll('button, select')) { el.disabled = true; el.classList.add('locked'); }
+    practiceEl.title = 'Practice pack is locked';
+  }
+
   // ── .lick file actions: Save / Open / ASCII, drag-drop, autosave ───────────
   // Gated controls stay visible when the cap is off (premium-ready upsell
   // affordance) but are disabled and inert.
@@ -458,6 +493,18 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
     getModel() { return model; },
     getUi() { return ui; },
     focus() { stage.focus(); },
+
+    // Practice state for playback. `loop` is resolved HERE (whole-bar seconds
+    // from the live selection) so the caller never touches ticks.
+    getPractice() {
+      if (!can('tab.practice')) return { metronome: false, countIn: false, loop: null, speed: 1 };
+      return {
+        metronome: practice.metronome,
+        countIn: practice.countIn,
+        loop: practice.loopOn ? loopWindow(model.serialize(), ui.selection) : null,
+        speed: practice.speed,
+      };
+    },
 
     destroy() {
       clearTimeout(autosaveTimer);
