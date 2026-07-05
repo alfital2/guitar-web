@@ -1295,6 +1295,12 @@
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
   .tab-head { display: flex; align-items: center; gap: 10px; padding: 7px 10px 6px 0;
     font: 700 10px var(--font); letter-spacing: .08em; color: var(--text-secondary); }
+  /* second header row: musical settings + practice pack (one row clipped) */
+  .tab-head2 { padding: 0 10px 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 2px; }
+  .tab-capo-wrap { display: inline-flex; align-items: center; gap: 3px; }
+  .tab-capo { width: 26px; font: 700 10px var(--mono); text-align: center; color: var(--text-secondary);
+    background: #17171d; border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; padding: 2px 3px; outline: none; }
+  .tab-capo:focus { color: var(--accent); border-color: rgba(var(--accent-rgb),0.6); }
   .tab-title { text-transform: uppercase; color: var(--accent); display: inline-flex; align-items: center; gap: 6px; }
   .tab-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red);
     box-shadow: 0 0 6px rgba(255,69,58,0.7); animation: rec-pulse-dot 1s ease-in-out infinite; }
@@ -1305,10 +1311,10 @@
   .tab-clear, .tab-close { font: 700 10px var(--font); color: var(--text-secondary); background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
   .tab-clear:hover, .tab-close:hover { color: var(--text); border-color: rgba(255,255,255,0.22); }
-  .tab-gutter { position: absolute; left: 10px; top: 34px; width: 20px; height: 90px; }
+  .tab-gutter { position: absolute; left: 10px; top: 62px; width: 20px; height: 90px; }
   .tab-gutter i { position: absolute; left: 0; transform: translateY(-6px); font: 700 10px var(--mono);
     color: var(--very-muted); font-style: normal; }
-  .tab-scroll { position: relative; overflow-x: auto; overflow-y: hidden; height: 104px; }
+  .tab-scroll { position: relative; overflow: auto; height: auto; min-height: 104px; max-height: 384px; }
   .tab-stage { position: relative; height: 90px; min-width: 100%; margin-top: 4px; }
   .tab-lines i { position: absolute; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.16); }
   .tab-bar { position: absolute; top: -3px; width: 1px; height: 82px; background: rgba(255,255,255,0.22); }
@@ -1339,7 +1345,76 @@
   .tab-export { font: 700 10px var(--font); color: var(--accent); background: rgba(var(--accent-rgb),0.1);
     border: 1px solid rgba(var(--accent-rgb),0.4); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
   .tab-export:hover { background: rgba(var(--accent-rgb),0.18); }
+  .tab-file-actions { display: inline-flex; gap: 6px; }
+  .tab-file-actions button { font: 700 10px var(--font); color: var(--text-secondary); background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+  .tab-file-actions button:hover { color: var(--text); border-color: rgba(255,255,255,0.22); }
+  .tab-file-actions button.tab-locked, .tab-file-actions button.tab-locked:hover { color: var(--very-muted);
+    border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); cursor: not-allowed; }
+  .tab-file-actions button.tab-locked::after { content: '🔒'; margin-left: 4px; font-size: 8px; }
+  /* drag-a-.lick-over-the-lane highlight — static border/shadow, nothing animated */
+  .tab-lane.tab-drop { border-color: rgba(var(--accent-rgb),0.6);
+    box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb),0.35); }
+  .tab-practice { display: inline-flex; align-items: center; gap: 6px; }
+  .tab-practice button { font: 700 10px var(--font); color: var(--text-secondary); background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+  .tab-practice button:hover { color: var(--text); border-color: rgba(255,255,255,0.22); }
+  .tab-practice button.on { color: var(--accent); background: rgba(var(--accent-rgb),0.12);
+    border-color: rgba(var(--accent-rgb),0.45); }
+  .tab-speed { width: auto; font: 700 10px var(--font); color: var(--text-secondary); background: #17171d;
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; padding: 2px 4px; cursor: pointer; }
+  .tab-practice .locked { opacity: .45; cursor: not-allowed; }
+  /* technique glyphs: slur arcs (h/p), slides, bends, PM―― spans, dead × */
+  .tab-glyphs { position: absolute; inset: 0; pointer-events: none; }
+  .tab-glyph { position: absolute; font: 700 7px var(--mono); font-style: normal;
+    line-height: 1; color: rgba(255,255,255,0.65); }
+  .tab-glyph.hp { height: 7px; border: 1px solid rgba(255,255,255,0.4); border-bottom: none;
+    border-radius: 50% 50% 0 0 / 100% 100% 0 0; }
+  .tab-glyph.hp::after { content: attr(data-t); position: absolute; left: 50%; top: 3px;
+    transform: translateX(-50%); color: rgba(255,255,255,0.8); background: rgba(12,12,16,0.7); padding: 0 1px; }
+  .tab-glyph.slide { width: 9px; height: 2px; border-radius: 1px; background: rgba(255,255,255,0.55); }
+  .tab-glyph.slide.up { transform: rotate(-24deg); }
+  .tab-glyph.slide.down { transform: rotate(24deg); }
+  .tab-glyph.bend { color: var(--accent); }
+  .tab-glyph.bend::after { content: '↗'; margin-left: 1px; }
+  .tab-glyph.pm { top: -4px; height: 8px; display: inline-flex; align-items: center;
+    letter-spacing: .08em; color: rgba(255,255,255,0.55); }
+  .tab-glyph.pm::after { content: ''; flex: 1; margin-left: 3px;
+    border-top: 1px dashed rgba(255,255,255,0.35); }
+  .tab-note.dead { color: var(--very-muted); }
   .tab-lane.paused .tab-title { color: var(--text-secondary); }
+  /* v2 editor overlays: grid cursor cell + column-range selection band.
+     Static styles only — moving them is a left/top write, no animation. */
+  .tab-cell-cursor { position: absolute; width: 22px; height: 13px; transform: translate(-50%, -55%);
+    border: 1px solid rgba(var(--accent-rgb),0.75); border-radius: 3px;
+    background: rgba(var(--accent-rgb),0.10); pointer-events: none; }
+  .tab-selection { position: absolute; top: -4px; height: 84px;
+    background: rgba(var(--accent-rgb),0.08); border-left: 1px solid rgba(var(--accent-rgb),0.35);
+    border-right: 1px solid rgba(var(--accent-rgb),0.35); pointer-events: none; }
+  .tab-stage:focus { outline: none; }
+  .tab-stage:focus-visible .tab-cell-cursor { box-shadow: 0 0 6px rgba(var(--accent-rgb),0.5); }
+  /* rhythm layer: stems/beams/dots under the strings (note durations) */
+  .tab-rhythm { position: absolute; inset: 0; pointer-events: none; }
+  .tab-stem { position: absolute; width: 2px; height: 10px; margin-left: -1px;
+    background: rgba(255,255,255,0.45); border-radius: 1px; }
+  .tab-stem.short { height: 5px; margin-top: 5px; }
+  .tab-beam { position: absolute; height: 2px; background: rgba(255,255,255,0.45); border-radius: 1px; }
+  .tab-beam.flag { opacity: .8; }
+  .tab-dot { position: absolute; top: 85px; width: 3px; height: 3px; border-radius: 50%;
+    background: rgba(255,255,255,0.55); }
+  /* interactive meta: tempo click-to-edit + pickers */
+  .tab-meta { display: inline-flex; align-items: center; gap: 5px; }
+  .tab-bpm { font: 700 10px var(--mono); color: var(--text-secondary); background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; padding: 2px 6px; cursor: pointer; }
+  .tab-bpm:hover { color: var(--accent); border-color: rgba(var(--accent-rgb),0.4); }
+  .tab-bpm-input { width: 30px; font: 700 10px var(--mono); text-align: center; color: var(--accent);
+    background: #0c0c10; border: 1px solid rgba(var(--accent-rgb),0.6); border-radius: 3px; padding: 0; outline: none; }
+  /* width:auto beats the app-global `select { width:100% }` (settings panel) */
+  .tab-meta select { width: auto; font: 700 10px var(--mono); color: var(--text-secondary); background: #17171d;
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 5px; padding: 2px 4px; cursor: pointer; }
+  .tab-meta select:hover { border-color: rgba(var(--accent-rgb),0.4); }
+  .tab-sep, .tab-unit { color: var(--very-muted); font-weight: 600; }
+  .tab-tune-slot { display: inline-flex; align-items: center; gap: 4px; }
 
   /* ── Safari compositor relief ─────────────────────────────
      WebKit re-filters backdrop-filter surfaces EVERY frame while anything
@@ -1635,7 +1710,7 @@
     grid-template-columns: fit-content(62%) minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
   }
-  body.rig-docked .toolbar, body.rig-docked #track-lane { grid-column: 1 / -1; }
+  body.rig-docked .toolbar, body.rig-docked #track-lane, body.rig-docked #tab-lane { grid-column: 1 / -1; }
   body.rig-docked .amp-strip { grid-column: 1; display: flex; align-items: center; padding: 6px 8px 8px 20px; }
   body.rig-docked .pedalboard-strip { grid-column: 2; display: flex; align-items: center; min-width: 0; padding: 6px 20px 8px 8px; background: rgba(0,0,0,0.12); }
   body.rig-docked .pedalboard-strip .strip-head { display: none; }
@@ -1688,6 +1763,7 @@
     <div id="transport-cluster"></div>
     <div class="toolbar-actions">
       <div class="start-hint">Start here<i class="start-hint-tip"></i></div>
+      <button id="tab-open" class="icon btn-dim" title="Tab editor — write a lick from scratch">🎼 TAB</button>
       <button id="power" class="btn-power off" title="Power on the amp engine">⏻ Power</button>
       <button id="settings-toggle" class="icon btn-dim" aria-label="Settings" title="Settings">⚙</button>
     </div>

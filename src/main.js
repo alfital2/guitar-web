@@ -37,6 +37,7 @@ import { assignFret, quantizeToGrid, tabTimeForTransport } from './tab/transcrib
 import { encodeWav } from './wav.js';
 import { transcribeTake } from './tab/offline-transcribe.js';
 import { mountTabLane } from './tab/tab-lane.js';
+import { encodeLick, decodeLick, toAscii } from './tab/tab-file.js';
 import { createTabMidiPlayer } from './tab/tab-midi-player.js';
 import { initJamUI } from './jam-ui.js';
 
@@ -1296,19 +1297,37 @@ function ensureTabLane() {
   return true;
 }
 
+// Toolbar 🎼 TAB — open the editor standalone, no transcription needed.
+// The lane's autosave restores the last working lick on mount; a fresh one
+// starts blank with the cursor ready.
+{
+  const btn = $('tab-open');
+  if (btn) btn.addEventListener('click', () => {
+    if (!ensureTabLane()) return;
+    tabLane.setLive(false, tabLane.noteCount() ? 'composing' : 'blank tab — click the grid and type frets');
+    $('tab-lane')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    tabLane.focus();
+  });
+}
+
 // Play the TAB itself as synthesized notes (independent of the recording).
 // The lane cursor rides along. Toggles; stops any transport playback first so
-// you don't hear both at once.
+// you don't hear both at once. The practice pack (speed, metronome, count-in,
+// loop window) is read from the lane at press time — tempo/TS from the model.
 function toggleTabMidi() {
   if (!tabLane) return;
   if (tabMidi.isPlaying()) { tabMidi.stop(); tabLane.hidePlayhead(); tabLane.setPlaying(false); return; }
   const notes = tabLane.getNotes();
   if (!notes.length) return;
   if (player.isPlaying()) { player.stop(); reflectPlay(); tabLane.hidePlayhead(); }
+  const st = tabLane.serialize();                        // v2 state: tempo + timeSig ride along
+  const played = tabLane.getModel().notesWithTime();     // {tSec,durSec,midi,tech,string} — techniques ride into the voices
   tabLane.setPlaying(true);
-  tabMidi.play(notes, {
+  tabMidi.play(played, {
     onTick: (t) => tabLane.setPlayhead(t),
     onEnd: () => { tabLane.hidePlayhead(); tabLane.setPlaying(false); },
+    tempo: st.tempo, timeSig: st.timeSig,
+    ...tabLane.getPractice(),                            // { speed, metronome, countIn, loop }
   });
 }
 
@@ -1416,6 +1435,33 @@ if ($('diag')) window.__tabDebug = {
   midiPlaying: () => tabMidi.isPlaying(),
   cursorShown: () => { const c = document.querySelector('.tab-cursor'); return !!c && c.style.opacity === '1'; },
   playingNotes: () => document.querySelectorAll('.tab-note.playing').length,
+  // Test-only: v2 editor surface — compose, navigate, undo, copy/paste.
+  addAt(col, string, fret) { return tabLane ? tabLane.getModel().addNote({ tick: col * 3, string, fret, durTicks: tabLane.getUi().currentDur }) : null; },
+  cursor() { return tabLane ? tabLane.getUi().cursor : null; },
+  setCursor(col, string) { if (!tabLane) return null; tabLane.getUi().cursor = { tick: col * 3, string }; return tabLane.getUi().cursor; },
+  undo: () => (tabLane ? tabLane.getModel().undo() : false),
+  redo: () => (tabLane ? tabLane.getModel().redo() : false),
+  selCopyPaste(startCol, endCol, atCol) {
+    if (!tabLane) return [];
+    const m = tabLane.getModel();
+    return m.pasteAt(atCol * 3, m.copyRange(startCol * 3, endCol * 3));
+  },
+  setDur(idx, durTicks) {
+    if (!tabLane) return 0;
+    const n = tabLane.getModel().getState().notes[idx];
+    return n ? tabLane.getModel().setDuration([n.id], durTicks) : 0;
+  },
+  // Test-only: phase-3 .lick round-trip without the browser download path.
+  saveLick: () => (tabLane ? encodeLick(tabLane.serialize()) : null),
+  loadLick: async (bytes) => { if (!ensureTabLane()) return false; tabLane.loadNotes(await decodeLick(new Uint8Array(bytes))); return true; },
+  ascii: () => (tabLane ? toAscii(tabLane.serialize()) : ''),
+  practice: () => (tabLane ? tabLane.getPractice() : null),
+  tech(idx, key, value) {
+    if (!tabLane) return 0;
+    const n = tabLane.getModel().getState().notes[idx];
+    return n ? tabLane.getModel().toggleTech([n.id], key, value) : 0;
+  },
+  openLane: () => { $('tab-open')?.click(); return !!tabLane; },
 };
 
 // Record: capture the live processed output into a take, append it as a clip.

@@ -24,7 +24,7 @@ describe('fret assignment (standard tuning)', () => {
   });
   it('out-of-range notes return null', () => {
     expect(assignFret(20)).toBeNull();   // way below E2
-    expect(assignFret(95)).toBeNull();   // above high e fret 17 (81)
+    expect(assignFret(95)).toBeNull();   // above high e fret 24 (88)
   });
 });
 
@@ -77,5 +77,20 @@ describe('tabTimeForTransport (cursor sync)', () => {
   });
   it('clamps a hair before the start to 0 (scheduling slop)', () => {
     expect(tabTimeForTransport(1.99, 2, 3)).toBe(0);
+  });
+});
+
+describe('per-tab tuning + 24-fret neck (tab editor v2)', () => {
+  it('the neck has 24 frets', () => {
+    expect(MAX_FRET).toBe(24);
+  });
+  it('fretForString accepts an alternate tuning array', () => {
+    const dropD = [64, 59, 55, 50, 45, 38];
+    expect(fretForString(40, 5, MAX_FRET, dropD)).toBe(2);     // E2 sits at fret 2 on a dropped D
+    expect(fretForString(38, 5, MAX_FRET, dropD)).toBe(0);
+    expect(fretForString(37, 5, MAX_FRET, dropD)).toBeNull();  // below the open string
+  });
+  it('positionsFor spans the extended neck', () => {
+    expect(positionsFor(88)).toEqual([{ string: 0, fret: 24 }]);  // unplayable on a 17-fret neck
   });
 });

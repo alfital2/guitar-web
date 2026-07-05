@@ -35,6 +35,13 @@ export class FakeAudioContext {
     n.stop = () => { ctx.oscStops = (ctx.oscStops || 0) + 1; };
     return n;
   }
+  createBufferSource() {
+    const ctx = this;
+    const n = this._mk('buffersource', { buffer: null, playbackRate: param(1) });
+    n.start = () => { ctx.srcStarts = (ctx.srcStarts || 0) + 1; };
+    n.stop = () => { ctx.srcStops = (ctx.srcStops || 0) + 1; };
+    return n;
+  }
   createBuffer(channels, length, rate) {
     const data = Array.from({ length: channels }, () => new Float32Array(length));
     return { numberOfChannels: channels, length, sampleRate: rate, getChannelData: i => data[i] };
