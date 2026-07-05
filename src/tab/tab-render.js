@@ -1,16 +1,24 @@
 // src/tab/tab-render.js — draws a tab model onto the lane's stage element.
 // Pure view: reads state + ui (cursor cell / selection band), owns the note
-// spans, bar lines and overlays. Incremental — note spans are keyed by note
-// id and only changed properties are touched, so a 16-bar lick re-renders in
-// microseconds and playback highlighting (.playing, applied by the lane)
-// survives re-renders. Geometry is the same 16th-column grid the v1 lane
-// used: COL_W px per 16th, LINE_GAP px between string lines.
+// spans, string lines, bar lines and overlays. Incremental — note spans are
+// keyed by note id and only changed properties are touched, so a 16-bar lick
+// re-renders in microseconds and playback highlighting (.playing, applied by
+// the lane) survives re-renders.
+//
+// WRAPPED layout: like paper tab, the grid breaks into stacked rows of whole
+// bars instead of scrolling horizontally forever. `getViewWidth()` supplies
+// the available width; how many bars fit decides the row length, and every
+// tick maps to a (row, x, y) through the layout object. When the width is
+// unknown (jsdom tests, detached stages) the layout degrades to one endless
+// row — exactly the classic single-strip geometry.
 
 import { SIXTEENTH, PPQ, barTicks } from './tab-model.js';
 
 export const COL_W = 26;          // px per 16th column
 export const LINE_GAP = 15;       // px between string lines
+export const ROW_H = 112;         // px per wrapped system row (strings + stems + bar numbers)
 
+// Single-row primitives (row 0 of any layout; the historical geometry).
 export function xForTick(tick) { return (tick / SIXTEENTH) * COL_W + COL_W / 2; }
 export function tickForX(x) { return Math.max(0, Math.round((x - COL_W / 2) / COL_W)) * SIXTEENTH; }
 export function yForString(s) { return s * LINE_GAP; }
@@ -18,12 +26,13 @@ export function stringForY(y) { return Math.max(0, Math.min(5, Math.round(y / LI
 
 const isEdited = (n) => !!(n.det && (n.det.string !== n.string || n.det.fret !== n.fret));
 
-export function createTabRenderer(stage) {
+export function createTabRenderer(stage, { getViewWidth = () => 0 } = {}) {
   const noteEls = new Map();      // note id -> span element
 
-  // Overlays are created once; render() moves/hides them. The cursor cell
-  // sits UNDER notes (a click target highlight), the selection band spans
-  // the whole strip height.
+  const lines = document.createElement('div');
+  lines.className = 'tab-lines';
+  stage.appendChild(lines);
+
   const cellCursor = document.createElement('div');
   cellCursor.className = 'tab-cell-cursor';
   cellCursor.style.display = 'none';
@@ -33,6 +42,9 @@ export function createTabRenderer(stage) {
   selection.className = 'tab-selection';
   selection.style.display = 'none';
   stage.appendChild(selection);
+
+  // Extra selection rectangles when a selection spans wrapped rows.
+  const selExtra = [];
 
   // Rhythm layer sits under the strings; pointer-events off so it never
   // steals clicks from cells or notes.
@@ -45,24 +57,78 @@ export function createTabRenderer(stage) {
   glyphs.className = 'tab-glyphs';
   stage.appendChild(glyphs);
 
-  let barKey = '';                // `${barTicks}:${cols}` — bars rebuild only when this changes
+  // ── Layout: tick ↔ (row, x, y) ──────────────────────────────────────────────
+  // Rows break on whole-bar boundaries. ticksPerRow = Infinity means the
+  // classic endless single strip (tests, unknown width).
+  let layout = null;
 
-  function renderBars(state, cols) {
-    const bt = barTicks(state.timeSig);
-    const key = `${bt}:${cols}`;
-    if (key === barKey) return;
-    barKey = key;
+  function computeLayout(state, ui) {
+    const barT = barTicks(state.timeSig);
+    const barPx = (barT / SIXTEENTH) * COL_W;
+    const vw = getViewWidth();
+    const barsPerRow = vw > 0 ? Math.max(1, Math.floor((vw - 50) / barPx)) : Infinity;
+    const ticksPerRow = barsPerRow === Infinity ? Infinity : barsPerRow * barT;
+
+    const lastEnd = state.notes.reduce((m, n) => Math.max(m, n.tick + n.durTicks), 0);
+    const uiTick = ui && ui.cursor ? ui.cursor.tick : 0;
+    const contentTicks = Math.max(lastEnd, uiTick + SIXTEENTH, 16 * SIXTEENTH);
+    // always keep one spare bar of room to type into
+    const totalTicks = (Math.ceil(contentTicks / barT) + 1) * barT;
+    const rows = ticksPerRow === Infinity ? 1 : Math.ceil(totalTicks / ticksPerRow);
+
+    return {
+      barT, ticksPerRow, rows, totalTicks,
+      rowOf(tick) { return ticksPerRow === Infinity ? 0 : Math.min(rows - 1, Math.floor(tick / ticksPerRow)); },
+      // tick may be fractional (playhead riding between columns)
+      pointFor(tick, string = 0) {
+        const row = this.rowOf(tick);
+        const rel = tick - row * (ticksPerRow === Infinity ? 0 : ticksPerRow);
+        return { row, x: (rel / SIXTEENTH) * COL_W + COL_W / 2, y: row * ROW_H + string * LINE_GAP };
+      },
+      cellAt(x, y) {
+        const row = ticksPerRow === Infinity ? 0 : Math.max(0, Math.min(rows - 1, Math.floor(y / ROW_H)));
+        const tick = row * (ticksPerRow === Infinity ? 0 : ticksPerRow) + tickForX(x);
+        return { tick, string: stringForY(y - row * ROW_H) };
+      },
+    };
+  }
+
+  let chromeKey = '';             // `${barT}:${ticksPerRow}:${rows}` — bars/lines rebuild key
+
+  function renderChrome(state) {
+    const key = `${layout.barT}:${layout.ticksPerRow}:${layout.rows}`;
+    if (key === chromeKey) return;
+    chromeKey = key;
+
+    // string lines per row
+    lines.textContent = '';
+    for (let r = 0; r < layout.rows; r++) {
+      for (let s = 0; s < 6; s++) {
+        const i = document.createElement('i');
+        i.style.top = `${r * ROW_H + s * LINE_GAP}px`;
+        lines.appendChild(i);
+      }
+    }
+
+    // bar lines + numbers. Internal boundaries get a line; every bar start
+    // (including row starts, except bar 1) gets its number.
     stage.querySelectorAll('.tab-bar, .tab-barnum').forEach((el) => el.remove());
-    for (let tick = bt; tick < cols * SIXTEENTH; tick += bt) {
-      const x = (tick / SIXTEENTH) * COL_W;             // column boundary, not center
-      const bar = document.createElement('i');
-      bar.className = 'tab-bar';
-      bar.style.left = `${x}px`;
-      stage.appendChild(bar);
+    const perRow = layout.ticksPerRow;
+    for (let tick = layout.barT; tick < layout.totalTicks; tick += layout.barT) {
+      const p = layout.pointFor(tick, 0);
+      const atRowStart = perRow !== Infinity && tick % perRow === 0;
+      if (!atRowStart) {
+        const bar = document.createElement('i');
+        bar.className = 'tab-bar';
+        bar.style.left = `${p.x - COL_W / 2}px`;
+        bar.style.top = `${p.row * ROW_H - 3}px`;
+        stage.appendChild(bar);
+      }
       const num = document.createElement('span');
       num.className = 'tab-barnum';
-      num.textContent = String(tick / bt + 1);
-      num.style.left = `${x + 3}px`;
+      num.textContent = String(tick / layout.barT + 1);
+      num.style.left = `${p.x - COL_W / 2 + 3}px`;
+      num.style.top = `${p.row * ROW_H - 2}px`;
       stage.appendChild(num);
     }
   }
@@ -80,12 +146,13 @@ export function createTabRenderer(stage) {
         noteEls.set(n.id, el);
         requestAnimationFrame(() => el.classList.add('in'));
       }
-      // never rewrite className wholesale — the lane owns .playing, phase-5
-      // glyphs own .dead, and the enter animation owns .in
+      // never rewrite className wholesale — the lane owns .playing, glyphs
+      // own .dead, and the enter animation owns .in
       const label = String(n.fret);
       if (!el.querySelector('input') && el.textContent !== label) el.textContent = label;
-      const left = `${xForTick(n.tick)}px`;
-      const top = `${yForString(n.string)}px`;
+      const p = layout.pointFor(n.tick, n.string);
+      const left = `${p.x}px`;
+      const top = `${p.y}px`;
       if (el.style.left !== left) el.style.left = left;
       if (el.style.top !== top) el.style.top = top;
       el.classList.toggle('edited', isEdited(n));
@@ -97,18 +164,36 @@ export function createTabRenderer(stage) {
 
   function renderOverlays(ui) {
     if (ui && ui.cursor) {
+      const p = layout.pointFor(ui.cursor.tick, ui.cursor.string);
       cellCursor.style.display = '';
-      cellCursor.style.left = `${xForTick(ui.cursor.tick)}px`;
-      cellCursor.style.top = `${yForString(ui.cursor.string)}px`;
+      cellCursor.style.left = `${p.x}px`;
+      cellCursor.style.top = `${p.y}px`;
     } else {
       cellCursor.style.display = 'none';
     }
+
+    for (const el of selExtra) el.remove();
+    selExtra.length = 0;
     if (ui && ui.selection) {
       const a = Math.min(ui.selection.startTick, ui.selection.endTick);
       const b = Math.max(ui.selection.startTick, ui.selection.endTick);
-      selection.style.display = '';
-      selection.style.left = `${(a / SIXTEENTH) * COL_W}px`;
-      selection.style.width = `${((b - a) / SIXTEENTH) * COL_W}px`;
+      const rowA = layout.rowOf(a);
+      const rowB = layout.rowOf(Math.max(a, b - 1));
+      const rect = (el, row, from, to) => {
+        const rowBase = row * (layout.ticksPerRow === Infinity ? 0 : layout.ticksPerRow);
+        el.style.display = '';
+        el.style.left = `${((from - rowBase) / SIXTEENTH) * COL_W}px`;
+        el.style.width = `${((to - from) / SIXTEENTH) * COL_W}px`;
+        el.style.top = `${row * ROW_H - 4}px`;
+      };
+      rect(selection, rowA, a, rowA === rowB ? b : (rowA + 1) * layout.ticksPerRow);
+      for (let r = rowA + 1; r <= rowB; r++) {
+        const el = document.createElement('div');
+        el.className = 'tab-selection';
+        stage.appendChild(el);
+        selExtra.push(el);
+        rect(el, r, r * layout.ticksPerRow, r === rowB ? b : (r + 1) * layout.ticksPerRow);
+      }
     } else {
       selection.style.display = 'none';
     }
@@ -123,19 +208,21 @@ export function createTabRenderer(stage) {
   const STEM_TOP = 78, BEAM_TOP = 86, BEAM_LVL = 3, FLAG_W = 12;
 
   const beamEl = (a, b, level) => {
+    const pa = layout.pointFor(a, 0), pb = layout.pointFor(b, 0);
     const el = document.createElement('i');
     el.className = 'tab-beam';
-    el.style.left = `${xForTick(a)}px`;
-    el.style.width = `${xForTick(b) - xForTick(a)}px`;
-    el.style.top = `${BEAM_TOP - level * BEAM_LVL}px`;
+    el.style.left = `${pa.x}px`;
+    el.style.width = `${pb.x - pa.x}px`;
+    el.style.top = `${pa.row * ROW_H + BEAM_TOP - level * BEAM_LVL}px`;
     return el;
   };
   const flagEl = (tick, level) => {
+    const p = layout.pointFor(tick, 0);
     const el = document.createElement('i');
     el.className = 'tab-beam flag';
-    el.style.left = `${xForTick(tick)}px`;
+    el.style.left = `${p.x}px`;
     el.style.width = `${FLAG_W}px`;
-    el.style.top = `${BEAM_TOP - level * BEAM_LVL}px`;
+    el.style.top = `${p.row * ROW_H + BEAM_TOP - level * BEAM_LVL}px`;
     return el;
   };
 
@@ -151,17 +238,19 @@ export function createTabRenderer(stage) {
     let carried = 0;                           // beam levels drawn INTO column i by i−1
     for (let i = 0; i < ticks.length; i++) {
       const tick = ticks[i], dur = cols.get(tick);
+      const p = layout.pointFor(tick, 0);
       if (dur < 48) {                          // whole notes carry no stem
         const stem = document.createElement('i');
         stem.className = 'tab-stem' + (dur >= 24 ? ' short' : '');
-        stem.style.left = `${xForTick(tick)}px`;
-        stem.style.top = `${STEM_TOP}px`;
+        stem.style.left = `${p.x}px`;
+        stem.style.top = `${p.row * ROW_H + STEM_TOP}px`;
         frag.appendChild(stem);
       }
       if (dur === 36 || dur === 18 || dur === 9) {
         const dot = document.createElement('i');
         dot.className = 'tab-dot';
-        dot.style.left = `${xForTick(tick) + 4}px`;
+        dot.style.left = `${p.x + 4}px`;
+        dot.style.top = `${p.row * ROW_H + 85}px`;
         frag.appendChild(dot);
       }
       const flags = FLAG_COUNT[dur] || 0;
@@ -170,7 +259,8 @@ export function createTabRenderer(stage) {
         const next = ticks[i + 1];
         const nextFlags = next != null ? (FLAG_COUNT[cols.get(next)] || 0) : 0;
         // beam only when the next column starts exactly where this note ends
-        // AND both sit inside the same quarter-note beat
+        // AND both sit inside the same quarter-note beat (a beat never spans
+        // a bar, so beam partners always share a row)
         if (nextFlags && next === tick + dur && Math.floor(tick / PPQ) === Math.floor(next / PPQ)) {
           joined = Math.min(flags, nextFlags);
           for (let l = 0; l < joined; l++) frag.appendChild(beamEl(tick, next, l));
@@ -186,19 +276,15 @@ export function createTabRenderer(stage) {
   // ── Technique glyphs (Guitar Pro-style tab marks) ───────────────────────────
   // h/p slur arc from the previous note on the string, / \ slide dash, bend
   // amount above the note, PM―― span over palm-muted runs. Rebuilt wholesale
-  // per render — glyphs connect notes across columns, so like the rhythm
-  // layer there is no per-note identity worth preserving. The stage has only
-  // ~4px of headroom above string 0 (same limit .tab-cursor lives with),
-  // hence the Math.max(-4, …) clamp on everything drawn above a note.
+  // per render. Rows clamp their own headroom (the ~4px above string 0).
   function renderGlyphs(state) {
     glyphs.textContent = '';
     const frag = document.createDocumentFragment();
     const sorted = [...state.notes].sort((a, b) => a.tick - b.tick || a.string - b.string);
 
-    // dead: × replaces the fret number on the note span itself. The keyed
-    // spans belong to the note reconcile — only label/class are adjusted
-    // here, in BOTH directions so a stale × never survives an un-toggle,
-    // and never while an inline fret edit is open inside the span.
+    // dead: × replaces the fret number on the note span itself. Adjusted in
+    // BOTH directions so a stale × never survives an un-toggle, and never
+    // while an inline fret edit is open inside the span.
     for (const n of sorted) {
       const el = noteEls.get(n.id);
       if (!el || el.querySelector('input')) continue;
@@ -217,77 +303,96 @@ export function createTabRenderer(stage) {
     for (const [s, list] of byString) {
       for (let i = 0; i < list.length; i++) {
         const n = list[i], t = n.tech || {};
-        const x = xForTick(n.tick), y = yForString(s);
+        const p = layout.pointFor(n.tick, s);
+        const rowTop = p.row * ROW_H;
+        const headClamp = (v) => Math.max(rowTop - 4, v);
         if (t.hp) {
           // slur arc from the previous note on the string; a phrase-opening
-          // hammer/pull gets a half-column stub arc instead
-          const from = i > 0 ? xForTick(list[i - 1].tick) + 5 : x - COL_W / 2;
+          // hammer/pull — or one whose partner sits on the previous row —
+          // gets a half-column stub arc instead
+          const prev = i > 0 ? list[i - 1] : null;
+          const sameRow = prev && layout.rowOf(prev.tick) === p.row;
+          const from = sameRow ? layout.pointFor(prev.tick, s).x + 5 : p.x - COL_W / 2;
           const el = document.createElement('i');
           el.className = 'tab-glyph hp';
           el.dataset.t = t.hp;
           el.style.left = `${from}px`;
-          el.style.width = `${Math.max(8, x - 5 - from)}px`;
-          el.style.top = `${Math.max(-4, y - 11)}px`;
+          el.style.width = `${Math.max(8, p.x - 5 - from)}px`;
+          el.style.top = `${headClamp(p.y - 11)}px`;
           frag.appendChild(el);
         }
         if (t.slide) {
           const el = document.createElement('i');
           el.className = `tab-glyph slide ${t.slide === '/' ? 'up' : 'down'}`;
-          el.style.left = `${x + 7}px`;
-          el.style.top = `${y - 3}px`;
+          el.style.left = `${p.x + 7}px`;
+          el.style.top = `${p.y - 3}px`;
           frag.appendChild(el);
         }
         if (t.bend) {
           const el = document.createElement('i');
           el.className = 'tab-glyph bend';
           el.textContent = t.bend === 1 ? 'full' : '½';
-          el.style.left = `${x + 6}px`;
-          el.style.top = `${Math.max(-4, y - 13)}px`;
+          el.style.left = `${p.x + 6}px`;
+          el.style.top = `${headClamp(p.y - 13)}px`;
           frag.appendChild(el);
         }
       }
     }
 
     // PM―― spans: palm-muted runs chain while consecutive muted columns are
-    // at most a beat apart; drawn in the bar-number band above the strings.
+    // at most a beat apart AND share a row; drawn in the bar-number band.
     const pmTicks = [...new Set(sorted.filter((n) => n.tech && n.tech.pm).map((n) => n.tick))];
     for (let i = 0; i < pmTicks.length; i++) {
       const start = pmTicks[i];
+      const row = layout.rowOf(start);
       let last = start;
-      while (i + 1 < pmTicks.length && pmTicks[i + 1] - pmTicks[i] <= PPQ) { i++; last = pmTicks[i]; }
+      while (i + 1 < pmTicks.length && pmTicks[i + 1] - pmTicks[i] <= PPQ && layout.rowOf(pmTicks[i + 1]) === row) {
+        i++; last = pmTicks[i];
+      }
+      const pa = layout.pointFor(start, 0), pb = layout.pointFor(last, 0);
       const el = document.createElement('i');
       el.className = 'tab-glyph pm';
       el.textContent = 'PM';
-      el.style.left = `${xForTick(start) - 6}px`;
-      el.style.width = `${Math.max(18, xForTick(last) - xForTick(start) + 12)}px`;
+      el.style.left = `${pa.x - 6}px`;
+      el.style.width = `${Math.max(18, pb.x - pa.x + 12)}px`;
+      el.style.top = `${row * ROW_H - 4}px`;
       frag.appendChild(el);
     }
     glyphs.appendChild(frag);
   }
 
   function render(state, ui) {
-    const lastEnd = state.notes.reduce((m, n) => Math.max(m, n.tick + n.durTicks), 0);
-    const uiTick = ui && ui.cursor ? ui.cursor.tick : 0;
-    const cols = Math.max(16, Math.ceil(Math.max(lastEnd, uiTick) / SIXTEENTH) + 16);
-    stage.style.width = `${cols * COL_W + 40}px`;
-    renderBars(state, cols);
+    layout = computeLayout(state, ui);
+    if (layout.ticksPerRow === Infinity) {
+      const cols = layout.totalTicks / SIXTEENTH;
+      stage.style.width = `${cols * COL_W + 40}px`;
+      stage.style.height = '';
+    } else {
+      stage.style.width = '';                          // min-width:100% from CSS
+      stage.style.height = `${layout.rows * ROW_H - 10}px`;
+    }
+    renderChrome(state);
     renderNotes(state);
     renderOverlays(ui);
     renderRhythm(state);
     renderGlyphs(state);
+    return layout;
   }
 
   function noteEl(id) { return noteEls.get(id) || null; }
+  function getLayout() { return layout; }
 
   function destroy() {
     stage.querySelectorAll('.tab-bar, .tab-barnum').forEach((el) => el.remove());
     for (const el of noteEls.values()) el.remove();
     noteEls.clear();
+    for (const el of selExtra) el.remove();
+    lines.remove();
     cellCursor.remove();
     selection.remove();
     rhythm.remove();
     glyphs.remove();
   }
 
-  return { render, noteEl, destroy };
+  return { render, noteEl, getLayout, destroy };
 }

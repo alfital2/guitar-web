@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  COL_W, LINE_GAP, xForTick, tickForX, yForString, stringForY, createTabRenderer,
+  COL_W, LINE_GAP, ROW_H, xForTick, tickForX, yForString, stringForY, createTabRenderer,
 } from '../src/tab/tab-render.js';
 
 const stateWith = (notes, timeSig = { num: 4, den: 4 }) => ({
@@ -100,15 +100,14 @@ describe('bars + width from the time signature', () => {
     expect(stage.querySelector('.tab-bar')).toBe(first);            // not rebuilt
   });
 
-  it('stage width grows past the last note end and covers the cursor', () => {
+  it('stage width covers whole bars past the content, plus one spare bar to type into', () => {
     const r = createTabRenderer(stage);
     r.render(stateWith([]), UI);
-    expect(stage.style.width).toBe(`${16 * COL_W + 40}px`);
+    expect(stage.style.width).toBe(`${(96 / 3) * COL_W + 40}px`);       // 2 empty bars
     r.render(stateWith([{ tick: 96, string: 0, fret: 0, durTicks: 12 }]), UI);
-    const cols = Math.ceil(108 / 3) + 16;
-    expect(stage.style.width).toBe(`${cols * COL_W + 40}px`);
+    expect(stage.style.width).toBe(`${(192 / 3) * COL_W + 40}px`);      // 3 bars content + 1 spare
     r.render(stateWith([]), { ...UI, cursor: { tick: 120, string: 0 } });
-    expect(stage.style.width).toBe(`${(40 + 16) * COL_W + 40}px`);
+    expect(stage.style.width).toBe(`${(192 / 3) * COL_W + 40}px`);      // cursor keeps room too
   });
 });
 
@@ -133,6 +132,59 @@ describe('overlays', () => {
     expect(sel.style.width).toBe(`${(9 / 3) * COL_W}px`);
     r.render(stateWith([]), UI);
     expect(sel.style.display).toBe('none');
+  });
+});
+
+describe('wrapped layout (bars flow into rows like paper tab)', () => {
+  const mountWrapped = (notes, viewWidth = 500) => {
+    const r = createTabRenderer(stage, { getViewWidth: () => viewWidth });
+    r.render(stateWith(notes), UI);
+    return r;
+  };
+
+  it('one bar per 500px row: bar 2 lands on row 1, same x as bar 1', () => {
+    const r = mountWrapped([{ tick: 48, string: 2, fret: 5 }]);         // bar 2, G string
+    const layout = r.getLayout();
+    expect(layout.ticksPerRow).toBe(48);
+    expect(layout.rows).toBe(3);                                        // 2 content bars + 1 spare
+    const el = stage.querySelector('.tab-note[data-id="1"]');
+    expect(el.style.left).toBe(`${xForTick(0)}px`);                     // x wraps back to column 0
+    expect(el.style.top).toBe(`${ROW_H + 2 * LINE_GAP}px`);             // row 1, string 2
+  });
+
+  it('cellAt inverts pointFor across rows (input clicks land on the right bar)', () => {
+    const r = mountWrapped([]);
+    const layout = r.getLayout();
+    const p = layout.pointFor(60, 3);                                   // bar 2, col 4
+    expect(p.row).toBe(1);
+    expect(layout.cellAt(p.x, p.y)).toEqual({ tick: 60, string: 3 });
+    expect(layout.cellAt(13, 5)).toEqual({ tick: 0, string: 0 });
+  });
+
+  it('string lines repeat per row; row starts get numbers, not lines', () => {
+    mountWrapped([{ tick: 48, string: 0, fret: 0 }]);
+    expect(stage.querySelectorAll('.tab-lines i')).toHaveLength(18);    // 3 rows × 6 strings
+    const nums = [...stage.querySelectorAll('.tab-barnum')].map((n) => [n.textContent, n.style.top]);
+    expect(nums).toContainEqual(['2', `${ROW_H - 2}px`]);               // bar 2 at row 1's head
+    expect(stage.querySelectorAll('.tab-bar')).toHaveLength(0);         // no internal boundaries at 1 bar/row
+  });
+
+  it('a selection spanning rows renders one rectangle per row', () => {
+    const r = createTabRenderer(stage, { getViewWidth: () => 500 });
+    r.render(stateWith([]), { ...UI, selection: { startTick: 24, endTick: 72 } });
+    const rects = stage.querySelectorAll('.tab-selection');
+    expect(rects).toHaveLength(2);
+    expect(rects[0].style.left).toBe(`${(24 / 3) * COL_W}px`);          // row 0 tail
+    expect(rects[0].style.width).toBe(`${(24 / 3) * COL_W}px`);
+    expect(rects[1].style.top).toBe(`${ROW_H - 4}px`);                  // row 1 head
+    expect(rects[1].style.width).toBe(`${(24 / 3) * COL_W}px`);
+  });
+
+  it('stems follow their note into the row (no absolute row-0 tops)', () => {
+    mountWrapped([{ tick: 60, string: 0, fret: 0, durTicks: 12 }]);
+    const stem = stage.querySelector('.tab-stem');
+    expect(stem.style.top).toBe(`${ROW_H + 78}px`);
+    expect(stem.style.left).toBe(`${xForTick(12)}px`);                  // col 4 within row 1
   });
 });
 

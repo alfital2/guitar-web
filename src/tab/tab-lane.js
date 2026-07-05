@@ -21,7 +21,7 @@ import {
   createTabModel, TUNING_PRESETS, SIXTEENTH, MAX_FRET,
   ticksToSec, durTicksFromSec, midiAt,
 } from './tab-model.js';
-import { createTabRenderer, COL_W, LINE_GAP } from './tab-render.js';
+import { createTabRenderer, COL_W, LINE_GAP, ROW_H } from './tab-render.js';
 import { attachTabInput } from './tab-input.js';
 import { can } from '../features.js';
 import { downloadLick, readLickFile, autosaveTab, loadAutosave, toAscii } from './tab-file.js';
@@ -63,10 +63,6 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
 
   const gutter = document.createElement('div');
   gutter.className = 'tab-gutter';
-  const lines = document.createElement('div');
-  lines.className = 'tab-lines';
-  lines.innerHTML = [0, 1, 2, 3, 4, 5].map((i) => `<i style="top:${i * LINE_GAP}px"></i>`).join('');
-  stage.appendChild(lines);
 
   // Playhead — ridden by the transport (real audio) and the tab MIDI player.
   const cursor = document.createElement('div');
@@ -79,7 +75,9 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   // ── model / renderer / input ────────────────────────────────────────────────
   const model = createTabModel({ tempo: bpm });
   const ui = { cursor: null, selection: null, currentDur: SIXTEENTH };
-  const renderer = createTabRenderer(stage);
+  // Wrapped layout: how many whole bars fit the visible strip decides the
+  // row length; the grid stacks rows instead of scrolling right forever.
+  const renderer = createTabRenderer(stage, { getViewWidth: () => scroll.clientWidth });
 
   let changeCb = null;
   let suppress = 0;               // >0 while seeding programmatically — no onChange
@@ -159,9 +157,6 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
     const refresh = (s) => {
       tunSel.value = s.tuning;
       if (document.activeElement !== capoIn) capoIn.value = s.capo ? String(s.capo) : '';
-      // gutter names in display order (high → low), same geometry as the lines
-      gutter.innerHTML = TUNING_PRESETS[s.tuning].names
-        .map((n, i) => `<i style="top:${i * LINE_GAP}px">${n}</i>`).join('');
     };
     tunSel.addEventListener('change', () => {
       if (!can('tab.edit')) { refresh(model.getState()); return; }
@@ -194,8 +189,22 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
     });
   }
 
+  // Gutter string names, repeated once per wrapped row.
+  function renderGutter(state) {
+    const layout = renderer.getLayout();
+    const names = TUNING_PRESETS[state.tuning].names;
+    const rows = layout ? layout.rows : 1;
+    let html = '';
+    for (let r = 0; r < rows; r++) {
+      html += names.map((n, i) => `<i style="top:${r * ROW_H + i * LINE_GAP}px">${n}</i>`).join('');
+    }
+    gutter.innerHTML = html;
+    gutter.style.height = `${rows * ROW_H}px`;
+  }
+
   function onModelChange(state) {
     renderer.render(state, ui);
+    renderGutter(state);
     rebuildPlayIndex(state);
     if (!suppress && changeCb) changeCb(api.serialize());
   }
@@ -250,7 +259,7 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
     el.classList.add('invalid');
   }
 
-  const input = attachTabInput({ scrollEl: scroll, stage, model, ui, requestRender, onEditFret: beginEdit });
+  const input = attachTabInput({ scrollEl: scroll, stage, model, ui, requestRender, onEditFret: beginEdit, renderer });
 
   // ── playhead (transport audio OR the tab's own MIDI player) ────────────────
   function ensureWidthFor(x) {
@@ -261,17 +270,25 @@ export function mountTabLane(container, { bpm = 120 } = {}) {
   function setPlayhead(tSec) {
     if (tSec == null || tSec < 0) { hidePlayhead(); return; }
     const state = model.getState();
-    const colF = tSec * (state.tempo / 60) * 4;          // seconds → 16th columns
-    const x = colF * COL_W + COL_W / 2;
-    ensureWidthFor(x);
-    cursor.style.transform = `translateX(${x}px)`;
+    const layout = renderer.getLayout();
+    const tickF = tSec * (state.tempo / 60) * 12;        // seconds → ticks (fractional)
+    const wrapped = layout && layout.ticksPerRow !== Infinity;
+    const p = layout ? layout.pointFor(tickF, 0) : { x: (tickF / 3) * COL_W + COL_W / 2, y: 0, row: 0 };
+    if (!wrapped) ensureWidthFor(p.x);
+    // row 0 keeps the historical translateX form (pinned by the v1 tests)
+    cursor.style.transform = p.row ? `translate(${p.x}px, ${p.row * ROW_H}px)` : `translateX(${p.x}px)`;
     cursor.style.opacity = '1';
     for (const w of playIndex) {
       const el = renderer.noteEl(w.id);
       if (el) el.classList.toggle('playing', tSec >= w.t0 && tSec < w.t1);
     }
-    if (x < scroll.scrollLeft + 24 || x > scroll.scrollLeft + scroll.clientWidth - 40) {
-      scroll.scrollLeft = Math.max(0, x - scroll.clientWidth * 0.4);
+    if (wrapped) {
+      const top = p.row * ROW_H;
+      if (top < scroll.scrollTop || top + ROW_H > scroll.scrollTop + scroll.clientHeight) {
+        scroll.scrollTop = Math.max(0, top - 20);
+      }
+    } else if (p.x < scroll.scrollLeft + 24 || p.x > scroll.scrollLeft + scroll.clientWidth - 40) {
+      scroll.scrollLeft = Math.max(0, p.x - scroll.clientWidth * 0.4);
     }
   }
   function hidePlayhead() {

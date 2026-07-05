@@ -26,8 +26,19 @@ import { can } from '../features.js';
 const DRAG_THRESH = 4;            // px before a pointerdown counts as a drag
 const DIGIT_MS = 600;             // window to combine two digits into 10–24
 
-export function attachTabInput({ scrollEl, stage, model, ui, requestRender, onEditFret }) {
+export function attachTabInput({ scrollEl, stage, model, ui, requestRender, onEditFret, renderer = null }) {
   stage.tabIndex = 0;             // stage receives keyboard focus
+
+  // Geometry: through the renderer's wrapped layout when provided (rows of
+  // whole bars); otherwise the classic single-row math (tests, headless).
+  const cellAtPoint = (x, y) => {
+    const layout = renderer && renderer.getLayout && renderer.getLayout();
+    return layout ? layout.cellAt(x, y) : { tick: tickForX(x), string: stringForY(y) };
+  };
+  const pointForCell = (tick, string) => {
+    const layout = renderer && renderer.getLayout && renderer.getLayout();
+    return layout ? layout.pointFor(tick, string) : { x: xForTick(tick), y: yForString(string), row: 0 };
+  };
 
   let clipboard = null;           // copyRange payload
   let selAnchor = null;           // tick where a Shift-selection started
@@ -249,7 +260,7 @@ export function attachTabInput({ scrollEl, stage, model, ui, requestRender, onEd
 
   const cellFromEvent = (e) => {
     const rect = stage.getBoundingClientRect();
-    return { tick: tickForX(e.clientX - rect.left), string: stringForY(e.clientY - rect.top) };
+    return cellAtPoint(e.clientX - rect.left, e.clientY - rect.top);
   };
 
   function shake(el) {
@@ -277,8 +288,9 @@ export function attachTabInput({ scrollEl, stage, model, ui, requestRender, onEd
     const cell = cellFromEvent(e);
     if (press.kind === 'note') {
       // live preview only — state moves on release, render restores truth
-      press.el.style.left = `${xForTick(cell.tick)}px`;
-      press.el.style.top = `${yForString(cell.string)}px`;
+      const p = pointForCell(cell.tick, cell.string);
+      press.el.style.left = `${p.x}px`;
+      press.el.style.top = `${p.y}px`;
       press.cell = cell;
     } else {
       const from = cellFromEvent({ clientX: press.x0, clientY: press.y0 });
